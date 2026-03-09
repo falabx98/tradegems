@@ -1,0 +1,28 @@
+{
+  "name": "@tradingarena/workers",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tradingarena/shared-types": "*",
+    "@tradingarena/db": "*",
+    "@tradingarena/game-engine": "*",
+    "bullmq": "^5.46.0",
+    "ioredis": "^5.6.0",
+    "drizzle-orm": "^0.39.0",
+    "postgres": "^3.4.7",
+    "pino": "^9.6.0",
+    "dotenv": "^16.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "tsx": "^4.19.0",
+    "typescript": "~5.9.3"
+  }
+}

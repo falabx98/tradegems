@@ -1,0 +1,320 @@
+import { create } from 'zustand';
+import {
+  RoundConfig,
+  RoundPhase,
+  RoundResult,
+  RiskTier,
+  GameMode,
+  PlayerProfile,
+  GameNode,
+} from '../types/game';
+import { generateRound, simulateRound, getPhase } from '../engine/roundEngine';
+import {
+  DEFAULT_ENGINE_CONFIG,
+  getBetTier,
+  computeNodeEffect,
+} from '../engine/engineConfig';
+import type { EngineConfig } from '../engine/engineConfig';
+import { api } from '../utils/api';
+
+interface GameState {
+  // Current view
+  screen: 'landing' | 'lobby' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings';
+  mode: GameMode;
+
+  // Round state
+  roundConfig: RoundConfig | null;
+  phase: RoundPhase;
+  elapsed: number;
+  isRunning: boolean;
+
+  // Server round tracking
+  serverRoundId: string | null;
+  betPlaced: boolean;
+
+  // Player choices
+  betAmount: number;
+  riskTier: RiskTier;
+
+  // Live state during round
+  currentMultiplier: number;
+  shields: number;
+  activatedNodeIds: Set<string>;
+  missedNodeIds: Set<string>;
+  nearMissNodeIds: Set<string>;
+
+  // Engine config
+  engineConfig: EngineConfig;
+
+  // Result
+  result: RoundResult | null;
+
+  // Player profile
+  profile: PlayerProfile;
+
+  // Actions
+  setScreen: (screen: GameState['screen']) => void;
+  setMode: (mode: GameMode) => void;
+  setBetAmount: (amount: number) => void;
+  setRiskTier: (tier: RiskTier) => void;
+  startRound: () => void;
+  updateElapsed: (elapsed: number) => void;
+  activateNode: (node: GameNode) => void;
+  missNode: (node: GameNode) => void;
+  nearMissNode: (node: GameNode) => void;
+  endRound: () => void;
+  resetRound: () => void;
+  playAgain: () => void;
+  syncProfile: () => Promise<void>;
+}
+
+const DEFAULT_PROFILE: PlayerProfile = {
+  id: 'local-player',
+  username: 'Player',
+  level: 1,
+  xp: 0,
+  xpToNext: 100,
+  vipTier: 'bronze',
+  rakebackRate: 0.01,
+  balance: 0, // lamports
+  totalWagered: 0,
+  totalWon: 0,
+  roundsPlayed: 0,
+  winRate: 0,
+  streak: 0,
+  bestMultiplier: 1.0,
+};
+
+export const useGameStore = create<GameState>((set, get) => ({
+  screen: 'landing',
+  mode: 'solo',
+  roundConfig: null,
+  phase: 'pre',
+  elapsed: 0,
+  isRunning: false,
+  serverRoundId: null,
+  betPlaced: false,
+  betAmount: 100_000_000, // 0.1 SOL in lamports
+  riskTier: 'balanced',
+  currentMultiplier: 1.0,
+  shields: 0,
+  activatedNodeIds: new Set(),
+  missedNodeIds: new Set(),
+  nearMissNodeIds: new Set(),
+  engineConfig: DEFAULT_ENGINE_CONFIG,
+  result: null,
+  profile: DEFAULT_PROFILE,
+
+  setScreen: (screen) => set({ screen }),
+  setMode: (mode) => set({ mode }),
+  setBetAmount: (amount) => set({ betAmount: amount }),
+  setRiskTier: (tier) => set({ riskTier: tier }),
+
+  startRound: () => {
+    const state = get();
+
+    // Generate round locally (deterministic engine)
+    const config = generateRound(undefined, state.engineConfig);
+
+    set({
+      roundConfig: config,
+      phase: 'opening',
+      elapsed: 0,
+      isRunning: true,
+      currentMultiplier: 1.0,
+      shields: 0,
+      activatedNodeIds: new Set(),
+      missedNodeIds: new Set(),
+      nearMissNodeIds: new Set(),
+      result: null,
+      screen: 'playing',
+      betPlaced: false,
+      serverRoundId: null,
+    });
+
+    // Place bet on server in background (non-blocking)
+    (async () => {
+      try {
+        // Schedule a dev round and place bet
+        const round = await api.scheduleRound() as any;
+        const roundId = round.id;
+
+        const idempotencyKey = `${roundId}-${Date.now()}`;
+        await api.placeBet(roundId, {
+          amount: state.betAmount, // already in lamports
+          riskTier: state.riskTier,
+          idempotencyKey,
+        });
+
+        set({ serverRoundId: roundId, betPlaced: true });
+      } catch (err) {
+        console.warn('Server bet placement failed (playing locally):', err);
+      }
+    })();
+  },
+
+  updateElapsed: (elapsed) => {
+    const phase = getPhase(elapsed);
+    set({ elapsed, phase });
+  },
+
+  activateNode: (node) => {
+    const state = get();
+    const newActivated = new Set(state.activatedNodeIds);
+    newActivated.add(node.id);
+
+    const modifier = state.roundConfig?.riskModifiers[state.riskTier];
+    const engineCfg = state.roundConfig?.engineConfig ?? state.engineConfig;
+    if (!modifier) return;
+
+    const betTier = getBetTier(state.betAmount, engineCfg);
+    const { newMultiplier, newShields } = computeNodeEffect(
+      node, state.currentMultiplier, state.shields,
+      modifier, betTier,
+    );
+
+    // Clamp to max
+    const maxMult = engineCfg.maxFinalMultiplier;
+    const clampedMultiplier = Math.max(0, Math.min(maxMult, newMultiplier));
+
+    set({
+      activatedNodeIds: newActivated,
+      currentMultiplier: clampedMultiplier,
+      shields: newShields,
+    });
+  },
+
+  missNode: (node) => {
+    const state = get();
+    const newMissed = new Set(state.missedNodeIds);
+    newMissed.add(node.id);
+    set({ missedNodeIds: newMissed });
+  },
+
+  nearMissNode: (node) => {
+    const state = get();
+    const newNearMissed = new Set(state.nearMissNodeIds);
+    newNearMissed.add(node.id);
+    set({ nearMissNodeIds: newNearMissed });
+  },
+
+  endRound: () => {
+    const state = get();
+    if (!state.roundConfig) return;
+
+    const result = simulateRound(state.roundConfig, state.betAmount, state.riskTier);
+
+    // Update profile locally
+    const profile = { ...state.profile };
+    profile.roundsPlayed++;
+    profile.totalWagered += state.betAmount;
+    profile.totalWon += result.payout;
+    profile.xp += result.xpGained;
+    profile.balance += result.payout - state.betAmount;
+    if (result.finalMultiplier > profile.bestMultiplier) {
+      profile.bestMultiplier = result.finalMultiplier;
+    }
+    if (profile.xp >= profile.xpToNext) {
+      profile.level++;
+      profile.xp -= profile.xpToNext;
+      profile.xpToNext = Math.floor(profile.xpToNext * 1.3);
+    }
+    profile.winRate = profile.totalWon / Math.max(profile.totalWagered, 1);
+
+    set({
+      phase: 'frozen',
+      isRunning: false,
+      result,
+      screen: 'result',
+      profile,
+    });
+
+    // Resolve on server in background and sync real balance
+    (async () => {
+      const { serverRoundId, betPlaced } = get();
+      if (serverRoundId && betPlaced) {
+        try {
+          // Resolve dev round server-side
+          await api.devResolveRound(serverRoundId);
+          // Sync real profile from server
+          await get().syncProfile();
+        } catch (err) {
+          console.warn('Server round resolution failed:', err);
+        }
+      }
+    })();
+  },
+
+  resetRound: () => {
+    set({
+      roundConfig: null,
+      phase: 'pre',
+      elapsed: 0,
+      isRunning: false,
+      currentMultiplier: 1.0,
+      shields: 0,
+      activatedNodeIds: new Set(),
+      missedNodeIds: new Set(),
+      nearMissNodeIds: new Set(),
+      result: null,
+      screen: 'lobby',
+      serverRoundId: null,
+      betPlaced: false,
+    });
+  },
+
+  playAgain: () => {
+    set({
+      roundConfig: null,
+      phase: 'pre',
+      elapsed: 0,
+      isRunning: false,
+      currentMultiplier: 1.0,
+      shields: 0,
+      activatedNodeIds: new Set(),
+      missedNodeIds: new Set(),
+      nearMissNodeIds: new Set(),
+      result: null,
+      screen: 'setup',
+      serverRoundId: null,
+      betPlaced: false,
+    });
+  },
+
+  syncProfile: async () => {
+    try {
+      const [me, balances] = await Promise.all([
+        api.getMe(),
+        api.getBalances(),
+      ]);
+
+      const solBalance = balances.balances?.find((b: any) => b.asset === 'SOL');
+      const availableLamports = solBalance ? parseInt(solBalance.available) : 0;
+
+      let stats: any = {};
+      try {
+        stats = await api.getMyStats();
+      } catch {
+        // Stats endpoint might not return data for new users
+      }
+
+      set((state) => ({
+        profile: {
+          ...state.profile,
+          id: me.id,
+          username: me.username || state.profile.username,
+          level: me.level || state.profile.level,
+          vipTier: (me.vipTier as any) || state.profile.vipTier,
+          balance: availableLamports, // stored as lamports
+          totalWagered: stats.totalWagered || state.profile.totalWagered,
+          totalWon: stats.totalWon || state.profile.totalWon,
+          roundsPlayed: stats.roundsPlayed || state.profile.roundsPlayed,
+          winRate: stats.winRate || state.profile.winRate,
+          bestMultiplier: stats.bestMultiplier ? parseFloat(stats.bestMultiplier) : state.profile.bestMultiplier,
+        },
+      }));
+    } catch (err) {
+      console.warn('Profile sync failed:', err);
+    }
+  },
+}));

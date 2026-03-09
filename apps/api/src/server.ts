@@ -28,9 +28,11 @@ export async function buildServer() {
 
   // ─── Plugins ─────────────────────────────────────────────
   await server.register(cors, {
-    origin: env.NODE_ENV === 'production'
-      ? ['https://tradingarena.gg']
-      : true,
+    origin: env.CORS_ORIGINS
+      ? env.CORS_ORIGINS.split(',').map(s => s.trim())
+      : env.NODE_ENV === 'production'
+        ? false
+        : true,
     credentials: true,
   });
 

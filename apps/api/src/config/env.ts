@@ -20,6 +20,7 @@ const envSchema = z.object({
   TREASURY_PRIVATE_KEY: z.string().optional(),
   SOLANA_REQUIRED_CONFIRMATIONS: z.coerce.number().default(1),
   WITHDRAWAL_FEE_LAMPORTS: z.coerce.number().default(5000),
+  CORS_ORIGINS: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

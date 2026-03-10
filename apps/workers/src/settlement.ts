@@ -1,6 +1,6 @@
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
-import { eq, sql } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import {
   createDb, rounds, bets, betResults, roundPools,
@@ -64,9 +64,9 @@ export class SettlementWorker {
 
     const config = generateRound(round.seed, DEFAULT_ENGINE_CONFIG);
 
-    // Get all bets for this round
+    // Get only active (unsettled) bets — prevents double-settlement
     const allBets = await this.db.query.bets.findMany({
-      where: eq(bets.roundId, roundId),
+      where: and(eq(bets.roundId, roundId), eq(bets.status, 'active')),
     });
 
     if (allBets.length === 0) {
@@ -112,14 +112,23 @@ export class SettlementWorker {
         });
 
         // Settle balance: unlock locked funds + credit payout
+        // Guard: only update if locked_amount is sufficient (prevents double-settlement)
         const totalLocked = bet.amount + bet.fee;
-        await this.db.execute(sql`
+        const updateResult = await this.db.execute(sql`
           UPDATE balances
           SET locked_amount = locked_amount - ${totalLocked},
               available_amount = available_amount + ${payoutLamports},
               updated_at = now()
           WHERE user_id = ${bet.userId} AND asset = 'SOL'
+            AND locked_amount >= ${totalLocked}
         `);
+
+        // If no row was updated, skip — already settled or insufficient locked funds
+        const rowsAffected = (updateResult as any)?.rowCount ?? (updateResult as any)?.length ?? 1;
+        if (rowsAffected === 0) {
+          this.logger.warn({ betId: bet.id, userId: bet.userId }, 'Settlement skipped — insufficient locked funds (possible double-settlement)');
+          continue;
+        }
 
         // Query actual balance for ledger entries
         const bal = await this.db.query.balances.findFirst({

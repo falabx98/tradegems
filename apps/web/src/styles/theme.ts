@@ -101,15 +101,15 @@ export const theme = {
 
   // Font sizes
   fontSize: {
-    xs: '0.75rem',
-    sm: '0.8125rem',
-    base: '0.875rem',
-    md: '1rem',
-    lg: '1.25rem',
-    xl: '1.5rem',
-    '2xl': '2rem',
-    '3xl': '2.5rem',
-    '4xl': '3.5rem',
+    xs: '0.8125rem',
+    sm: '0.875rem',
+    base: '1rem',
+    md: '1.125rem',
+    lg: '1.375rem',
+    xl: '1.625rem',
+    '2xl': '2.25rem',
+    '3xl': '2.75rem',
+    '4xl': '3.75rem',
     hero: '5rem',
   },
 

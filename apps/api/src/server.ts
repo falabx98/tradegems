@@ -38,6 +38,8 @@ export async function buildServer() {
         ? false
         : true,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   });
 
   await server.register(jwt, {
@@ -65,6 +67,25 @@ export async function buildServer() {
     timestamp: new Date().toISOString(),
     version: '0.0.1',
   }));
+
+  // ─── SOL Price Proxy (avoids CoinGecko CORS) ────────────
+  let cachedSolPrice = { usd: 0, ts: 0 };
+  server.get('/v1/sol-price', async () => {
+    const now = Date.now();
+    if (now - cachedSolPrice.ts < 30_000 && cachedSolPrice.usd > 0) {
+      return { solana: { usd: cachedSolPrice.usd } };
+    }
+    try {
+      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+      const data = await res.json() as { solana?: { usd?: number } };
+      if (data?.solana?.usd) {
+        cachedSolPrice = { usd: data.solana.usd, ts: now };
+      }
+      return data;
+    } catch {
+      return { solana: { usd: cachedSolPrice.usd || 0 } };
+    }
+  });
 
   // ─── Routes ──────────────────────────────────────────────
   await server.register(authRoutes, { prefix: '/v1/auth' });

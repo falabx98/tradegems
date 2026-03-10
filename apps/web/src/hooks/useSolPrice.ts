@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
-const COINGECKO_URL =
-  'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const SOL_PRICE_URL = `${API_BASE}/v1/sol-price`;
 const POLL_INTERVAL = 30_000;
 
 export function useSolPrice() {
@@ -14,7 +14,7 @@ export function useSolPrice() {
 
     async function fetchPrice() {
       try {
-        const res = await fetch(COINGECKO_URL);
+        const res = await fetch(SOL_PRICE_URL);
         if (!res.ok) return;
         const data = await res.json();
         if (!cancelled && data?.solana?.usd) {

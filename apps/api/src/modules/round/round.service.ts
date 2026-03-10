@@ -184,7 +184,7 @@ export class RoundService {
         userId: bet.userId,
         roundId,
         finalMultiplier: String(result.finalMultiplier),
-        finalScore: String(result.payout),
+        finalScore: String(result.payout / 1e9), // Convert lamports to SOL for numeric(12,4) column
         payoutAmount: payoutLamports,
         xpAwarded: result.xpGained,
         nodesHit: result.nodesHit.length,

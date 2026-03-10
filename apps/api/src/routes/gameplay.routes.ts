@@ -5,7 +5,7 @@ import { RoundService } from '../modules/round/round.service.js';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
 
 const placeBetSchema = z.object({
-  amount: z.number().int().positive().min(500).max(100000), // 500 cents = $5 to $1000
+  amount: z.number().int().positive().min(1_000_000).max(10_000_000_000), // 0.001 SOL to 10 SOL in lamports
   riskTier: z.enum(['conservative', 'balanced', 'aggressive']),
   idempotencyKey: z.string().min(1).max(128),
 });
@@ -76,21 +76,19 @@ export async function gameplayRoutes(server: FastifyInstance) {
     return { data: results };
   });
 
-  // ─── Dev: manually trigger round cycle ───────────────────
-  if (process.env.NODE_ENV === 'development') {
-    server.post('/dev/schedule', { preHandler: [requireAuth] }, async () => {
-      const round = await roundService.scheduleRound('solo', 10000);
-      await roundService.openEntry(round.id);
-      return round;
-    });
+  // ─── Round lifecycle (solo mode) ─────────────────────────
+  server.post('/dev/schedule', { preHandler: [requireAuth] }, async () => {
+    const round = await roundService.scheduleRound('solo', 10000);
+    await roundService.openEntry(round.id);
+    return round;
+  });
 
-    server.post('/dev/resolve/:id', { preHandler: [requireAuth] }, async (request) => {
-      const { id } = request.params as { id: string };
-      await roundService.generateRoundPayload(id);
-      await roundService.startRound(id);
-      await roundService.freezeRound(id);
-      await roundService.resolveRound(id);
-      return { message: 'Round resolved', roundId: id };
-    });
-  }
+  server.post('/dev/resolve/:id', { preHandler: [requireAuth] }, async (request) => {
+    const { id } = request.params as { id: string };
+    await roundService.generateRoundPayload(id);
+    await roundService.startRound(id);
+    await roundService.freezeRound(id);
+    await roundService.resolveRound(id);
+    return { message: 'Round resolved', roundId: id };
+  });
 }

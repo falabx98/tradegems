@@ -19,7 +19,7 @@ import { api } from '../utils/api';
 
 interface GameState {
   // Current view
-  screen: 'landing' | 'lobby' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings';
+  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings';
   mode: GameMode;
 
   // Round state
@@ -86,7 +86,7 @@ const DEFAULT_PROFILE: PlayerProfile = {
 };
 
 export const useGameStore = create<GameState>((set, get) => ({
-  screen: 'landing',
+  screen: 'lobby',
   mode: 'solo',
   roundConfig: null,
   phase: 'pre',

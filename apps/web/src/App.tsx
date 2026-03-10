@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useGameStore } from './stores/gameStore';
 import { useAuthStore } from './stores/authStore';
 import { AppLayout } from './components/layout/AppLayout';
-import { LandingScreen } from './components/screens/LandingScreen';
 import { AuthScreen } from './components/screens/AuthScreen';
 import { LobbyScreen } from './components/screens/LobbyScreen';
 import { PlayingScreen } from './components/screens/PlayingScreen';
@@ -40,23 +39,8 @@ export default function App() {
     );
   }
 
-  // Landing screen: show to everyone, transitions to auth or lobby
-  if (screen === 'landing') {
-    return (
-      <div style={{ minHeight: '100vh', background: '#0a0b0f' }}>
-        <LandingScreen onEnter={() => {
-          if (isAuthenticated) {
-            setScreen('lobby');
-          } else {
-            setScreen('auth' as any);
-          }
-        }} />
-      </div>
-    );
-  }
-
-  // Auth screen
-  if ((screen as string) === 'auth' || (!isAuthenticated && (screen as string) !== 'landing')) {
+  // Auth screen (only shown when user explicitly navigates here)
+  if (screen === 'auth') {
     return (
       <div style={{ minHeight: '100vh', background: '#0a0b0f' }}>
         <AuthScreen onSuccess={() => {

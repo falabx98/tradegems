@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
+import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useSolPrice } from '../../hooks/useSolPrice';
 import { theme } from '../../styles/theme';
@@ -8,6 +9,7 @@ import { formatSol } from '../../utils/sol';
 export function TopBar() {
   const profile = useGameStore((s) => s.profile);
   const setScreen = useGameStore((s) => s.setScreen);
+  const { isAuthenticated } = useAuthStore();
   const isMobile = useIsMobile();
   const { price } = useSolPrice();
   const [showUsd, setShowUsd] = useState(false);
@@ -35,41 +37,52 @@ export function TopBar() {
       )}
 
       <div style={styles.right}>
-        <div
-          style={styles.balanceBox}
-          onMouseEnter={() => !isMobile && setShowUsd(true)}
-          onMouseLeave={() => !isMobile && setShowUsd(false)}
-          onClick={() => isMobile && setShowUsd((v) => !v)}
-        >
-          <span style={styles.balanceLabel}>Balance</span>
-          <div style={styles.balanceRow}>
-            <img src="/sol-coin.png" alt="SOL" style={styles.solIcon} />
-            <span style={styles.balanceValue} className="mono">
-              {formatSol(profile.balance)}
-            </span>
-          </div>
-          {showUsd && usdValue && (
-            <span style={styles.usdValue} className="mono">
-              ≈ ${usdValue}
-            </span>
-          )}
-        </div>
-
-        <button style={styles.depositBtn} onClick={() => setScreen('wallet')}>Deposit</button>
-
-        <div style={styles.profilePill} className="profile-glow">
-          <div style={styles.avatar}>
-            {profile.username.charAt(0).toUpperCase()}
-          </div>
-          {!isMobile && (
-            <div style={styles.profileInfo}>
-              <span style={styles.profileName}>{profile.username}</span>
-              <span style={styles.profileTier}>
-                Lvl {profile.level} · {profile.vipTier}
-              </span>
+        {isAuthenticated ? (
+          <>
+            <div
+              style={styles.balanceBox}
+              onMouseEnter={() => !isMobile && setShowUsd(true)}
+              onMouseLeave={() => !isMobile && setShowUsd(false)}
+              onClick={() => isMobile && setShowUsd((v) => !v)}
+            >
+              <span style={styles.balanceLabel}>Balance</span>
+              <div style={styles.balanceRow}>
+                <img src="/sol-coin.png" alt="SOL" style={styles.solIcon} />
+                <span style={styles.balanceValue} className="mono">
+                  {formatSol(profile.balance)}
+                </span>
+              </div>
+              {showUsd && usdValue && (
+                <span style={styles.usdValue} className="mono">
+                  ≈ ${usdValue}
+                </span>
+              )}
             </div>
-          )}
-        </div>
+
+            <button style={styles.depositBtn} onClick={() => setScreen('wallet')}>Deposit</button>
+
+            <div style={styles.profilePill} className="profile-glow">
+              <div style={styles.avatar}>
+                {profile.username.charAt(0).toUpperCase()}
+              </div>
+              {!isMobile && (
+                <div style={styles.profileInfo}>
+                  <span style={styles.profileName}>{profile.username}</span>
+                  <span style={styles.profileTier}>
+                    Lvl {profile.level} · {profile.vipTier}
+                  </span>
+                </div>
+              )}
+            </div>
+          </>
+        ) : (
+          <button
+            style={styles.depositBtn}
+            onClick={() => setScreen('auth')}
+          >
+            Login
+          </button>
+        )}
       </div>
     </header>
   );

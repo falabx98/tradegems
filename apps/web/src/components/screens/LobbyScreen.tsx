@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
+import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 import { RiskTier } from '../../types/game';
@@ -44,8 +45,10 @@ function timeAgo(dateStr: string) {
 
 export function LobbyScreen() {
   const isMobile = useIsMobile();
-  const { mode, setMode, betAmount, setBetAmount, riskTier, setRiskTier, startRound, profile, syncProfile } = useGameStore();
+  const { mode, setMode, betAmount, setBetAmount, riskTier, setRiskTier, startRound, profile, syncProfile, setScreen } = useGameStore();
+  const { isAuthenticated } = useAuthStore();
   const [crediting, setCrediting] = useState(false);
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [activityFeed, setActivityFeed] = useState<FeedItem[]>([]);
   const [liveStats, setLiveStats] = useState({ active: 0, volume: '0', topWin: '1.0x' });
 
@@ -195,8 +198,14 @@ export function LobbyScreen() {
 
           {/* Start Round Button — Duolingo 3D style */}
           <button
-            onClick={startRound}
-            disabled={betAmount > profile.balance}
+            onClick={() => {
+              if (!isAuthenticated) {
+                setShowAuthPrompt(true);
+                return;
+              }
+              startRound();
+            }}
+            disabled={isAuthenticated && betAmount > profile.balance}
             className="btn-3d btn-3d-primary"
             style={{
               display: 'flex',
@@ -206,7 +215,7 @@ export function LobbyScreen() {
               padding: '14px 24px',
               fontSize: '14px',
               width: '100%',
-              opacity: betAmount > profile.balance ? 0.4 : 1,
+              opacity: isAuthenticated && betAmount > profile.balance ? 0.4 : 1,
             }}
           >
             <span style={styles.executeBtnText}>
@@ -217,6 +226,29 @@ export function LobbyScreen() {
               {formatSol(betAmount)} · {riskTier}
             </span>
           </button>
+
+          {/* Auth prompt overlay */}
+          {showAuthPrompt && (
+            <div style={styles.authOverlay} onClick={() => setShowAuthPrompt(false)}>
+              <div style={styles.authModal} onClick={(e) => e.stopPropagation()}>
+                <span style={styles.authTitle}>Sign in to play</span>
+                <span style={styles.authDesc}>Create an account or sign in to start trading rounds.</span>
+                <button
+                  className="btn-3d btn-3d-primary"
+                  style={{ padding: '12px 24px', fontSize: '14px', width: '100%' }}
+                  onClick={() => { setShowAuthPrompt(false); setScreen('auth'); }}
+                >
+                  Sign in / Register
+                </button>
+                <button
+                  style={styles.authDismiss}
+                  onClick={() => setShowAuthPrompt(false)}
+                >
+                  Maybe later
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right column: Activity & Stats */}
@@ -725,5 +757,50 @@ const styles: Record<string, React.CSSProperties> = {
     color: theme.text.primary,
     display: 'flex',
     alignItems: 'center',
+  },
+
+  // Auth prompt
+  authOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0,0,0,0.6)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    animation: 'fadeIn 0.2s ease',
+  },
+  authModal: {
+    background: theme.bg.secondary,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: '12px',
+    padding: '24px',
+    maxWidth: '340px',
+    width: '90%',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '12px',
+    textAlign: 'center' as const,
+  },
+  authTitle: {
+    fontSize: '16px',
+    fontWeight: 700,
+    color: theme.text.primary,
+  },
+  authDesc: {
+    fontSize: '13px',
+    fontWeight: 500,
+    color: theme.text.muted,
+    lineHeight: 1.4,
+  },
+  authDismiss: {
+    padding: '8px',
+    background: 'transparent',
+    border: 'none',
+    cursor: 'pointer',
+    fontFamily: 'Inter, sans-serif',
+    fontSize: '12px',
+    fontWeight: 500,
+    color: theme.text.muted,
   },
 };

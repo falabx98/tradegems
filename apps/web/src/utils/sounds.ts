@@ -184,7 +184,7 @@ export function playDividerHit(value: number = 1.4) {
   g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
 
   // Distortion for grit
-  const dist = ctx.createWaveShaperFunction ? null : null; // Use filter instead
+  const dist = (ctx as any).createWaveShaper ? null : null; // Use filter instead
   const filter = ctx.createBiquadFilter();
   filter.type = 'lowpass';
   filter.frequency.value = 800;

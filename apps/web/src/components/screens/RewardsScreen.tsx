@@ -121,7 +121,7 @@ export function RewardsScreen() {
                   <div style={styles.missionReward}>
                     <span style={styles.rewardLabel}>Reward</span>
                     <span style={styles.rewardValue} className="mono">
-                      <img src="/sol-coin.png" alt="SOL" style={{ width: '18px', height: '18px', marginRight: '4px', verticalAlign: 'middle' }} />
+                      <img src="/sol-coin.png" alt="SOL" style={{ width: '26px', height: '26px', marginRight: '4px', verticalAlign: 'middle' }} />
                       {formatReward(m.reward)}
                     </span>
                   </div>

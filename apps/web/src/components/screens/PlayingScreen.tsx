@@ -131,7 +131,7 @@ export function PlayingScreen() {
             <div data-count style={styles.countdownNumber} className="mono">3</div>
             <div style={styles.countdownLabel}>Get ready</div>
             <div style={styles.countdownMeta}>
-              <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px' }} />
+              <img src="/sol-coin.png" alt="SOL" style={{ width: '24px', height: '24px' }} />
               <span className="mono">{formatSol(betAmount)}</span>
               <span style={styles.countdownDivider}>·</span>
               <span>{riskTier}</span>

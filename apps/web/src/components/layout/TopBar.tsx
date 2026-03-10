@@ -20,21 +20,8 @@ export function TopBar() {
   return (
     <header style={styles.bar}>
       <div style={styles.logoGroup}>
-        <div style={styles.logoMark}>TA</div>
-        {!isMobile && (
-          <div style={styles.logoText}>
-            <span style={styles.logoTitle}>Trading Arena</span>
-            <span style={styles.logoSub}>v0.1 alpha</span>
-          </div>
-        )}
+        <img src="/logo.png" alt="Trading Arena" style={styles.logoImg} />
       </div>
-
-      {!isMobile && (
-        <div style={styles.center}>
-          <div style={styles.liveDot} />
-          <span style={styles.liveText}>LIVE</span>
-        </div>
-      )}
 
       <div style={styles.right}>
         {isAuthenticated ? (
@@ -93,7 +80,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    height: '52px',
+    height: '64px',
     padding: '0 16px',
     background: theme.bg.secondary,
     borderBottom: `1px solid ${theme.border.subtle}`,
@@ -105,50 +92,10 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '10px',
   },
-  logoMark: {
-    width: '30px',
-    height: '30px',
-    borderRadius: '8px',
-    background: `rgba(153, 69, 255, 0.1)`,
-    border: `1px solid rgba(153, 69, 255, 0.15)`,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: '11px',
-    fontWeight: 700,
-    color: '#c084fc',
-  },
-  logoText: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  logoTitle: {
-    fontSize: '13px',
-    fontWeight: 700,
-    color: theme.text.primary,
-    letterSpacing: '0.5px',
-  },
-  logoSub: {
-    fontSize: '9px',
-    fontWeight: 500,
-    color: theme.text.muted,
-  },
-  center: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-  },
-  liveDot: {
-    width: '6px',
-    height: '6px',
-    borderRadius: '50%',
-    background: theme.success,
-    animation: 'pulse 2s ease-in-out infinite',
-  },
-  liveText: {
-    fontSize: '10px',
-    fontWeight: 600,
-    color: theme.success,
+  logoImg: {
+    height: '52px',
+    width: 'auto',
+    objectFit: 'contain',
   },
   right: {
     display: 'flex',
@@ -173,8 +120,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '4px',
   },
   solIcon: {
-    width: '20px',
-    height: '20px',
+    width: '28px',
+    height: '28px',
   },
   balanceValue: {
     fontSize: '14px',

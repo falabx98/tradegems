@@ -8,6 +8,13 @@
       "when": 1773077160085,
       "tag": "0000_broad_blazing_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773149728797,
+      "tag": "0001_secret_white_queen",
+      "breakpoints": true
     }
   ]
 }

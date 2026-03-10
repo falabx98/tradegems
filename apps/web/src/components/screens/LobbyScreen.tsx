@@ -139,7 +139,7 @@ export function LobbyScreen() {
             <div style={styles.panelHeader}>
               <span style={styles.panelTitle}>Position size</span>
               <span style={styles.panelValue} className="mono">
-                <img src="/sol-coin.png" alt="SOL" style={{ width: '18px', height: '18px', marginRight: '5px', verticalAlign: 'middle' }} />
+                <img src="/sol-coin.png" alt="SOL" style={{ width: '26px', height: '26px', marginRight: '5px', verticalAlign: 'middle' }} />
                 {formatSol(betAmount)}
               </span>
             </div>
@@ -222,7 +222,7 @@ export function LobbyScreen() {
               {mode === 'solo' ? 'Start Round' : 'Find Battle'}
             </span>
             <span style={styles.executeBtnSub} className="mono">
-              <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />
+              <img src="/sol-coin.png" alt="SOL" style={{ width: '24px', height: '24px', marginRight: '4px', verticalAlign: 'middle' }} />
               {formatSol(betAmount)} · {riskTier}
             </span>
           </button>
@@ -322,7 +322,7 @@ export function LobbyScreen() {
             <div style={styles.quickStatItem}>
               <span style={styles.quickStatLabel}>24h vol</span>
               <span style={styles.quickStatValue} className="mono">
-                <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />
+                <img src="/sol-coin.png" alt="SOL" style={{ width: '24px', height: '24px', marginRight: '4px', verticalAlign: 'middle' }} />
                 {liveStats.volume}
               </span>
             </div>
@@ -344,7 +344,7 @@ function StatRow({ label, value, color, icon }: { label: string; value: string; 
     <div style={styles.statRow}>
       <span style={styles.statLabel}>{label}</span>
       <span style={{ ...styles.statValue, color: color || theme.text.primary }} className="mono">
-        {icon && <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />}
+        {icon && <img src="/sol-coin.png" alt="SOL" style={{ width: '24px', height: '24px', marginRight: '4px', verticalAlign: 'middle' }} />}
         {value}
       </span>
     </div>

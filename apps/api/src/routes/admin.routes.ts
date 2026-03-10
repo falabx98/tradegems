@@ -4,10 +4,12 @@ import {
   rounds, bets, betResults, users, userProfiles, featureFlags,
   engineConfigs, adminAuditLogs, balances, balanceLedgerEntries,
   deposits, withdrawals, roundPools, roundNodes, riskFlags,
+  userDepositWallets,
 } from '@tradingarena/db';
 import { getDb } from '../config/database.js';
 import { requireAdmin, getAuthUser } from '../middleware/auth.js';
 import { getTreasuryAddress, getSolanaConnection } from '../modules/solana/treasury.js';
+import { DepositWalletService } from '../modules/solana/depositWallet.service.js';
 
 export async function adminRoutes(server: FastifyInstance) {
   const db = getDb();
@@ -609,5 +611,64 @@ export async function adminRoutes(server: FastifyInstance) {
       riskTiers: riskTiers.map((t) => ({ tier: t.tier, count: Number(t.count) })),
       topPlayers: topPlayers.map((p) => ({ userId: p.userId, username: p.username, totalWagered: Number(p.totalWagered) })),
     };
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  DEPOSIT WALLETS
+  // ═══════════════════════════════════════════════════════════
+
+  const depositWalletService = new DepositWalletService();
+
+  server.get('/deposit-wallets', async (request) => {
+    const { limit, offset } = request.query as { limit?: string; offset?: string };
+    const lim = parseInt(limit || '50');
+    const off = parseInt(offset || '0');
+
+    const data = await db
+      .select({
+        id: userDepositWallets.id,
+        userId: userDepositWallets.userId,
+        address: userDepositWallets.address,
+        isActive: userDepositWallets.isActive,
+        lastSweptAt: userDepositWallets.lastSweptAt,
+        createdAt: userDepositWallets.createdAt,
+        username: users.username,
+      })
+      .from(userDepositWallets)
+      .leftJoin(users, eq(userDepositWallets.userId, users.id))
+      .orderBy(desc(userDepositWallets.createdAt))
+      .limit(lim)
+      .offset(off);
+
+    const [totalCount] = await db.select({ total: count() }).from(userDepositWallets);
+
+    return { data, total: Number(totalCount?.total ?? 0) };
+  });
+
+  server.get('/deposit-wallets/:userId/balance', async (request) => {
+    const { userId } = request.params as { userId: string };
+    const address = await depositWalletService.getWalletAddress(userId);
+    if (!address) return { error: 'No deposit wallet found for user' };
+
+    const balance = await depositWalletService.getWalletBalance(address);
+    return { address, balance, balanceSol: balance / 1_000_000_000 };
+  });
+
+  server.post('/deposit-wallets/:userId/sweep', async (request) => {
+    const { userId } = request.params as { userId: string };
+    const actor = getAuthUser(request);
+
+    const txHash = await depositWalletService.sweepToTreasury(userId);
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'deposit_wallet_sweep',
+      targetType: 'user',
+      targetId: userId,
+      payload: { txHash },
+      ipAddress: request.ip,
+    });
+
+    return { success: true, txHash };
   });
 }

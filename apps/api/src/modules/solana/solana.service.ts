@@ -35,7 +35,12 @@ export class SolanaService {
     this.treasury = getTreasuryKeypair();
   }
 
-  async verifyDepositTransaction(txHash: string): Promise<DepositVerification> {
+  /**
+   * Verify a deposit transaction on-chain.
+   * @param txHash - The transaction hash to verify
+   * @param targetAddress - The expected recipient address (per-user deposit wallet or treasury)
+   */
+  async verifyDepositTransaction(txHash: string, targetAddress?: string): Promise<DepositVerification> {
     try {
       const tx = await this.connection.getTransaction(txHash, {
         commitment: 'confirmed',
@@ -50,26 +55,26 @@ export class SolanaService {
         return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: 'Transaction failed on-chain' };
       }
 
-      const treasuryAddress = getTreasuryAddress();
+      const checkAddress = targetAddress || getTreasuryAddress();
       const accountKeys = tx.transaction.message.getAccountKeys();
       const keys: string[] = [];
       for (let i = 0; i < accountKeys.length; i++) {
         keys.push(accountKeys.get(i)!.toBase58());
       }
 
-      // Find the treasury account index
-      const treasuryIdx = keys.findIndex(k => k === treasuryAddress);
-      if (treasuryIdx === -1) {
-        return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: 'Transaction does not involve treasury' };
+      // Find the target account index
+      const targetIdx = keys.findIndex(k => k === checkAddress);
+      if (targetIdx === -1) {
+        return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: 'Transaction does not involve expected address' };
       }
 
-      // Calculate amount received by treasury from balance changes
-      const preBalance = tx.meta!.preBalances[treasuryIdx];
-      const postBalance = tx.meta!.postBalances[treasuryIdx];
+      // Calculate amount received from balance changes
+      const preBalance = tx.meta!.preBalances[targetIdx];
+      const postBalance = tx.meta!.postBalances[targetIdx];
       const amount = postBalance - preBalance;
 
       if (amount <= 0) {
-        return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: 'No SOL received by treasury' };
+        return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: 'No SOL received' };
       }
 
       // Sender is typically the first account (fee payer)
@@ -79,7 +84,7 @@ export class SolanaService {
       const currentSlot = await this.connection.getSlot('confirmed');
       const confirmations = tx.slot ? currentSlot - tx.slot : 0;
 
-      return { valid: true, amount, from, to: treasuryAddress, confirmations };
+      return { valid: true, amount, from, to: checkAddress, confirmations };
     } catch (err: any) {
       return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: err.message };
     }

@@ -84,6 +84,21 @@ export const linkedWallets = pgTable('linked_wallets', {
   index('idx_wallets_user').on(table.userId),
 ]);
 
+export const userDepositWallets = pgTable('user_deposit_wallets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  address: text('address').notNull(),
+  encryptedPrivateKey: text('encrypted_private_key').notNull(),
+  iv: text('iv').notNull(),
+  authTag: text('auth_tag').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  lastSweptAt: timestamp('last_swept_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_deposit_wallets_user').on(table.userId),
+  uniqueIndex('idx_deposit_wallets_address').on(table.address),
+]);
+
 // ============================================================
 // WALLET & TREASURY
 // ============================================================

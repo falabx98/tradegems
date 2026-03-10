@@ -4,8 +4,8 @@ import { eq } from 'drizzle-orm';
 import { linkedWallets } from '@tradingarena/db';
 import { WalletService } from '../modules/wallet/wallet.service.js';
 import { DepositService } from '../modules/solana/deposit.service.js';
+import { DepositWalletService } from '../modules/solana/depositWallet.service.js';
 import { WithdrawalService } from '../modules/solana/withdrawal.service.js';
-import { getTreasuryAddress } from '../modules/solana/treasury.js';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
 import { getDb } from '../config/database.js';
 import { env } from '../config/env.js';
@@ -27,6 +27,7 @@ const linkWalletSchema = z.object({
 export async function walletRoutes(server: FastifyInstance) {
   const walletService = new WalletService();
   const depositService = new DepositService();
+  const depositWalletService = new DepositWalletService();
   const withdrawalService = new WithdrawalService();
 
   server.addHook('preHandler', requireAuth);
@@ -55,9 +56,11 @@ export async function walletRoutes(server: FastifyInstance) {
     if (asset !== 'SOL') {
       return { error: 'Only SOL deposits are supported' };
     }
+    const userId = getAuthUser(request).userId;
+    const { address } = await depositWalletService.getOrCreateDepositWallet(userId);
     return {
       asset: 'SOL',
-      address: getTreasuryAddress(),
+      address,
       minimumAmount: '10000000', // 0.01 SOL
       requiredConfirmations: env.SOLANA_REQUIRED_CONFIRMATIONS,
     };

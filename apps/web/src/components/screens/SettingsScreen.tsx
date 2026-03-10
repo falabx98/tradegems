@@ -14,7 +14,7 @@ export function SettingsScreen() {
     setLoggingOut(true);
     try {
       await logout();
-      setScreen('landing');
+      setScreen('lobby');
     } catch {
       // ignore
     } finally {
@@ -115,7 +115,7 @@ function StatBox({ label, value, color, icon }: { label: string; value: string; 
     <div style={statStyles.box}>
       <span style={statStyles.label}>{label}</span>
       <span style={{ ...statStyles.value, color: color || theme.text.primary }} className="mono">
-        {icon && <img src="/sol-coin.png" alt="SOL" style={{ width: '18px', height: '18px', marginRight: '5px', verticalAlign: 'middle' }} />}
+        {icon && <img src="/sol-coin.png" alt="SOL" style={{ width: '26px', height: '26px', marginRight: '5px', verticalAlign: 'middle' }} />}
         {value}
       </span>
     </div>

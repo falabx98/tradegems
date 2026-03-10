@@ -107,7 +107,7 @@ export function ResultScreen() {
             >
               <span style={styles.primaryBtnText}>Play again</span>
               <span style={styles.primaryBtnSub} className="mono">
-                <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />
+                <img src="/sol-coin.png" alt="SOL" style={{ width: '24px', height: '24px', marginRight: '4px', verticalAlign: 'middle' }} />
                 {formatSol(betAmount)} · {riskTier}
               </span>
             </button>
@@ -177,7 +177,7 @@ export function ResultScreen() {
           <div style={styles.balancePanel}>
             <span style={styles.balanceLabel}>Balance</span>
             <span style={styles.balanceValue} className="mono">
-              <img src="/sol-coin.png" alt="SOL" style={{ width: '20px', height: '20px', marginRight: '5px', verticalAlign: 'middle' }} />
+              <img src="/sol-coin.png" alt="SOL" style={{ width: '28px', height: '28px', marginRight: '5px', verticalAlign: 'middle' }} />
               {formatSol(profile.balance)}
             </span>
           </div>
@@ -194,7 +194,7 @@ function SummaryRow({ label, value, color, icon }: { label: string; value: strin
     <div style={summaryRowStyles.row}>
       <span style={summaryRowStyles.label}>{label}</span>
       <span style={{ ...summaryRowStyles.value, color: color || theme.text.primary }} className="mono">
-        {icon && <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />}
+        {icon && <img src="/sol-coin.png" alt="SOL" style={{ width: '24px', height: '24px', marginRight: '4px', verticalAlign: 'middle' }} />}
         {value}
       </span>
     </div>

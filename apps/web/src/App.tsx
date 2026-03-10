@@ -39,18 +39,6 @@ export default function App() {
     );
   }
 
-  // Auth screen (only shown when user explicitly navigates here)
-  if (screen === 'auth') {
-    return (
-      <div style={{ minHeight: '100vh', background: '#0a0b0f' }}>
-        <AuthScreen onSuccess={() => {
-          syncProfile();
-          setScreen('lobby');
-        }} />
-      </div>
-    );
-  }
-
   // Playing screen gets full immersion (no top bar / side nav)
   if (screen === 'playing') {
     return (
@@ -61,9 +49,10 @@ export default function App() {
   }
 
   // All other screens get the full layout shell
+  // Auth screen overlays on top of the lobby
   return (
     <AppLayout>
-      {screen === 'lobby' && <LobbyScreen />}
+      {(screen === 'lobby' || screen === 'auth') && <LobbyScreen />}
       {screen === 'setup' && <LobbyScreen />}
       {screen === 'result' && <ResultScreen />}
       {screen === 'wallet' && <WalletScreen />}
@@ -71,6 +60,12 @@ export default function App() {
       {screen === 'leaderboard' && <LeaderboardScreen />}
       {screen === 'rewards' && <RewardsScreen />}
       {screen === 'settings' && <SettingsScreen />}
+      {screen === 'auth' && (
+        <AuthScreen onSuccess={() => {
+          syncProfile();
+          setScreen('lobby');
+        }} />
+      )}
     </AppLayout>
   );
 }

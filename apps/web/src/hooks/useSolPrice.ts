@@ -7,7 +7,7 @@ const POLL_INTERVAL = 30_000;
 export function useSolPrice() {
   const [price, setPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
 
   useEffect(() => {
     let cancelled = false;

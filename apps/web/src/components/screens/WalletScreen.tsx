@@ -18,9 +18,7 @@ interface Transaction {
 }
 
 type Tab = 'deposit' | 'withdraw';
-type DepositMethod = 'phantom' | 'manual';
 type DepositState = 'idle' | 'sending' | 'verifying' | 'confirmed' | 'error';
-type VerifyState = 'idle' | 'verifying' | 'confirmed' | 'error';
 type WithdrawState = 'idle' | 'processing' | 'confirmed' | 'error';
 
 const QUICK_AMOUNTS = [0.1, 0.25, 0.5, 1, 5];
@@ -34,20 +32,9 @@ export function WalletScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Treasury address
+  // Deposit address
   const [treasuryAddress, setTreasuryAddress] = useState('');
-  const [addressLoading, setAddressLoading] = useState(true);
-  const [copied, setCopied] = useState(false);
 
-  // Deposit method
-  const [depositMethod, setDepositMethod] = useState<DepositMethod>(
-    isPhantomInstalled() ? 'phantom' : 'manual',
-  );
-
-  // Manual txHash verification
-  const [manualTxHash, setManualTxHash] = useState('');
-  const [verifyState, setVerifyState] = useState<VerifyState>('idle');
-  const [verifyError, setVerifyError] = useState('');
 
   // Phantom quick-send
   const [depositAmount, setDepositAmount] = useState('0.1');
@@ -66,17 +53,14 @@ export function WalletScreen() {
   useEffect(() => {
     loadTransactions();
     loadLinkedWallet();
-    loadTreasuryAddress();
+    loadDepositAddress();
   }, []);
 
-  async function loadTreasuryAddress() {
-    setAddressLoading(true);
+  async function loadDepositAddress() {
     try {
       const info = await api.getDepositInfo('SOL');
       setTreasuryAddress(info.address);
-    } catch {} finally {
-      setAddressLoading(false);
-    }
+    } catch {}
   }
 
   async function loadTransactions() {
@@ -104,42 +88,6 @@ export function WalletScreen() {
     } catch {}
   }
 
-  async function handleCopyAddress() {
-    if (!treasuryAddress) return;
-    try {
-      await navigator.clipboard.writeText(treasuryAddress);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {}
-  }
-
-  async function handleVerifyTxHash() {
-    setVerifyError('');
-    const hash = manualTxHash.trim();
-    if (!hash || hash.length < 64) {
-      setVerifyError('Enter a valid transaction hash (64+ characters)');
-      return;
-    }
-    try {
-      setVerifyState('verifying');
-      const result = await api.verifyDeposit(hash);
-      if (result.status === 'confirmed') {
-        setVerifyState('confirmed');
-        await syncProfile();
-        await loadTransactions();
-        setTimeout(() => {
-          setVerifyState('idle');
-          setManualTxHash('');
-        }, 3000);
-      } else {
-        setVerifyError('Transaction is still confirming. Please wait and try again.');
-        setVerifyState('idle');
-      }
-    } catch (err: any) {
-      setVerifyError(err.message || 'Verification failed. Check the transaction hash.');
-      setVerifyState('error');
-    }
-  }
 
   async function handleDeposit() {
     setDepositError('');
@@ -244,7 +192,7 @@ export function WalletScreen() {
             </div>
           </div>
           <div style={s.solBadge}>
-            <img src="/sol-coin.png" alt="SOL" style={{ width: 28, height: 28 }} />
+            <img src="/sol-coin.png" alt="SOL" style={{ width: 36, height: 36 }} />
           </div>
         </div>
         {linkedAddress && (
@@ -276,26 +224,8 @@ export function WalletScreen() {
       {/* ── Deposit Tab ── */}
       {tab === 'deposit' && (
         <div style={s.card}>
-          {/* Method selector */}
-          {isPhantomInstalled() && (
-            <div style={s.methodBar}>
-              <button
-                style={depositMethod === 'phantom' ? s.methodActive : s.method}
-                onClick={() => setDepositMethod('phantom')}
-              >
-                Phantom
-              </button>
-              <button
-                style={depositMethod === 'manual' ? s.methodActive : s.method}
-                onClick={() => setDepositMethod('manual')}
-              >
-                Manual Transfer
-              </button>
-            </div>
-          )}
 
-          {depositMethod === 'phantom' && isPhantomInstalled() ? (
-            <div style={s.section}>
+          <div style={s.section}>
               <div style={s.fieldLabel}>Amount</div>
               <div style={s.amountInputRow}>
                 <input
@@ -324,91 +254,54 @@ export function WalletScreen() {
                 ))}
               </div>
 
-              <button
-                style={{
-                  ...s.primaryBtn,
-                  opacity: depositState === 'sending' || depositState === 'verifying' ? 0.7 : 1,
-                }}
-                onClick={handleDeposit}
-                disabled={depositState === 'sending' || depositState === 'verifying'}
-              >
-                {depositState === 'idle' || depositState === 'error'
-                  ? 'Deposit with Phantom'
-                  : depositState === 'sending'
-                  ? 'Sending...'
-                  : depositState === 'verifying'
-                  ? 'Confirming...'
-                  : 'Deposit Confirmed!'}
-              </button>
+              {isPhantomInstalled() ? (
+                <button
+                  style={{
+                    ...s.primaryBtn,
+                    opacity: depositState === 'sending' || depositState === 'verifying' ? 0.7 : 1,
+                  }}
+                  onClick={handleDeposit}
+                  disabled={depositState === 'sending' || depositState === 'verifying'}
+                >
+                  {depositState === 'idle' || depositState === 'error'
+                    ? 'Deposit with Phantom'
+                    : depositState === 'sending'
+                    ? 'Approve in Phantom...'
+                    : depositState === 'verifying'
+                    ? 'Confirming on-chain...'
+                    : 'Deposit Confirmed!'}
+                </button>
+              ) : (
+                <a
+                  href="https://phantom.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={s.installPhantomLink}
+                >
+                  Install Phantom Wallet to deposit
+                </a>
+              )}
 
               {depositState === 'confirmed' && <div style={s.successMsg}>Deposit confirmed and credited!</div>}
               {depositError && <div style={s.errorMsg}>{depositError}</div>}
-            </div>
-          ) : (
-            <div style={s.section}>
-              {/* Treasury address */}
-              <div style={s.fieldLabel}>Send SOL to this address</div>
-              <div style={s.addressRow}>
-                {addressLoading ? (
-                  <span style={s.loadingText}>Loading address...</span>
-                ) : treasuryAddress ? (
-                  <>
-                    <span style={s.addressText} className="mono">{treasuryAddress}</span>
-                    <button
-                      style={copied ? s.copyBtnDone : s.copyBtn}
-                      onClick={handleCopyAddress}
-                    >
-                      {copied ? 'Copied' : 'Copy'}
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span style={s.loadingText}>Failed to load</span>
-                    <button style={s.copyBtn} onClick={loadTreasuryAddress}>Retry</button>
-                  </>
-                )}
+
+              {/* How it works info */}
+              <div style={s.howItWorks}>
+                <div style={s.howTitle}>How it works</div>
+                <div style={s.howStep}>
+                  <span style={s.howNum}>1</span>
+                  <span style={s.howText}>Deposit SOL from your Phantom wallet</span>
+                </div>
+                <div style={s.howStep}>
+                  <span style={s.howNum}>2</span>
+                  <span style={s.howText}>Your balance updates automatically — no manual verification needed</span>
+                </div>
+                <div style={s.howStep}>
+                  <span style={s.howNum}>3</span>
+                  <span style={s.howText}>Bets are placed instantly from your balance — no wallet popups per round</span>
+                </div>
               </div>
-
-              <div style={s.infoRow}>
-                <span style={s.infoDot}>i</span>
-                <span style={s.infoText}>Send from any Solana wallet. Min deposit: 0.01 SOL</span>
-              </div>
-
-              <div style={s.separator} />
-
-              {/* Verify */}
-              <div style={s.fieldLabel}>Verify your transaction</div>
-              <input
-                type="text"
-                value={manualTxHash}
-                onChange={(e) => setManualTxHash(e.target.value)}
-                style={s.textInput}
-                className="mono"
-                placeholder="Paste transaction hash..."
-              />
-              <button
-                className="btn-3d btn-3d-success"
-                style={{
-                  padding: '14px',
-                  fontSize: '14px',
-                  width: '100%',
-                  marginTop: '4px',
-                  opacity: verifyState === 'verifying' ? 0.7 : 1,
-                }}
-                onClick={handleVerifyTxHash}
-                disabled={verifyState === 'verifying'}
-              >
-                {verifyState === 'idle' || verifyState === 'error'
-                  ? 'Verify Deposit'
-                  : verifyState === 'verifying'
-                  ? 'Verifying...'
-                  : 'Confirmed!'}
-              </button>
-
-              {verifyState === 'confirmed' && <div style={s.successMsg}>Deposit confirmed and credited!</div>}
-              {verifyError && <div style={s.errorMsg}>{verifyError}</div>}
             </div>
-          )}
         </div>
       )}
 
@@ -657,40 +550,6 @@ const s: Record<string, React.CSSProperties> = {
     padding: '20px',
   },
 
-  // ── Method Bar (Phantom / Manual) ──
-  methodBar: {
-    display: 'flex',
-    gap: '4px',
-    marginBottom: '16px',
-    background: '#111118',
-    borderRadius: '8px',
-    padding: '3px',
-  },
-  method: {
-    flex: 1,
-    padding: '8px 0',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: '6px',
-    color: '#6b6b8a',
-    fontSize: '12px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-  methodActive: {
-    flex: 1,
-    padding: '8px 0',
-    background: 'rgba(153, 69, 255, 0.15)',
-    border: '1px solid rgba(153, 69, 255, 0.3)',
-    borderRadius: '6px',
-    color: '#c084fc',
-    fontSize: '12px',
-    fontWeight: 700,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-
   // ── Section ──
   section: {
     display: 'flex',
@@ -763,55 +622,6 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: '"JetBrains Mono", monospace',
   },
 
-  // ── Address ──
-  addressRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    background: '#111118',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '10px',
-    padding: '12px 14px',
-  },
-  addressText: {
-    flex: 1,
-    fontSize: '11px',
-    color: '#ececef',
-    wordBreak: 'break-all' as const,
-    lineHeight: 1.5,
-  },
-  loadingText: {
-    flex: 1,
-    fontSize: '12px',
-    color: '#6b6b8a',
-  },
-  copyBtn: {
-    padding: '6px 16px',
-    background: 'rgba(153, 69, 255, 0.12)',
-    border: '1px solid rgba(153, 69, 255, 0.25)',
-    borderRadius: '8px',
-    color: '#c084fc',
-    fontSize: '12px',
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    whiteSpace: 'nowrap' as const,
-    flexShrink: 0,
-  },
-  copyBtnDone: {
-    padding: '6px 16px',
-    background: 'rgba(52, 211, 153, 0.1)',
-    border: '1px solid rgba(52, 211, 153, 0.25)',
-    borderRadius: '8px',
-    color: '#34d399',
-    fontSize: '12px',
-    fontWeight: 600,
-    cursor: 'default',
-    fontFamily: 'inherit',
-    whiteSpace: 'nowrap' as const,
-    flexShrink: 0,
-  },
-
   // ── Info ──
   infoRow: {
     display: 'flex',
@@ -835,12 +645,6 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     color: '#6b6b8a',
     lineHeight: 1.4,
-  },
-
-  separator: {
-    height: '1px',
-    background: 'rgba(255,255,255,0.06)',
-    margin: '6px 0',
   },
 
   // ── Text Input ──
@@ -884,6 +688,64 @@ const s: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontFamily: 'inherit',
     textAlign: 'center' as const,
+  },
+
+  // ── Install Link ──
+  installPhantomLink: {
+    display: 'block',
+    padding: '14px',
+    background: 'rgba(139, 139, 245, 0.1)',
+    border: '1px solid rgba(139, 139, 245, 0.2)',
+    borderRadius: '10px',
+    color: '#8b8bf5',
+    fontSize: '14px',
+    fontWeight: 600,
+    textAlign: 'center' as const,
+    textDecoration: 'none',
+    marginTop: '4px',
+  },
+
+  // ── How it works ──
+  howItWorks: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '8px',
+    padding: '14px',
+    background: 'rgba(153, 69, 255, 0.04)',
+    border: '1px solid rgba(153, 69, 255, 0.1)',
+    borderRadius: '10px',
+    marginTop: '4px',
+  },
+  howTitle: {
+    fontSize: '11px',
+    fontWeight: 700,
+    color: '#8888a0',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+  },
+  howStep: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '10px',
+  },
+  howNum: {
+    width: '18px',
+    height: '18px',
+    borderRadius: '50%',
+    background: 'rgba(153, 69, 255, 0.15)',
+    color: '#c084fc',
+    fontSize: '10px',
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: '1px',
+  },
+  howText: {
+    fontSize: '12px',
+    color: '#8888a0',
+    lineHeight: 1.4,
   },
 
   // ── Messages ──

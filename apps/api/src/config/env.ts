@@ -20,6 +20,9 @@ const envSchema = z.object({
   TREASURY_PRIVATE_KEY: z.string().optional(),
   SOLANA_REQUIRED_CONFIRMATIONS: z.coerce.number().default(1),
   WITHDRAWAL_FEE_LAMPORTS: z.coerce.number().default(5000),
+  WALLET_ENCRYPTION_KEY: z.string().optional(), // 32-byte hex key for AES-256-GCM
+  DEPOSIT_SWEEP_INTERVAL_MS: z.coerce.number().default(60_000), // 1 min
+  DEPOSIT_MIN_SWEEP_LAMPORTS: z.coerce.number().default(5000), // min balance to trigger sweep
   CORS_ORIGINS: z.string().optional(),
 });
 

@@ -174,13 +174,16 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
-    position: 'relative',
-    minHeight: '100vh',
+    position: 'fixed',
+    inset: 0,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: theme.bg.primary,
-    overflow: 'hidden',
+    background: 'rgba(10, 11, 15, 0.75)',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    zIndex: 50,
+    overflow: 'auto',
   },
   card: {
     position: 'relative',
@@ -192,7 +195,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '40px',
     maxWidth: '400px',
     width: '100%',
-    background: theme.bg.secondary,
+    background: 'rgba(17, 19, 28, 0.92)',
     border: `1px solid ${theme.border.subtle}`,
     borderRadius: '12px',
   },

@@ -4,7 +4,7 @@ import { getDb } from '../../config/database.js';
 import { getRedis } from '../../config/redis.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { SolanaService } from './solana.service.js';
-import { getTreasuryAddress } from './treasury.js';
+import { DepositWalletService } from './depositWallet.service.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { env } from '../../config/env.js';
 
@@ -12,6 +12,7 @@ export class DepositService {
   private db = getDb();
   private solanaService = new SolanaService();
   private walletService = new WalletService();
+  private depositWalletService = new DepositWalletService();
 
   async submitDeposit(userId: string, txHash: string) {
     const redis = getRedis();
@@ -37,8 +38,14 @@ export class DepositService {
         };
       }
 
-      // Verify on-chain
-      const verification = await this.solanaService.verifyDepositTransaction(txHash);
+      // Get user's deposit wallet address
+      const userWalletAddress = await this.depositWalletService.getWalletAddress(userId);
+
+      // Verify on-chain against the user's deposit wallet (or treasury as fallback)
+      const verification = await this.solanaService.verifyDepositTransaction(
+        txHash,
+        userWalletAddress || undefined,
+      );
 
       if (!verification.valid) {
         throw new AppError(400, 'INVALID_DEPOSIT', verification.error || 'Transaction verification failed');
@@ -54,7 +61,7 @@ export class DepositService {
         amount: verification.amount,
         txHash,
         fromAddress: verification.from,
-        toAddress: getTreasuryAddress(),
+        toAddress: verification.to,
         status,
         confirmations: verification.confirmations,
         requiredConfirmations,
@@ -64,6 +71,13 @@ export class DepositService {
       // Credit user balance if confirmed
       if (status === 'confirmed') {
         await this.walletService.creditDeposit(userId, verification.amount, 'SOL', deposit.id);
+
+        // Sweep funds from deposit wallet to treasury (fire-and-forget)
+        if (userWalletAddress) {
+          this.depositWalletService.sweepToTreasury(userId).catch((err) => {
+            console.error(`[Sweep] Failed to sweep for user ${userId}:`, err.message);
+          });
+        }
       }
 
       return {

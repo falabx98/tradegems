@@ -102,11 +102,30 @@ export function UsersPage() {
     return map[tier] || theme.text.muted;
   };
 
+  const isBot = (u: User) => u.email.endsWith('@tradesol.bot');
+  const realUsers = users.filter((u) => !isBot(u) && u.role === 'player');
+  const botCount = users.filter(isBot).length;
+
   const columns: Column<User>[] = [
     {
       key: 'username',
       label: 'Username',
-      render: (u) => <span style={{ fontWeight: 600, color: theme.text.primary }}>{u.username}</span>,
+      render: (u) => (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontWeight: 600, color: theme.text.primary }}>{u.username}</span>
+          {isBot(u) && (
+            <span style={{
+              fontSize: '0.6rem',
+              fontWeight: 700,
+              color: theme.accent.purple,
+              border: `1px solid ${theme.accent.purple}`,
+              borderRadius: theme.radius.sm,
+              padding: '1px 5px',
+              letterSpacing: '0.5px',
+            }}>BOT</span>
+          )}
+        </span>
+      ),
     },
     { key: 'email', label: 'Email' },
     {
@@ -151,6 +170,22 @@ export function UsersPage() {
 
   return (
     <div style={styles.page}>
+      {/* User counters */}
+      <div style={styles.counters}>
+        <span style={styles.counterBadge}>
+          <span style={{ color: theme.text.secondary }}>Total:</span>{' '}
+          <span style={{ color: theme.text.primary, fontWeight: 600 }}>{users.length}</span>
+        </span>
+        <span style={styles.counterBadge}>
+          <span style={{ color: theme.text.secondary }}>Real Users:</span>{' '}
+          <span style={{ color: theme.success, fontWeight: 600 }}>{realUsers.length}</span>
+        </span>
+        <span style={styles.counterBadge}>
+          <span style={{ color: theme.text.secondary }}>Bots:</span>{' '}
+          <span style={{ color: theme.accent.purple, fontWeight: 600 }}>{botCount}</span>
+        </span>
+      </div>
+
       {/* Search bar */}
       <div style={styles.searchBar}>
         <input
@@ -293,6 +328,21 @@ function DetailRow({ label, value, mono }: { label: string; value: string; mono?
 
 const styles: Record<string, CSSProperties> = {
   page: { display: 'flex', flexDirection: 'column', gap: '20px' },
+  counters: {
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'center',
+  },
+  counterBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '6px 12px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.md,
+    fontSize: theme.fontSize.sm,
+  },
   loading: { color: theme.text.secondary, textAlign: 'center', padding: '40px' },
   searchBar: { display: 'flex', gap: '8px' },
   searchInput: {

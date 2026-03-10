@@ -6,7 +6,7 @@ import { requireAuth, getAuthUser } from '../middleware/auth.js';
 const updateProfileSchema = z.object({
   username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_]+$/).optional(),
   displayName: z.string().max(50).optional(),
-  avatarUrl: z.string().url().optional(),
+  avatarUrl: z.string().max(200_000).optional(), // base64 data URL or http URL
 });
 
 export async function userRoutes(server: FastifyInstance) {

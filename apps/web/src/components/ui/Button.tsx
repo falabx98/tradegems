@@ -62,7 +62,7 @@ export function Button({
         alignItems: 'center',
         justifyContent: 'center',
         gap: '8px',
-        fontFamily: 'Inter, sans-serif',
+        fontFamily: 'Rajdhani, sans-serif',
         transition: 'all 0.15s ease',
         width: fullWidth ? '100%' : undefined,
         opacity: props.disabled ? 0.5 : 1,

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { AuthService } from '../modules/auth/auth.service.js';
+import { ReferralService } from '../modules/referral/referral.service.js';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
 import { AppError } from '../middleware/errorHandler.js';
 
@@ -8,6 +9,7 @@ const registerSchema = z.object({
   email: z.string().email(),
   username: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_]+$/),
   password: z.string().min(8).max(128),
+  referralCode: z.string().max(20).optional(),
 });
 
 const loginSchema = z.object({
@@ -28,6 +30,17 @@ export async function authRoutes(server: FastifyInstance) {
   server.post('/register', async (request, reply) => {
     const body = registerSchema.parse(request.body);
     const { userId } = await authService.register(body);
+
+    // Link referral if code provided
+    if (body.referralCode) {
+      try {
+        const referralService = new ReferralService();
+        await referralService.linkReferral(userId, body.referralCode);
+      } catch {
+        // Don't fail registration if referral code is invalid
+      }
+    }
+
     const { sessionId, refreshToken } = await authService.createSession(userId, {
       ip: request.ip,
       userAgent: request.headers['user-agent'],

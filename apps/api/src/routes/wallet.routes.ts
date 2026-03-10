@@ -77,11 +77,39 @@ export async function walletRoutes(server: FastifyInstance) {
   server.post('/withdraw', async (request) => {
     const body = withdrawSchema.parse(request.body);
     const userId = getAuthUser(request).userId;
+    const amount = parseInt(body.amount);
+
+    // Check bonus withdrawal restriction
+    const eligibility = await walletService.checkWithdrawalEligibility(userId, amount);
+    if (!eligibility.eligible) {
+      return {
+        error: {
+          code: 'BONUS_LOCKED',
+          message: eligibility.reason || 'Withdrawal restricted',
+          maxWithdrawable: String(eligibility.maxWithdrawable),
+        },
+      };
+    }
+
     return withdrawalService.requestWithdrawal(
       userId,
-      parseInt(body.amount),
+      amount,
       body.destination,
     );
+  });
+
+  // ─── Bonus: Claim new user bonus ────────────────────────
+
+  server.post('/claim-bonus', async (request) => {
+    const userId = getAuthUser(request).userId;
+    return walletService.claimNewUserBonus(userId);
+  });
+
+  // ─── Bonus: Get bonus status ────────────────────────────
+
+  server.get('/bonus-status', async (request) => {
+    const userId = getAuthUser(request).userId;
+    return walletService.getBonusStatus(userId);
   });
 
   // ─── Link Wallet ──────────────────────────────────────────
@@ -113,14 +141,4 @@ export async function walletRoutes(server: FastifyInstance) {
     return { message: 'Wallet linked successfully', address };
   });
 
-  // ─── Dev: credit balance for testing ──────────────────────
-
-  if (env.NODE_ENV === 'development') {
-    server.post('/dev/credit', async (request) => {
-      const { amount, asset } = request.body as { amount: number; asset?: string };
-      const userId = getAuthUser(request).userId;
-      await walletService.devCreditBalance(userId, amount, asset || 'SOL');
-      return walletService.getBalances(userId);
-    });
-  }
 }

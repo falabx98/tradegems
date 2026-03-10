@@ -33,6 +33,7 @@ export const users = pgTable('users', {
   xpTotal: bigint('xp_total', { mode: 'number' }).notNull().default(0),
   xpCurrent: bigint('xp_current', { mode: 'number' }).notNull().default(0),
   xpToNext: bigint('xp_to_next', { mode: 'number' }).notNull().default(100),
+  bonusClaimed: boolean('bonus_claimed').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -109,6 +110,7 @@ export const balances = pgTable('balances', {
   availableAmount: bigint('available_amount', { mode: 'number' }).notNull().default(0),
   lockedAmount: bigint('locked_amount', { mode: 'number' }).notNull().default(0),
   pendingAmount: bigint('pending_amount', { mode: 'number' }).notNull().default(0),
+  bonusAmount: bigint('bonus_amount', { mode: 'number' }).notNull().default(0),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   // composite PK emulated via unique index
@@ -333,6 +335,59 @@ export const userAchievements = pgTable('user_achievements', {
   index('idx_user_achievements_user').on(table.userId),
 ]);
 
+export const dailyRewards = pgTable('daily_rewards', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  claimedAt: timestamp('claimed_at', { withTimezone: true }).notNull().defaultNow(),
+  rarity: text('rarity').notNull(), // common | uncommon | rare | epic | legendary
+  amountLamports: bigint('amount_lamports', { mode: 'number' }).notNull(),
+  userLevel: integer('user_level').notNull(),
+  vipTier: text('vip_tier').notNull(),
+}, (table) => [
+  index('idx_daily_rewards_user').on(table.userId, table.claimedAt),
+  index('idx_daily_rewards_claimed').on(table.claimedAt),
+]);
+
+// ============================================================
+// REFERRAL / AFFILIATE
+// ============================================================
+
+export const referralCodes = pgTable('referral_codes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  code: text('code').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_referral_codes_user').on(table.userId),
+  uniqueIndex('idx_referral_codes_code').on(table.code),
+]);
+
+export const referrals = pgTable('referrals', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  referrerId: uuid('referrer_id').notNull().references(() => users.id),
+  referredUserId: uuid('referred_user_id').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_referrals_referred').on(table.referredUserId),
+  index('idx_referrals_referrer').on(table.referrerId),
+]);
+
+export const referralEarnings = pgTable('referral_earnings', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  referrerId: uuid('referrer_id').notNull().references(() => users.id),
+  referredUserId: uuid('referred_user_id').notNull().references(() => users.id),
+  betId: uuid('bet_id').notNull().references(() => bets.id),
+  betAmount: bigint('bet_amount', { mode: 'number' }).notNull(),
+  feeAmount: bigint('fee_amount', { mode: 'number' }).notNull(),
+  commissionAmount: bigint('commission_amount', { mode: 'number' }).notNull(),
+  status: text('status').notNull().default('pending'),
+  claimedAt: timestamp('claimed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_referral_earnings_referrer').on(table.referrerId, table.status),
+  index('idx_referral_earnings_bet').on(table.betId),
+]);
+
 // ============================================================
 // SOCIAL & COMPETITIVE
 // ============================================================
@@ -433,4 +488,21 @@ export const outboxEvents = pgTable('outbox_events', {
   publishedAt: timestamp('published_at', { withTimezone: true }),
 }, (table) => [
   index('idx_outbox_pending').on(table.createdAt),
+]);
+
+// ============================================================
+// CHAT
+// ============================================================
+
+export const chatMessages = pgTable('chat_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  username: text('username').notNull(),
+  message: text('message').notNull(),
+  channel: text('channel').notNull().default('global'),
+  avatar: text('avatar'),  // gradient preset ID or URL
+  level: integer('level').notNull().default(1),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_chat_channel_created').on(table.channel, table.createdAt),
 ]);

@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { theme } from '../styles/theme';
 import { Modal } from '../components/Modal';
 import { adminApi } from '../utils/api';
+import { useToastStore } from '../stores/toastStore';
 
 interface FeatureFlag {
   id: string;
@@ -36,12 +37,15 @@ export function FeatureFlagsPage() {
     setLoading(false);
   }
 
+  const addToast = useToastStore((s) => s.addToast);
+
   async function toggleFlag(key: string, enabled: boolean) {
     try {
       await adminApi.updateFeatureFlag(key, { enabled });
       setFlags((prev) => prev.map((f) => f.flagKey === key ? { ...f, enabled } : f));
+      addToast(`Flag ${enabled ? 'enabled' : 'disabled'}`);
     } catch {
-      // silent
+      addToast('Failed to toggle flag', 'error');
     }
   }
 
@@ -49,12 +53,13 @@ export function FeatureFlagsPage() {
     if (!newKey.trim()) return;
     try {
       await adminApi.createFeatureFlag({ flagKey: newKey.trim(), description: newDesc || newKey });
+      addToast('Flag created');
       setCreateModal(false);
       setNewKey('');
       setNewDesc('');
       loadFlags();
     } catch {
-      // silent
+      addToast('Failed to create flag', 'error');
     }
   }
 
@@ -63,10 +68,11 @@ export function FeatureFlagsPage() {
     try {
       const config = JSON.parse(editConfig);
       await adminApi.updateFeatureFlag(editFlag.flagKey, { config });
+      addToast('Config saved');
       setEditFlag(null);
       loadFlags();
     } catch {
-      // invalid JSON
+      addToast('Invalid JSON config', 'error');
     }
   }
 
@@ -75,7 +81,7 @@ export function FeatureFlagsPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <h3 style={styles.title}>Feature Flags</h3>
+        <div style={{ flex: 1 }} />
         <button style={styles.addBtn} onClick={() => setCreateModal(true)}>+ New Flag</button>
       </div>
 

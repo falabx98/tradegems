@@ -3,6 +3,7 @@ import { theme } from '../styles/theme';
 import { StatCard } from '../components/StatCard';
 import { DataTable, type Column } from '../components/DataTable';
 import { adminApi } from '../utils/api';
+import { useToastStore } from '../stores/toastStore';
 
 interface TreasuryOverview {
   address: string;
@@ -63,12 +64,15 @@ export function TreasuryPage() {
     setLoading(false);
   }
 
+  const addToast = useToastStore((s) => s.addToast);
+
   async function handleWithdrawalAction(id: string, status: 'approved' | 'rejected') {
     try {
       await adminApi.updateWithdrawal(id, { status });
+      addToast(`Withdrawal ${status}`);
       loadTreasury();
     } catch {
-      // silent
+      addToast(`Failed to ${status} withdrawal`, 'error');
     }
   }
 

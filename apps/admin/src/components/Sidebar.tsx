@@ -1,38 +1,37 @@
 import type { CSSProperties } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { theme } from '../styles/theme';
 
-export type Page =
-  | 'dashboard'
-  | 'users'
-  | 'treasury'
-  | 'rounds'
-  | 'fairness'
-  | 'gameConfig'
-  | 'featureFlags'
-  | 'risk'
-  | 'audit'
-  | 'analytics';
-
 interface SidebarProps {
-  activePage: Page;
-  onNavigate: (page: Page) => void;
   onLogout: () => void;
 }
 
-const navItems: { page: Page; label: string; icon: string }[] = [
-  { page: 'dashboard', label: 'Dashboard', icon: '📊' },
-  { page: 'users', label: 'Users', icon: '👥' },
-  { page: 'treasury', label: 'Treasury', icon: '🏦' },
-  { page: 'rounds', label: 'Rounds', icon: '🎮' },
-  { page: 'fairness', label: 'Fairness', icon: '⚖️' },
-  { page: 'gameConfig', label: 'Game Config', icon: '⚙️' },
-  { page: 'featureFlags', label: 'Feature Flags', icon: '🚩' },
-  { page: 'risk', label: 'Risk Flags', icon: '🛡️' },
-  { page: 'audit', label: 'Audit Log', icon: '📝' },
-  { page: 'analytics', label: 'Analytics', icon: '📈' },
+const navItems: { path: string; label: string; icon: string }[] = [
+  { path: '/', label: 'Dashboard', icon: '📊' },
+  { path: '/users', label: 'Users', icon: '👥' },
+  { path: '/treasury', label: 'Treasury', icon: '🏦' },
+  { path: '/rounds', label: 'Rounds', icon: '🎮' },
+  { path: '/fairness', label: 'Fairness', icon: '⚖️' },
+  { path: '/game-config', label: 'Game Config', icon: '⚙️' },
+  { path: '/feature-flags', label: 'Feature Flags', icon: '🚩' },
+  { path: '/risk', label: 'Risk Flags', icon: '🛡️' },
+  { path: '/audit', label: 'Audit Log', icon: '📝' },
+  { path: '/analytics', label: 'Analytics', icon: '📈' },
+  { path: '/chat', label: 'Chat', icon: '💬' },
+  { path: '/deposit-wallets', label: 'Wallets', icon: '🏧' },
+  { path: '/referrals', label: 'Referrals', icon: '🔗' },
+  { path: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
-export function Sidebar({ activePage, onNavigate, onLogout }: SidebarProps) {
+export function Sidebar({ onLogout }: SidebarProps) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const isActive = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
+
   return (
     <aside style={styles.sidebar}>
       <div style={styles.logo}>
@@ -42,18 +41,18 @@ export function Sidebar({ activePage, onNavigate, onLogout }: SidebarProps) {
       </div>
 
       <nav style={styles.nav}>
-        {navItems.map(({ page, label, icon }) => (
+        {navItems.map(({ path, label, icon }) => (
           <button
-            key={page}
+            key={path}
             style={{
               ...styles.navItem,
-              background: activePage === page ? theme.bg.tertiary : 'transparent',
-              color: activePage === page ? theme.accent.cyan : theme.text.secondary,
-              borderLeft: activePage === page
+              background: isActive(path) ? theme.bg.tertiary : 'transparent',
+              color: isActive(path) ? theme.accent.cyan : theme.text.secondary,
+              borderLeft: isActive(path)
                 ? `3px solid ${theme.accent.cyan}`
                 : '3px solid transparent',
             }}
-            onClick={() => onNavigate(page)}
+            onClick={() => navigate(path)}
           >
             <span>{icon}</span>
             <span>{label}</span>

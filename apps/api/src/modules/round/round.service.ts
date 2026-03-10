@@ -1,4 +1,4 @@
-import { eq, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql } from 'drizzle-orm';
 import crypto from 'node:crypto';
 import { rounds, roundNodes, roundEvents, roundPools, bets, betResults, userProfiles } from '@tradingarena/db';
 import {
@@ -162,9 +162,9 @@ export class RoundService {
 
     const config = generateRound(round.seed, DEFAULT_ENGINE_CONFIG);
 
-    // Get all active bets
+    // Get only active (unsettled) bets — prevents double-settlement
     const activeBets = await this.db.query.bets.findMany({
-      where: eq(bets.roundId, roundId),
+      where: and(eq(bets.roundId, roundId), eq(bets.status, 'active')),
     });
 
     // Simulate each player's outcome
@@ -206,6 +206,14 @@ export class RoundService {
         'SOL',
         { type: 'round', id: roundId },
       );
+
+      // Record referral commission
+      try {
+        const { ReferralService } = await import('../referral/referral.service.js');
+        await new ReferralService().recordCommission(bet.userId, bet.id, bet.amount, bet.fee);
+      } catch {
+        // Non-critical — don't fail settlement
+      }
 
       // Update bet status
       await this.db.update(bets).set({

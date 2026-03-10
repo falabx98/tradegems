@@ -1,8 +1,10 @@
 import { useEffect, useState, type CSSProperties } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { theme } from '../styles/theme';
 import { DataTable, type Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
 import { adminApi } from '../utils/api';
+import { useToastStore } from '../stores/toastStore';
 
 interface User {
   id: string;
@@ -16,6 +18,8 @@ interface User {
 }
 
 export function UsersPage() {
+  const navigate = useNavigate();
+  const addToast = useToastStore((s) => s.addToast);
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -53,20 +57,22 @@ export function UsersPage() {
   async function handleStatusChange(userId: string, status: string) {
     try {
       await adminApi.updateUser(userId, { status });
+      addToast(`Status changed to ${status}`);
       loadUsers();
       setSelectedUser(null);
     } catch {
-      // silent
+      addToast('Failed to update status', 'error');
     }
   }
 
   async function handleRoleChange(userId: string, role: string) {
     try {
       await adminApi.updateUser(userId, { role });
+      addToast(`Role changed to ${role}`);
       loadUsers();
       setSelectedUser(null);
     } catch {
-      // silent
+      addToast('Failed to update role', 'error');
     }
   }
 
@@ -77,13 +83,18 @@ export function UsersPage() {
         amount: Math.round(parseFloat(adjustAmount) * 1_000_000_000),
         reason: adjustReason || 'Admin adjustment',
       });
+      addToast('Balance adjusted');
       setAdjustModal(false);
       setAdjustAmount('');
       setAdjustReason('');
       openUserDetail(selectedUser);
     } catch {
-      // silent
+      addToast('Failed to adjust balance', 'error');
     }
+  }
+
+  function handleRowClick(user: User) {
+    navigate(`/users/${user.id}`);
   }
 
   const vipColor = (tier: string) => {
@@ -157,7 +168,7 @@ export function UsersPage() {
       {loading ? (
         <div style={styles.loading}>Loading users...</div>
       ) : (
-        <DataTable columns={columns} data={users} onRowClick={openUserDetail} />
+        <DataTable columns={columns} data={users} onRowClick={handleRowClick} />
       )}
 
       {/* User Detail Modal */}

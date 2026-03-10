@@ -108,7 +108,7 @@ export async function apiFetch<T = unknown>(
 
 export const api = {
   // Auth
-  register: (data: { email: string; username: string; password: string }) =>
+  register: (data: { email: string; username: string; password: string; referralCode?: string }) =>
     apiFetch<{ accessToken: string; userId: string }>('/v1/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -125,7 +125,13 @@ export const api = {
 
   // User
   getMe: () =>
-    apiFetch<{ id: string; username: string; email: string; level: number; vipTier: string }>('/v1/users/me'),
+    apiFetch<{ id: string; username: string; email: string; level: number; vipTier: string; avatarUrl?: string }>('/v1/users/me'),
+
+  updateMe: (data: { username?: string; displayName?: string; avatarUrl?: string }) =>
+    apiFetch<{ id: string; username: string; avatarUrl?: string }>('/v1/users/me', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
 
   getMyStats: () =>
     apiFetch('/v1/users/me/stats'),
@@ -139,12 +145,6 @@ export const api = {
 
   getTransactions: (limit?: number) =>
     apiFetch(`/v1/wallet/transactions?limit=${limit || 20}`),
-
-  devCredit: (amount: number) =>
-    apiFetch('/v1/wallet/dev/credit', {
-      method: 'POST',
-      body: JSON.stringify({ amount }),
-    }),
 
   // Rounds
   getLobby: () =>
@@ -213,5 +213,136 @@ export const api = {
     apiFetch<{ message: string; address: string }>('/v1/wallet/link-wallet', {
       method: 'POST',
       body: JSON.stringify({ address }),
+    }),
+
+  // Bonus
+  claimBonus: () =>
+    apiFetch<{ success: boolean; message: string; amount?: number }>('/v1/wallet/claim-bonus', {
+      method: 'POST',
+    }),
+
+  getBonusStatus: () =>
+    apiFetch<{
+      claimed: boolean;
+      bonusAmount: number;
+      profitRequired: number;
+      currentProfit: number;
+      withdrawalUnlocked: boolean;
+    }>('/v1/wallet/bonus-status'),
+
+  // Rewards
+  getMissions: () =>
+    apiFetch<{ data: Array<{ id: string; title: string; description: string; progress: number; target: number; reward: number; completed: boolean }> }>('/v1/rewards/missions'),
+
+  claimMission: (id: string) =>
+    apiFetch<{ success: boolean; message?: string }>(`/v1/rewards/missions/${id}/claim`, { method: 'POST' }),
+
+  getAchievements: () =>
+    apiFetch<{ data: Array<{ id: string; title: string; description: string; unlockedAt: string | null }> }>('/v1/rewards/achievements'),
+
+  getRakeback: () =>
+    apiFetch<{ rate: number; tier: string; accumulated: number; claimable: number }>('/v1/rewards/rakeback'),
+
+  claimRakeback: () =>
+    apiFetch<{ success: boolean; claimed?: number; message?: string }>('/v1/rewards/rakeback/claim', { method: 'POST' }),
+
+  // Daily Mystery Box
+  getDailyBox: () =>
+    apiFetch<{
+      available: boolean;
+      nextAvailableAt: string | null;
+      level: number;
+      vipTier: string;
+      rewardTable: Array<{ rarity: string; probability: number; amountLamports: number }>;
+      nextTierRewards: { tier: string; rewards: Array<{ rarity: string; probability: number; amountLamports: number }> } | null;
+      history: Array<{ id: string; claimedAt: string; rarity: string; amountLamports: number; userLevel: number; vipTier: string }>;
+    }>('/v1/rewards/daily-box'),
+
+  claimDailyBox: () =>
+    apiFetch<{
+      success: boolean;
+      message?: string;
+      nextAvailableAt?: string;
+      reward?: { id: string; rarity: string; amountLamports: number; level: number; vipTier: string };
+    }>('/v1/rewards/daily-box/claim', { method: 'POST' }),
+
+  // Battles (continuous loop)
+  getCurrentBattle: () =>
+    apiFetch<{
+      roundNumber: number;
+      phase: 'betting' | 'active' | 'results';
+      phaseStartedAt: number;
+      phaseEndsAt: number;
+      players: any[];
+      playerCount: number;
+      grossPool: number;
+      elapsed: number | null;
+      myPlayerId: string | null;
+      roundConfig: any | null;
+      results: any | null;
+    }>('/v1/battles/current'),
+
+  joinBattle: (data: { betAmount: number; riskTier: string }) =>
+    apiFetch<{ success: boolean; roundNumber: number; phase: string; phaseEndsAt: number }>(
+      '/v1/battles/join', { method: 'POST', body: JSON.stringify(data) },
+    ),
+
+  reportBattleMultiplier: (finalMultiplier: number) =>
+    apiFetch('/v1/battles/report', {
+      method: 'POST',
+      body: JSON.stringify({ finalMultiplier }),
+    }),
+
+  // Referrals / Affiliates
+  getReferralCode: () =>
+    apiFetch<{ code: string }>('/v1/referrals/code'),
+
+  getReferralStats: () =>
+    apiFetch<{
+      referralCode: string;
+      referredCount: number;
+      totalWagered: number;
+      totalEarned: number;
+      claimable: number;
+      referredUsers: Array<{
+        username: string;
+        joinedAt: string;
+        totalWagered: number;
+        yourEarnings: number;
+      }>;
+    }>('/v1/referrals/stats'),
+
+  claimReferralEarnings: () =>
+    apiFetch<{ success: boolean; claimed?: number; message?: string }>(
+      '/v1/referrals/claim', { method: 'POST' },
+    ),
+
+  // Chat
+  getChatMessages: (channel?: string, after?: string) => {
+    const params = new URLSearchParams();
+    if (channel) params.set('channel', channel);
+    if (after) params.set('after', after);
+    return apiFetch<{
+      messages: Array<{
+        id: string;
+        userId: string;
+        username: string;
+        message: string;
+        channel: string;
+        createdAt: string;
+      }>;
+    }>(`/v1/chat/messages?${params.toString()}`);
+  },
+
+  sendChatMessage: (message: string, channel?: string) =>
+    apiFetch<{
+      id: string;
+      userId: string;
+      username: string;
+      message: string;
+      createdAt: string;
+    }>('/v1/chat/messages', {
+      method: 'POST',
+      body: JSON.stringify({ message, channel }),
     }),
 };

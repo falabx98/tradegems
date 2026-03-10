@@ -96,8 +96,8 @@ export function ChartArena({
 
       ctx.clearRect(0, 0, width, height);
 
-      drawBackground(ctx, width, height, phase);
-      drawGrid(ctx, chartArea);
+      drawBackground(ctx, width, height, phase, elapsed);
+      drawGrid(ctx, chartArea, elapsed);
       drawPhaseZones(ctx, chartArea, config.duration, elapsed);
       drawChartPath(ctx, config, chartArea, elapsed);
       drawNodes(ctx, config, chartArea, elapsed, activatedNodeIds, missedNodeIds);
@@ -142,30 +142,221 @@ export function ChartArena({
 
 type Area = { x: number; y: number; w: number; h: number };
 
-function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, phase: RoundPhase) {
-  ctx.fillStyle = '#111114';
+function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, _phase: RoundPhase, elapsed: number) {
+  // Deep dark base
+  ctx.fillStyle = '#0a0a0f';
   ctx.fillRect(0, 0, w, h);
+
+  // Radial vignette / glow from center
+  const cx = w / 2;
+  const cy = h / 2;
+  const radGrad = ctx.createRadialGradient(cx, cy * 0.7, 0, cx, cy, Math.max(w, h) * 0.7);
+  radGrad.addColorStop(0, 'rgba(153, 69, 255, 0.07)');
+  radGrad.addColorStop(0.4, 'rgba(80, 40, 180, 0.03)');
+  radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = radGrad;
+  ctx.fillRect(0, 0, w, h);
+
+  // Animated horizontal scan beam (purple, slow)
+  const scanY = ((elapsed * 0.12) % 1) * h;
+  const scanGrad = ctx.createLinearGradient(0, scanY - 50, 0, scanY + 50);
+  scanGrad.addColorStop(0, 'rgba(153, 69, 255, 0)');
+  scanGrad.addColorStop(0.4, 'rgba(153, 69, 255, 0.045)');
+  scanGrad.addColorStop(0.5, 'rgba(153, 69, 255, 0.06)');
+  scanGrad.addColorStop(0.6, 'rgba(153, 69, 255, 0.045)');
+  scanGrad.addColorStop(1, 'rgba(153, 69, 255, 0)');
+  ctx.fillStyle = scanGrad;
+  ctx.fillRect(0, scanY - 50, w, 100);
+
+  // Scan line (thin bright line at center of beam)
+  ctx.strokeStyle = 'rgba(153, 69, 255, 0.08)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, scanY);
+  ctx.lineTo(w, scanY);
+  ctx.stroke();
+
+  // Second faster scan beam (teal accent)
+  const scan2Y = ((elapsed * 0.2 + 0.5) % 1) * h;
+  const scan2Grad = ctx.createLinearGradient(0, scan2Y - 35, 0, scan2Y + 35);
+  scan2Grad.addColorStop(0, 'rgba(20, 241, 149, 0)');
+  scan2Grad.addColorStop(0.4, 'rgba(20, 241, 149, 0.025)');
+  scan2Grad.addColorStop(0.5, 'rgba(20, 241, 149, 0.04)');
+  scan2Grad.addColorStop(0.6, 'rgba(20, 241, 149, 0.025)');
+  scan2Grad.addColorStop(1, 'rgba(20, 241, 149, 0)');
+  ctx.fillStyle = scan2Grad;
+  ctx.fillRect(0, scan2Y - 35, w, 70);
+
+  // Teal scan line
+  ctx.strokeStyle = 'rgba(20, 241, 149, 0.05)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, scan2Y);
+  ctx.lineTo(w, scan2Y);
+  ctx.stroke();
 }
 
-function drawGrid(ctx: CanvasRenderingContext2D, area: Area) {
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.025)';
-  ctx.lineWidth = 1;
+function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
+  const time = elapsed || performance.now() / 1000;
 
-  for (let i = 0; i <= 8; i++) {
-    const y = area.y + (area.h * i) / 8;
+  // ─── Horizontal grid lines with animated fade ─────────────
+  const hLines = 12;
+  for (let i = 0; i <= hLines; i++) {
+    const y = area.y + (area.h * i) / hLines;
+    const distFromCenter = Math.abs(i - hLines / 2) / (hLines / 2);
+
+    // Animated brightness pulse: each line subtly pulses at different phase
+    const pulse = Math.sin(time * 0.8 + i * 0.5) * 0.3 + 0.7;
+    const alpha = (0.045 + (1 - distFromCenter) * 0.035) * pulse;
+
+    ctx.strokeStyle = `rgba(153, 69, 255, ${alpha})`;
+    ctx.lineWidth = i === hLines / 2 ? 1.0 : 0.6;
     ctx.beginPath();
     ctx.moveTo(area.x, y);
     ctx.lineTo(area.x + area.w, y);
     ctx.stroke();
   }
 
-  for (let t = 0; t <= 15; t += 3) {
-    const x = area.x + (area.w * t) / 15;
+  // ─── Vertical grid lines with animated pulse ──────────────
+  const vLines = 18;
+  for (let i = 0; i <= vLines; i++) {
+    const x = area.x + (area.w * i) / vLines;
+
+    // Vertical lines pulse outward from the elapsed position
+    const elapsedFraction = (elapsed || 0) / 15;
+    const lineFraction = i / vLines;
+    const distFromElapsed = Math.abs(lineFraction - elapsedFraction);
+    const proximity = Math.max(0, 1 - distFromElapsed * 4);
+
+    const basePulse = Math.sin(time * 0.6 + i * 0.4) * 0.25 + 0.75;
+    const alpha = (0.035 + proximity * 0.06) * basePulse;
+
+    ctx.strokeStyle = `rgba(153, 69, 255, ${alpha})`;
+    ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(x, area.y);
     ctx.lineTo(x, area.y + area.h);
     ctx.stroke();
   }
+
+  // ─── Glowing intersection dots ────────────────────────────
+  const dotRows = 6;
+  const dotCols = 6;
+  for (let r = 0; r <= dotRows; r++) {
+    for (let c = 0; c <= dotCols; c++) {
+      const x = area.x + (area.w * c) / dotCols;
+      const y = area.y + (area.h * r) / dotRows;
+
+      // Each dot pulses at a unique phase
+      const dotPhase = Math.sin(time * 1.2 + r * 1.1 + c * 0.9);
+      const dotAlpha = 0.10 + dotPhase * 0.06;
+      const dotSize = 1.2 + dotPhase * 0.6;
+
+      ctx.beginPath();
+      ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(153, 69, 255, ${dotAlpha})`;
+      ctx.fill();
+    }
+  }
+
+  // ─── Floating micro-particles ─────────────────────────────
+  const particleCount = 15;
+  for (let p = 0; p < particleCount; p++) {
+    // Deterministic but animated positions using sin/cos
+    const seed1 = p * 7.31;
+    const seed2 = p * 13.17;
+    const px = area.x + ((Math.sin(seed1 + time * 0.3) * 0.5 + 0.5) * area.w);
+    const py = area.y + ((Math.cos(seed2 + time * 0.2) * 0.5 + 0.5) * area.h);
+
+    const pAlpha = (Math.sin(time * 1.5 + p * 2.3) * 0.5 + 0.5) * 0.12;
+    const pSize = 1.0 + Math.sin(time + p) * 0.5;
+
+    ctx.beginPath();
+    ctx.arc(px, py, pSize, 0, Math.PI * 2);
+    ctx.fillStyle = p % 3 === 0
+      ? `rgba(20, 241, 149, ${pAlpha})`
+      : `rgba(153, 69, 255, ${pAlpha})`;
+    ctx.fill();
+  }
+
+  // ─── Edge glow borders ────────────────────────────────────
+  // Top edge glow
+  const topGrad = ctx.createLinearGradient(area.x, area.y, area.x, area.y + 40);
+  topGrad.addColorStop(0, 'rgba(153, 69, 255, 0.10)');
+  topGrad.addColorStop(1, 'rgba(153, 69, 255, 0)');
+  ctx.fillStyle = topGrad;
+  ctx.fillRect(area.x, area.y, area.w, 40);
+
+  // Top border line
+  ctx.strokeStyle = `rgba(153, 69, 255, ${0.08 + Math.sin(time * 1.5) * 0.04})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(area.x, area.y);
+  ctx.lineTo(area.x + area.w, area.y);
+  ctx.stroke();
+
+  // Bottom edge glow
+  const botGrad = ctx.createLinearGradient(area.x, area.y + area.h - 40, area.x, area.y + area.h);
+  botGrad.addColorStop(0, 'rgba(153, 69, 255, 0)');
+  botGrad.addColorStop(1, 'rgba(153, 69, 255, 0.08)');
+  ctx.fillStyle = botGrad;
+  ctx.fillRect(area.x, area.y + area.h - 40, area.w, 40);
+
+  // Bottom border line
+  ctx.strokeStyle = `rgba(153, 69, 255, ${0.06 + Math.sin(time * 1.5 + 1) * 0.03})`;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(area.x, area.y + area.h);
+  ctx.lineTo(area.x + area.w, area.y + area.h);
+  ctx.stroke();
+
+  // Left edge glow
+  const leftGrad = ctx.createLinearGradient(area.x, area.y, area.x + 25, area.y);
+  leftGrad.addColorStop(0, 'rgba(153, 69, 255, 0.06)');
+  leftGrad.addColorStop(1, 'rgba(153, 69, 255, 0)');
+  ctx.fillStyle = leftGrad;
+  ctx.fillRect(area.x, area.y, 25, area.h);
+
+  // Right edge glow
+  const rightGrad = ctx.createLinearGradient(area.x + area.w - 25, area.y, area.x + area.w, area.y);
+  rightGrad.addColorStop(0, 'rgba(153, 69, 255, 0)');
+  rightGrad.addColorStop(1, 'rgba(153, 69, 255, 0.04)');
+  ctx.fillStyle = rightGrad;
+  ctx.fillRect(area.x + area.w - 25, area.y, 25, area.h);
+
+  // ─── Corner accents (futuristic bracket corners) ──────────
+  const cornerLen = 20;
+  const cornerAlpha = 0.15 + Math.sin(time * 2) * 0.05;
+  ctx.strokeStyle = `rgba(153, 69, 255, ${cornerAlpha})`;
+  ctx.lineWidth = 1.5;
+
+  // Top-left
+  ctx.beginPath();
+  ctx.moveTo(area.x, area.y + cornerLen);
+  ctx.lineTo(area.x, area.y);
+  ctx.lineTo(area.x + cornerLen, area.y);
+  ctx.stroke();
+
+  // Top-right
+  ctx.beginPath();
+  ctx.moveTo(area.x + area.w - cornerLen, area.y);
+  ctx.lineTo(area.x + area.w, area.y);
+  ctx.lineTo(area.x + area.w, area.y + cornerLen);
+  ctx.stroke();
+
+  // Bottom-left
+  ctx.beginPath();
+  ctx.moveTo(area.x, area.y + area.h - cornerLen);
+  ctx.lineTo(area.x, area.y + area.h);
+  ctx.lineTo(area.x + cornerLen, area.y + area.h);
+  ctx.stroke();
+
+  // Bottom-right
+  ctx.beginPath();
+  ctx.moveTo(area.x + area.w - cornerLen, area.y + area.h);
+  ctx.lineTo(area.x + area.w, area.y + area.h);
+  ctx.lineTo(area.x + area.w, area.y + area.h - cornerLen);
+  ctx.stroke();
 }
 
 function drawPhaseZones(ctx: CanvasRenderingContext2D, area: Area, duration: number, elapsed: number) {

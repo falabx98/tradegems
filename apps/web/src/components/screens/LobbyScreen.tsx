@@ -20,10 +20,42 @@ const BET_OPTIONS = [
   { label: '5',    lamports: 5_000_000_000 },
 ];
 
-const RISK_OPTIONS: { tier: RiskTier; label: string; tag: string; color: string }[] = [
-  { tier: 'conservative', label: 'Conservative', tag: '0.80x gain · 0.85x loss', color: theme.success },
-  { tier: 'balanced', label: 'Balanced', tag: '1.0x gain · 1.0x loss', color: theme.warning },
-  { tier: 'aggressive', label: 'Aggressive', tag: '1.25x gain · 1.40x loss', color: theme.danger },
+const GAME_MODE_OPTIONS: {
+  tier: RiskTier;
+  label: string;
+  desc: string;
+  color: string;
+  multipliers: string[];
+  gainTag: string;
+  lossTag: string;
+}[] = [
+  {
+    tier: 'conservative',
+    label: 'Safe',
+    desc: 'Reduced gains & losses. Best for beginners.',
+    color: theme.success,
+    multipliers: ['x1.04-1.20', 'x1.20-1.48', 'x1.48-1.96', 'x1.96-3.00', 'x3.00-5.00', 'x5.00-8.20'],
+    gainTag: '0.80x',
+    lossTag: '0.85x',
+  },
+  {
+    tier: 'balanced',
+    label: 'Standard',
+    desc: 'Normal gains & losses. The default experience.',
+    color: theme.warning,
+    multipliers: ['x1.05-1.25', 'x1.25-1.60', 'x1.60-2.20', 'x2.20-3.50', 'x3.50-6.00', 'x6.00-10.0'],
+    gainTag: '1.00x',
+    lossTag: '1.00x',
+  },
+  {
+    tier: 'aggressive',
+    label: 'Degen',
+    desc: 'Boosted gains but amplified losses. High risk.',
+    color: theme.danger,
+    multipliers: ['x1.06-1.31', 'x1.31-1.75', 'x1.75-2.50', 'x2.50-4.13', 'x4.13-7.25', 'x7.25-10.0'],
+    gainTag: '1.25x',
+    lossTag: '1.40x',
+  },
 ];
 
 interface FeedItem {
@@ -45,12 +77,47 @@ function timeAgo(dateStr: string) {
 
 export function LobbyScreen() {
   const isMobile = useIsMobile();
-  const { mode, setMode, betAmount, setBetAmount, riskTier, setRiskTier, startRound, profile, syncProfile, setScreen } = useGameStore();
+  const { mode, setMode, betAmount, setBetAmount, riskTier, setRiskTier, startRound, profile, syncProfile, setScreen, enterBattle } = useGameStore();
   const { isAuthenticated } = useAuthStore();
-  const [crediting, setCrediting] = useState(false);
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
+  const [customBet, setCustomBet] = useState('');
   const [activityFeed, setActivityFeed] = useState<FeedItem[]>([]);
   const [liveStats, setLiveStats] = useState({ active: 0, volume: '0', topWin: '1.0x' });
+  const [bonusClaimed, setBonusClaimed] = useState<boolean | null>(null);
+  const [claimingBonus, setClaimingBonus] = useState(false);
+  const [bonusUnlocked, setBonusUnlocked] = useState(false);
+  const [bonusProfit, setBonusProfit] = useState(0);
+  const [bonusProfitRequired, setBonusProfitRequired] = useState(1_000_000_000);
+
+  // Check bonus status for authenticated users
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    (async () => {
+      try {
+        const status = await api.getBonusStatus();
+        setBonusClaimed(status.claimed);
+        setBonusUnlocked(status.withdrawalUnlocked);
+        setBonusProfit(status.currentProfit);
+        setBonusProfitRequired(status.profitRequired);
+      } catch {
+        // Ignore — might not be logged in yet
+      }
+    })();
+  }, [isAuthenticated]);
+
+  const handleClaimBonus = async () => {
+    setClaimingBonus(true);
+    try {
+      const res = await api.claimBonus();
+      if (res.success) {
+        setBonusClaimed(true);
+        await syncProfile();
+      }
+    } catch (err) {
+      console.error('Failed to claim bonus:', err);
+    }
+    setClaimingBonus(false);
+  };
 
   useEffect(() => {
     (async () => {
@@ -83,16 +150,17 @@ export function LobbyScreen() {
     })();
   }, []);
 
-  const handleGetCredits = async () => {
-    setCrediting(true);
-    try {
-      await api.devCredit(2_000_000_000);
-      await syncProfile();
-    } catch (err) {
-      console.error('Failed to credit:', err);
-    }
-    setCrediting(false);
+  const handleCustomBet = () => {
+    const val = parseFloat(customBet);
+    if (isNaN(val) || val <= 0) return;
+    const lamports = solToLamports(val);
+    if (lamports > profile.balance) return;
+    setBetAmount(lamports);
+    setCustomBet('');
   };
+
+  // Check if current bet is a preset
+  const isCustomBetActive = betAmount > 0 && !BET_OPTIONS.some(o => o.lamports === betAmount);
 
   return (
     <div style={{
@@ -147,7 +215,7 @@ export function LobbyScreen() {
               {BET_OPTIONS.map((opt) => (
                 <button
                   key={opt.lamports}
-                  onClick={() => setBetAmount(opt.lamports)}
+                  onClick={() => { setBetAmount(opt.lamports); setCustomBet(''); }}
                   disabled={opt.lamports > profile.balance}
                   style={{
                     ...styles.betChip,
@@ -160,39 +228,131 @@ export function LobbyScreen() {
                 </button>
               ))}
             </div>
-          </div>
-
-          {/* Risk */}
-          <div style={styles.panel}>
-            <div style={styles.panelHeader}>
-              <span style={styles.panelTitle}>Risk</span>
-            </div>
-            <div style={styles.riskGrid}>
-              {RISK_OPTIONS.map(({ tier, label, tag, color }) => (
-                <button
-                  key={tier}
-                  onClick={() => setRiskTier(tier)}
+            <div style={styles.customBetRow}>
+              <span style={styles.customBetLabel}>Custom</span>
+              <div style={styles.customBetInputWrap}>
+                <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+                <input
+                  type="number"
+                  placeholder="0.00"
+                  value={customBet}
+                  onChange={(e) => setCustomBet(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleCustomBet(); }}
                   style={{
-                    ...styles.riskCard,
-                    ...(riskTier === tier ? {
-                      border: `1px solid ${color}40`,
-                      background: `${color}08`,
-                    } : {}),
+                    ...styles.customBetInput,
+                    ...(isCustomBetActive ? { color: '#c084fc' } : {}),
+                  }}
+                  className="mono"
+                  step="0.01"
+                  min="0"
+                />
+                <button
+                  onClick={handleCustomBet}
+                  disabled={!customBet || parseFloat(customBet) <= 0}
+                  style={{
+                    ...styles.customBetBtn,
+                    opacity: !customBet || parseFloat(customBet) <= 0 ? 0.35 : 1,
                   }}
                 >
-                  <div style={{
-                    ...styles.riskIndicator,
-                    background: riskTier === tier ? color : theme.text.muted,
-                  }} />
-                  <div style={styles.riskInfo}>
-                    <span style={{
-                      ...styles.riskLabel,
-                      color: riskTier === tier ? color : theme.text.secondary,
-                    }}>{label}</span>
-                    <span style={styles.riskTag} className="mono">{tag}</span>
-                  </div>
+                  Set
                 </button>
-              ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Game Mode */}
+          <div style={styles.panel}>
+            <div style={styles.panelHeader}>
+              <span style={styles.panelTitle}>Game Mode</span>
+            </div>
+            <div style={styles.riskGrid}>
+              {GAME_MODE_OPTIONS.map(({ tier, label, desc, color, multipliers, gainTag, lossTag }) => {
+                const isActive = riskTier === tier;
+                return (
+                  <button
+                    key={tier}
+                    onClick={() => setRiskTier(tier)}
+                    style={{
+                      ...styles.riskCard,
+                      ...(isActive ? {
+                        border: `1px solid ${color}40`,
+                        background: `${color}08`,
+                      } : {}),
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                      <div style={{
+                        ...styles.riskIndicator,
+                        background: isActive ? color : theme.text.muted,
+                      }} />
+                      <div style={{ ...styles.riskInfo, flex: 1 }}>
+                        <span style={{
+                          ...styles.riskLabel,
+                          color: isActive ? color : theme.text.secondary,
+                          fontSize: '13px',
+                        }}>{label}</span>
+                        <span style={{
+                          fontSize: '10px',
+                          fontWeight: 500,
+                          color: theme.text.muted,
+                          lineHeight: 1.3,
+                        }}>{desc}</span>
+                      </div>
+                      <div style={{
+                        display: 'flex',
+                        flexDirection: 'column' as const,
+                        alignItems: 'flex-end',
+                        gap: '2px',
+                        flexShrink: 0,
+                      }}>
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: 600,
+                          color: theme.game.multiplier,
+                          fontFamily: '"JetBrains Mono", monospace',
+                        }}>gain {gainTag}</span>
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: 600,
+                          color: theme.game.divider,
+                          fontFamily: '"JetBrains Mono", monospace',
+                        }}>loss {lossTag}</span>
+                      </div>
+                    </div>
+                    {isActive && (
+                      <div style={styles.modeMultipliersWrap}>
+                        {multipliers.map((m, i) => {
+                          const rarities = ['common', 'common', 'uncommon', 'uncommon', 'rare', 'legendary'];
+                          const rarityColors: Record<string, string> = {
+                            common: 'rgba(148, 163, 184, 0.6)',
+                            uncommon: 'rgba(52, 211, 153, 0.8)',
+                            rare: 'rgba(96, 165, 250, 0.9)',
+                            legendary: 'rgba(251, 191, 36, 1)',
+                          };
+                          const rarity = rarities[i] || 'common';
+                          return (
+                            <span
+                              key={i}
+                              style={{
+                                fontSize: '9px',
+                                fontWeight: 600,
+                                fontFamily: '"JetBrains Mono", monospace',
+                                color: rarityColors[rarity],
+                                padding: '2px 5px',
+                                borderRadius: '3px',
+                                background: `${rarityColors[rarity]}10`,
+                                border: `1px solid ${rarityColors[rarity]}20`,
+                              }}
+                            >
+                              {m}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -201,6 +361,10 @@ export function LobbyScreen() {
             onClick={() => {
               if (!isAuthenticated) {
                 setShowAuthPrompt(true);
+                return;
+              }
+              if (mode === 'battle') {
+                enterBattle();
                 return;
               }
               startRound();
@@ -223,7 +387,7 @@ export function LobbyScreen() {
             </span>
             <span style={styles.executeBtnSub} className="mono">
               <img src="/sol-coin.png" alt="SOL" style={{ width: '24px', height: '24px', marginRight: '4px', verticalAlign: 'middle' }} />
-              {formatSol(betAmount)} · {riskTier}
+              {formatSol(betAmount)} · {GAME_MODE_OPTIONS.find(o => o.tier === riskTier)?.label || riskTier}
             </span>
           </button>
 
@@ -260,15 +424,6 @@ export function LobbyScreen() {
             </div>
             <div style={styles.statsBody}>
               <StatRow label="Balance" value={`${formatSol(profile.balance)} SOL`} color="#c084fc" icon />
-              {profile.balance < 5 && (
-                <button
-                  onClick={handleGetCredits}
-                  disabled={crediting}
-                  style={styles.creditBtn}
-                >
-                  {crediting ? 'Crediting...' : 'Get 2 SOL dev credits'}
-                </button>
-              )}
               <StatRow label="Level" value={`${profile.level}`} />
               <StatRow label="VIP" value={profile.vipTier} color={theme.vip[profile.vipTier as keyof typeof theme.vip] || theme.text.secondary} />
               <StatRow label="Rounds" value={`${profile.roundsPlayed}`} />
@@ -282,6 +437,66 @@ export function LobbyScreen() {
               </div>
             </div>
           </div>
+
+          {/* Bonus Card — Unclaimed */}
+          {isAuthenticated && bonusClaimed === false && (
+            <div style={styles.bonusCard} className="card-enter card-enter-1">
+              <div style={styles.bonusGlow} />
+              <div style={styles.bonusContent}>
+                <div style={styles.bonusIcon}>🎁</div>
+                <div style={styles.bonusTextWrap}>
+                  <span style={styles.bonusTitle}>Welcome Bonus!</span>
+                  <span style={styles.bonusDesc}>
+                    Claim <strong style={{ color: '#14F195' }}>1 SOL</strong> free to start playing.
+                    Withdrawable after 1 SOL profit.
+                  </span>
+                </div>
+                <button
+                  onClick={handleClaimBonus}
+                  disabled={claimingBonus}
+                  className="btn-3d btn-3d-primary"
+                  style={styles.bonusBtn}
+                >
+                  {claimingBonus ? 'Claiming...' : 'Claim 1 SOL'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Bonus Status — Claimed but locked */}
+          {isAuthenticated && bonusClaimed === true && !bonusUnlocked && (
+            <div style={styles.bonusStatusCard}>
+              <div style={styles.bonusStatusRow}>
+                <span style={{ fontSize: '14px' }}>🔒</span>
+                <div style={styles.bonusStatusTextWrap}>
+                  <span style={styles.bonusStatusTitle}>Bonus: 1 SOL locked</span>
+                  <span style={styles.bonusStatusDesc}>
+                    Earn {(bonusProfitRequired / 1_000_000_000).toFixed(0)} SOL profit to unlock withdrawals
+                  </span>
+                </div>
+                <span style={{
+                  ...styles.bonusStatusProgress,
+                  color: bonusProfit >= 0 ? '#34d399' : '#f87171',
+                }} className="mono">
+                  {(bonusProfit / 1_000_000_000).toFixed(2)}/{(bonusProfitRequired / 1_000_000_000).toFixed(0)}
+                </span>
+              </div>
+              <div style={styles.bonusProgressBarSmall}>
+                <div style={{
+                  ...styles.bonusProgressFillSmall,
+                  width: `${Math.max(0, Math.min(100, (bonusProfit / bonusProfitRequired) * 100))}%`,
+                }} />
+              </div>
+            </div>
+          )}
+
+          {/* Bonus Status — Unlocked */}
+          {isAuthenticated && bonusClaimed === true && bonusUnlocked && (
+            <div style={styles.bonusUnlockedCard}>
+              <span style={{ fontSize: '14px' }}>🎉</span>
+              <span style={styles.bonusUnlockedText}>Bonus unlocked! Full balance withdrawable.</span>
+            </div>
+          )}
 
           {/* Recent plays */}
           <div style={{ ...styles.panel, flex: 1 }}>
@@ -421,7 +636,7 @@ function ChartPreview() {
     ctx.stroke();
 
     // Overlay text
-    ctx.fillStyle = 'rgba(153, 69, 255, 0.1)';
+    ctx.fillStyle = 'rgba(153, 69, 255, 0.18)';
     ctx.font = 'bold 40px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
     ctx.fillText('PREVIEW', w / 2, h / 2 + 14);
@@ -503,10 +718,13 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.bg.tertiary,
   },
   panelTitle: {
-    fontSize: '13px',
-    fontWeight: 600,
+    fontSize: '12px',
+    fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
   },
   panelValue: {
     fontSize: '12px',
@@ -521,16 +739,18 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
     gap: '1px',
-    background: theme.border.subtle,
+    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.25), rgba(20, 241, 149, 0.25))',
   },
   modeBtn: {
     padding: '12px',
     background: theme.bg.secondary,
     border: 'none',
     cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
-    fontSize: '13px',
-    fontWeight: 600,
+    fontFamily: 'Rajdhani, sans-serif',
+    fontSize: '14px',
+    fontWeight: 700,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
     color: theme.text.muted,
     transition: 'all 0.15s ease',
   },
@@ -544,7 +764,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '1px',
-    background: theme.border.subtle,
+    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.25), rgba(20, 241, 149, 0.25))',
   },
   betChip: {
     padding: '10px 4px',
@@ -563,6 +783,57 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(153, 69, 255, 0.08)',
   },
 
+  // Custom Bet
+  customBetRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 12px',
+    borderTop: `1px solid ${theme.border.subtle}`,
+  },
+  customBetLabel: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: theme.text.muted,
+    flexShrink: 0,
+  },
+  customBetInputWrap: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    background: theme.bg.tertiary,
+    borderRadius: '6px',
+    padding: '0 8px',
+    border: `1px solid ${theme.border.subtle}`,
+  },
+  customBetInput: {
+    flex: 1,
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    fontFamily: '"JetBrains Mono", monospace',
+    fontSize: '12px',
+    fontWeight: 600,
+    color: theme.text.secondary,
+    padding: '7px 0',
+    width: '60px',
+    minWidth: 0,
+  },
+  customBetBtn: {
+    padding: '5px 10px',
+    background: 'rgba(153, 69, 255, 0.12)',
+    border: `1px solid rgba(153, 69, 255, 0.2)`,
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontFamily: 'Rajdhani, sans-serif',
+    fontSize: '11px',
+    fontWeight: 700,
+    color: '#c084fc',
+    transition: 'all 0.12s ease',
+    flexShrink: 0,
+  },
+
   // Risk Profile
   riskGrid: {
     display: 'flex',
@@ -570,14 +841,15 @@ const styles: Record<string, React.CSSProperties> = {
   },
   riskCard: {
     display: 'flex',
+    flexWrap: 'wrap' as const,
     alignItems: 'center',
-    gap: '10px',
+    gap: '0px',
     padding: '10px 12px',
     background: 'transparent',
     border: 'none',
     borderBottom: `1px solid ${theme.border.subtle}`,
     cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
     transition: 'all 0.15s ease',
     textAlign: 'left',
   },
@@ -604,6 +876,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     color: theme.text.muted,
   },
+  modeMultipliersWrap: {
+    display: 'flex',
+    flexWrap: 'wrap' as const,
+    gap: '4px',
+    marginTop: '6px',
+    paddingTop: '6px',
+    borderTop: `1px solid ${theme.border.subtle}`,
+    width: '100%',
+  },
 
   // Execute Button
   executeBtn: {
@@ -622,7 +903,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 700,
     color: '#fff',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
   },
   executeBtnSub: {
     fontSize: '11px',
@@ -654,18 +935,6 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
-  },
-  creditBtn: {
-    padding: '6px 12px',
-    background: 'rgba(153, 69, 255, 0.08)',
-    border: `1px solid rgba(153, 69, 255, 0.15)`,
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
-    fontSize: '11px',
-    fontWeight: 600,
-    color: '#c084fc',
-    marginTop: '2px',
   },
   xpBarContainer: {
     height: '3px',
@@ -734,7 +1003,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '1px',
-    background: theme.border.subtle,
+    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.25), rgba(20, 241, 149, 0.25))',
     borderRadius: '8px',
     overflow: 'hidden',
   },
@@ -786,6 +1055,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: 700,
     color: theme.text.primary,
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   },
   authDesc: {
     fontSize: '13px',
@@ -798,9 +1070,129 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
     fontSize: '12px',
     fontWeight: 500,
     color: theme.text.muted,
+  },
+
+  // Bonus card
+  bonusCard: {
+    position: 'relative',
+    borderRadius: '14px',
+    overflow: 'hidden',
+    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.15), rgba(20, 241, 149, 0.1))',
+    border: '1px solid rgba(20, 241, 149, 0.25)',
+    boxShadow: '0 4px 24px rgba(20, 241, 149, 0.1), inset 0 1px 0 rgba(255,255,255,0.06)',
+  },
+  bonusGlow: {
+    position: 'absolute',
+    top: '-50%',
+    right: '-30%',
+    width: '120px',
+    height: '120px',
+    borderRadius: '50%',
+    background: 'radial-gradient(circle, rgba(20, 241, 149, 0.15) 0%, transparent 70%)',
+    pointerEvents: 'none',
+  },
+  bonusContent: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '14px 16px',
+    zIndex: 1,
+  },
+  bonusIcon: {
+    fontSize: '28px',
+    flexShrink: 0,
+  },
+  bonusTextWrap: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+  },
+  bonusTitle: {
+    fontSize: '14px',
+    fontWeight: 700,
+    color: '#14F195',
+  },
+  bonusDesc: {
+    fontSize: '11px',
+    fontWeight: 500,
+    color: theme.text.muted,
+    lineHeight: 1.3,
+  },
+  bonusBtn: {
+    padding: '8px 16px',
+    fontSize: '13px',
+    fontWeight: 700,
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
+  },
+
+  // Bonus status (after claim)
+  bonusStatusCard: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '6px',
+    padding: '10px 12px',
+    background: 'rgba(251, 191, 36, 0.05)',
+    border: '1px solid rgba(251, 191, 36, 0.15)',
+    borderRadius: '8px',
+  },
+  bonusStatusRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  bonusStatusTextWrap: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '1px',
+  },
+  bonusStatusTitle: {
+    fontSize: '11px',
+    fontWeight: 700,
+    color: '#fbbf24',
+  },
+  bonusStatusDesc: {
+    fontSize: '10px',
+    fontWeight: 500,
+    color: theme.text.muted,
+  },
+  bonusStatusProgress: {
+    fontSize: '11px',
+    fontWeight: 700,
+    flexShrink: 0,
+  },
+  bonusProgressBarSmall: {
+    height: '3px',
+    background: 'rgba(255,255,255,0.06)',
+    borderRadius: '2px',
+    overflow: 'hidden',
+  },
+  bonusProgressFillSmall: {
+    height: '100%',
+    background: 'linear-gradient(90deg, #9945FF, #14F195)',
+    borderRadius: '2px',
+    transition: 'width 0.3s ease',
+    minWidth: '2px',
+  },
+  bonusUnlockedCard: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 12px',
+    background: 'rgba(52, 211, 153, 0.06)',
+    border: '1px solid rgba(52, 211, 153, 0.15)',
+    borderRadius: '8px',
+  },
+  bonusUnlockedText: {
+    fontSize: '11px',
+    fontWeight: 600,
+    color: '#34d399',
   },
 };

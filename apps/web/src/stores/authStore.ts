@@ -10,7 +10,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
 
-  register: (email: string, username: string, password: string) => Promise<void>;
+  register: (email: string, username: string, password: string, referralCode?: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   connectWallet: () => Promise<void>;
   logout: () => Promise<void>;
@@ -26,10 +26,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: false,
   error: null,
 
-  register: async (email, username, password) => {
+  register: async (email, username, password, referralCode?) => {
     set({ isLoading: true, error: null });
     try {
-      const res = await api.register({ email, username, password });
+      const res = await api.register({ email, username, password, referralCode: referralCode || undefined });
       setAccessToken(res.accessToken);
       set({
         userId: res.userId,

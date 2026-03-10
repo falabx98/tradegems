@@ -252,4 +252,35 @@ export const adminApi = {
 
   getDistributions: () =>
     apiFetch('/v1/admin/analytics/distributions'),
+
+  // ─── Deposit Wallets ──────────────────────────────
+  getDepositWallets: (params: { limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.limit) q.set('limit', String(params.limit));
+    return apiFetch<{ data: unknown[] }>(`/v1/admin/deposit-wallets?${q}`);
+  },
+
+  getDepositWalletBalance: (userId: string) =>
+    apiFetch(`/v1/admin/deposit-wallets/${userId}/balance`),
+
+  sweepDepositWallet: (userId: string) =>
+    apiFetch(`/v1/admin/deposit-wallets/${userId}/sweep`, { method: 'POST' }),
+
+  // ─── Chat ─────────────────────────────────────────
+  getChatMessages: (params: { channel?: string; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.channel) q.set('channel', params.channel);
+    if (params.limit) q.set('limit', String(params.limit));
+    return apiFetch(`/v1/chat/messages?${q}`);
+  },
+
+  // ─── Referrals ────────────────────────────────────
+  getReferrals: (params: { limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.limit) q.set('limit', String(params.limit));
+    return apiFetch<{ data: unknown[] }>(`/v1/admin/referrals?${q}`);
+  },
+
+  getReferralStats: () =>
+    apiFetch('/v1/admin/referrals/stats'),
 };

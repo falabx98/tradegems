@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { theme } from '../styles/theme';
 import { DataTable, type Column } from '../components/DataTable';
 import { adminApi } from '../utils/api';
+import { useToastStore } from '../stores/toastStore';
 
 interface ConfigVersion {
   id: string;
@@ -43,12 +44,15 @@ export function GameConfigPage() {
     setLoading(false);
   }
 
+  const addToast = useToastStore((s) => s.addToast);
+
   async function handleSave() {
     setError('');
     try {
       const config = JSON.parse(editJson);
       setSaving(true);
       await adminApi.createEngineConfig(config);
+      addToast('Config saved as new version');
       await loadConfig();
       setShowEditor(false);
     } catch (e) {
@@ -60,9 +64,10 @@ export function GameConfigPage() {
   async function handleActivate(id: string) {
     try {
       await adminApi.activateEngineConfig(id);
+      addToast('Config activated');
       await loadConfig();
     } catch {
-      // silent
+      addToast('Failed to activate config', 'error');
     }
   }
 

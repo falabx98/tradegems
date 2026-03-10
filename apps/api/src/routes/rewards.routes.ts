@@ -12,6 +12,64 @@ const RAKEBACK_RATES: Record<string, number> = {
   titan: 0.08,
 };
 
+// Mystery box reward configuration per VIP tier
+// Each entry: { probability, amountLamports }
+const MYSTERY_BOX_REWARDS: Record<string, Record<string, { probability: number; amountLamports: number }>> = {
+  bronze: {
+    common:    { probability: 0.60,  amountLamports: 1_000_000 },       // 0.001 SOL
+    uncommon:  { probability: 0.25,  amountLamports: 5_000_000 },       // 0.005 SOL
+    rare:      { probability: 0.12,  amountLamports: 10_000_000 },      // 0.01 SOL
+    epic:      { probability: 0.025, amountLamports: 50_000_000 },      // 0.05 SOL
+    legendary: { probability: 0.005, amountLamports: 100_000_000 },     // 0.1 SOL
+  },
+  silver: {
+    common:    { probability: 0.50,  amountLamports: 2_000_000 },       // 0.002 SOL
+    uncommon:  { probability: 0.28,  amountLamports: 10_000_000 },      // 0.01 SOL
+    rare:      { probability: 0.16,  amountLamports: 25_000_000 },      // 0.025 SOL
+    epic:      { probability: 0.05,  amountLamports: 100_000_000 },     // 0.1 SOL
+    legendary: { probability: 0.01,  amountLamports: 250_000_000 },     // 0.25 SOL
+  },
+  gold: {
+    common:    { probability: 0.45,  amountLamports: 5_000_000 },       // 0.005 SOL
+    uncommon:  { probability: 0.28,  amountLamports: 20_000_000 },      // 0.02 SOL
+    rare:      { probability: 0.18,  amountLamports: 50_000_000 },      // 0.05 SOL
+    epic:      { probability: 0.07,  amountLamports: 200_000_000 },     // 0.2 SOL
+    legendary: { probability: 0.02,  amountLamports: 500_000_000 },     // 0.5 SOL
+  },
+  platinum: {
+    common:    { probability: 0.40,  amountLamports: 10_000_000 },      // 0.01 SOL
+    uncommon:  { probability: 0.28,  amountLamports: 40_000_000 },      // 0.04 SOL
+    rare:      { probability: 0.20,  amountLamports: 100_000_000 },     // 0.1 SOL
+    epic:      { probability: 0.09,  amountLamports: 400_000_000 },     // 0.4 SOL
+    legendary: { probability: 0.03,  amountLamports: 1_000_000_000 },   // 1.0 SOL
+  },
+  titan: {
+    common:    { probability: 0.35,  amountLamports: 20_000_000 },      // 0.02 SOL
+    uncommon:  { probability: 0.28,  amountLamports: 80_000_000 },      // 0.08 SOL
+    rare:      { probability: 0.22,  amountLamports: 200_000_000 },     // 0.2 SOL
+    epic:      { probability: 0.10,  amountLamports: 500_000_000 },     // 0.5 SOL
+    legendary: { probability: 0.05,  amountLamports: 2_000_000_000 },   // 2.0 SOL
+  },
+};
+
+const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as const;
+
+function rollMysteryBox(vipTier: string): { rarity: string; amountLamports: number } {
+  const rewards = MYSTERY_BOX_REWARDS[vipTier] || MYSTERY_BOX_REWARDS.bronze;
+  const roll = Math.random();
+  let cumulative = 0;
+
+  for (const rarity of RARITY_ORDER) {
+    cumulative += rewards[rarity].probability;
+    if (roll < cumulative) {
+      return { rarity, amountLamports: rewards[rarity].amountLamports };
+    }
+  }
+
+  // Fallback
+  return { rarity: 'common', amountLamports: rewards.common.amountLamports };
+}
+
 export async function rewardsRoutes(server: FastifyInstance) {
   const db = getDb();
 
@@ -107,11 +165,21 @@ export async function rewardsRoutes(server: FastifyInstance) {
     const totalFees = Number(feeRows[0]?.total_fees || 0);
     const accumulated = Math.floor(totalFees * rate);
 
+    // Subtract what has already been claimed (tracked via ledger entries)
+    const claimedResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount), 0) as total_claimed
+      FROM balance_ledger_entries
+      WHERE user_id = ${userId} AND asset = 'SOL' AND entry_type = 'rakeback_claim'
+    `);
+    const claimedRows = claimedResult as unknown as Array<Record<string, unknown>>;
+    const totalClaimed = Number(claimedRows[0]?.total_claimed || 0);
+    const claimable = Math.max(0, accumulated - totalClaimed);
+
     return {
       rate,
       tier: vipTier,
       accumulated,
-      claimable: accumulated, // simplified: all accumulated is claimable
+      claimable,
     };
   });
 
@@ -132,7 +200,17 @@ export async function rewardsRoutes(server: FastifyInstance) {
     `);
     const feeRows = feeResult as unknown as Array<Record<string, unknown>>;
     const totalFees = Number(feeRows[0]?.total_fees || 0);
-    const claimable = Math.floor(totalFees * rate);
+    const accumulated = Math.floor(totalFees * rate);
+
+    // Subtract what has already been claimed
+    const claimedResult = await db.execute(sql`
+      SELECT COALESCE(SUM(amount), 0) as total_claimed
+      FROM balance_ledger_entries
+      WHERE user_id = ${userId} AND asset = 'SOL' AND entry_type = 'rakeback_claim'
+    `);
+    const claimedRows = claimedResult as unknown as Array<Record<string, unknown>>;
+    const totalClaimed = Number(claimedRows[0]?.total_claimed || 0);
+    const claimable = Math.max(0, accumulated - totalClaimed);
 
     if (claimable <= 0) {
       return { success: false, message: 'No rakeback to claim' };
@@ -142,9 +220,164 @@ export async function rewardsRoutes(server: FastifyInstance) {
     await db.execute(sql`
       UPDATE balances
       SET available_amount = available_amount + ${claimable}, updated_at = now()
-      WHERE user_id = ${userId} AND asset = 'USDC'
+      WHERE user_id = ${userId} AND asset = 'SOL'
+    `);
+
+    // Record ledger entry so we track what was claimed
+    const balResult = await db.execute(sql`
+      SELECT available_amount FROM balances
+      WHERE user_id = ${userId} AND asset = 'SOL'
+    `);
+    const balAfter = Number((balResult as unknown as Array<Record<string, unknown>>)[0]?.available_amount || 0);
+
+    await db.execute(sql`
+      INSERT INTO balance_ledger_entries
+        (user_id, asset, entry_type, amount, balance_after, reference_type, reference_id)
+      VALUES (${userId}, 'SOL', 'rakeback_claim', ${claimable}, ${balAfter}, 'rakeback', ${userId})
     `);
 
     return { success: true, claimed: claimable };
+  });
+
+  // ---- Daily Mystery Box ----
+
+  server.get('/daily-box', async (request) => {
+    const userId = getAuthUser(request).userId;
+
+    const userResult = await db.execute(sql`
+      SELECT level, vip_tier FROM users WHERE id = ${userId}
+    `);
+    const userRows = userResult as unknown as Array<Record<string, unknown>>;
+    const level = Number(userRows[0]?.level || 1);
+    const vipTier = String(userRows[0]?.vip_tier || 'bronze');
+
+    // Find most recent claim
+    const lastClaimResult = await db.execute(sql`
+      SELECT claimed_at FROM daily_rewards
+      WHERE user_id = ${userId}
+      ORDER BY claimed_at DESC
+      LIMIT 1
+    `);
+    const claimRows = lastClaimResult as unknown as Array<Record<string, unknown>>;
+    const lastClaimed = claimRows[0]?.claimed_at
+      ? new Date(claimRows[0].claimed_at as string)
+      : null;
+
+    const now = new Date();
+    const cooldownMs = 24 * 60 * 60 * 1000;
+    const nextAvailableAt = lastClaimed
+      ? new Date(lastClaimed.getTime() + cooldownMs)
+      : null;
+    const available = !lastClaimed || now >= nextAvailableAt!;
+
+    // Build reward table for current tier
+    const tierRewards = MYSTERY_BOX_REWARDS[vipTier] || MYSTERY_BOX_REWARDS.bronze;
+    const rewardTable = RARITY_ORDER.map((rarity) => ({
+      rarity,
+      probability: tierRewards[rarity].probability,
+      amountLamports: tierRewards[rarity].amountLamports,
+    }));
+
+    // Next tier preview
+    const tierOrder = ['bronze', 'silver', 'gold', 'platinum', 'titan'];
+    const currentIdx = tierOrder.indexOf(vipTier);
+    const nextTier = currentIdx < tierOrder.length - 1 ? tierOrder[currentIdx + 1] : null;
+    let nextTierRewards = null;
+    if (nextTier) {
+      const nr = MYSTERY_BOX_REWARDS[nextTier];
+      nextTierRewards = {
+        tier: nextTier,
+        rewards: RARITY_ORDER.map((rarity) => ({
+          rarity,
+          probability: nr[rarity].probability,
+          amountLamports: nr[rarity].amountLamports,
+        })),
+      };
+    }
+
+    // Claim history (last 10)
+    const historyResult = await db.execute(sql`
+      SELECT id, claimed_at, rarity, amount_lamports, user_level, vip_tier
+      FROM daily_rewards
+      WHERE user_id = ${userId}
+      ORDER BY claimed_at DESC
+      LIMIT 10
+    `);
+    const history = (historyResult as unknown as Array<Record<string, unknown>>).map((r) => ({
+      id: r.id,
+      claimedAt: r.claimed_at,
+      rarity: r.rarity,
+      amountLamports: Number(r.amount_lamports),
+      userLevel: Number(r.user_level),
+      vipTier: r.vip_tier,
+    }));
+
+    return { available, nextAvailableAt: nextAvailableAt?.toISOString() || null, level, vipTier, rewardTable, nextTierRewards, history };
+  });
+
+  server.post('/daily-box/claim', async (request) => {
+    const userId = getAuthUser(request).userId;
+
+    const userResult = await db.execute(sql`
+      SELECT level, vip_tier FROM users WHERE id = ${userId}
+    `);
+    const userRows = userResult as unknown as Array<Record<string, unknown>>;
+    const level = Number(userRows[0]?.level || 1);
+    const vipTier = String(userRows[0]?.vip_tier || 'bronze');
+
+    // Check 24h cooldown
+    const lastClaimResult = await db.execute(sql`
+      SELECT claimed_at FROM daily_rewards
+      WHERE user_id = ${userId}
+      ORDER BY claimed_at DESC
+      LIMIT 1
+    `);
+    const claimRows = lastClaimResult as unknown as Array<Record<string, unknown>>;
+    const lastClaimed = claimRows[0]?.claimed_at
+      ? new Date(claimRows[0].claimed_at as string)
+      : null;
+
+    const now = new Date();
+    const cooldownMs = 24 * 60 * 60 * 1000;
+    if (lastClaimed && now.getTime() - lastClaimed.getTime() < cooldownMs) {
+      const nextAvailableAt = new Date(lastClaimed.getTime() + cooldownMs);
+      return { success: false, message: 'Daily box already claimed', nextAvailableAt: nextAvailableAt.toISOString() };
+    }
+
+    // Roll the mystery box
+    const { rarity, amountLamports } = rollMysteryBox(vipTier);
+
+    // Insert daily_rewards record
+    const insertResult = await db.execute(sql`
+      INSERT INTO daily_rewards (user_id, rarity, amount_lamports, user_level, vip_tier)
+      VALUES (${userId}, ${rarity}, ${amountLamports}, ${level}, ${vipTier})
+      RETURNING id
+    `);
+    const rewardId = (insertResult as unknown as Array<Record<string, unknown>>)[0]?.id as string;
+
+    // Credit balance
+    await db.execute(sql`
+      UPDATE balances
+      SET available_amount = available_amount + ${amountLamports}, updated_at = now()
+      WHERE user_id = ${userId} AND asset = 'SOL'
+    `);
+
+    // Record ledger entry
+    const balResult = await db.execute(sql`
+      SELECT available_amount FROM balances
+      WHERE user_id = ${userId} AND asset = 'SOL'
+    `);
+    const balAfter = Number((balResult as unknown as Array<Record<string, unknown>>)[0]?.available_amount || 0);
+
+    await db.execute(sql`
+      INSERT INTO balance_ledger_entries
+        (user_id, asset, entry_type, amount, balance_after, reference_type, reference_id)
+      VALUES (${userId}, 'SOL', 'daily_box_reward', ${amountLamports}, ${balAfter}, 'daily_reward', ${rewardId})
+    `);
+
+    return {
+      success: true,
+      reward: { id: rewardId, rarity, amountLamports, level, vipTier },
+    };
   });
 }

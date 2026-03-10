@@ -4,7 +4,8 @@ import {
   rounds, bets, betResults, users, userProfiles, featureFlags,
   engineConfigs, adminAuditLogs, balances, balanceLedgerEntries,
   deposits, withdrawals, roundPools, roundNodes, riskFlags,
-  userDepositWallets,
+  userDepositWallets, referralCodes, referrals, referralEarnings,
+  chatMessages,
 } from '@tradingarena/db';
 import { getDb } from '../config/database.js';
 import { requireAdmin, getAuthUser } from '../middleware/auth.js';
@@ -549,7 +550,7 @@ export async function adminRoutes(server: FastifyInstance) {
   server.get('/analytics/timeseries', async (request) => {
     const { metric, period } = request.query as { metric?: string; period?: string };
     const days = period === '7d' ? 7 : period === '90d' ? 90 : 30;
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
     let data: { date: string; value: number }[] = [];
 
@@ -670,5 +671,101 @@ export async function adminRoutes(server: FastifyInstance) {
     });
 
     return { success: true, txHash };
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  REFERRALS
+  // ═══════════════════════════════════════════════════════════
+
+  server.get('/referrals', async (request) => {
+    const { limit = 50 } = request.query as { limit?: number };
+
+    const data = await db
+      .select({
+        id: referralCodes.id,
+        userId: referralCodes.userId,
+        code: referralCodes.code,
+        createdAt: referralCodes.createdAt,
+        username: users.username,
+      })
+      .from(referralCodes)
+      .leftJoin(users, eq(users.id, referralCodes.userId))
+      .orderBy(desc(referralCodes.createdAt))
+      .limit(Number(limit));
+
+    // Enrich with referral count and earnings per code
+    const enriched = await Promise.all(data.map(async (row) => {
+      const [refCount] = await db
+        .select({ total: count() })
+        .from(referrals)
+        .where(eq(referrals.referrerId, row.userId));
+
+      const [earnings] = await db
+        .select({ total: sql<string>`COALESCE(SUM(${referralEarnings.commissionAmount}), 0)` })
+        .from(referralEarnings)
+        .where(eq(referralEarnings.referrerId, row.userId));
+
+      return {
+        ...row,
+        referralCount: refCount?.total ?? 0,
+        totalEarnings: Number(earnings?.total ?? 0),
+      };
+    }));
+
+    return { data: enriched };
+  });
+
+  server.get('/referrals/stats', async () => {
+    const [codes] = await db.select({ total: count() }).from(referralCodes);
+    const [refs] = await db.select({ total: count() }).from(referrals);
+    const [earnings] = await db
+      .select({ total: sql<string>`COALESCE(SUM(${referralEarnings.commissionAmount}), 0)` })
+      .from(referralEarnings);
+    const [claimed] = await db
+      .select({ total: sql<string>`COALESCE(SUM(${referralEarnings.commissionAmount}), 0)` })
+      .from(referralEarnings)
+      .where(eq(referralEarnings.status, 'claimed'));
+
+    return {
+      totalCodes: codes?.total ?? 0,
+      totalReferrals: refs?.total ?? 0,
+      totalEarnings: Number(earnings?.total ?? 0),
+      totalClaimed: Number(claimed?.total ?? 0),
+    };
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  CHAT MODERATION
+  // ═══════════════════════════════════════════════════════════
+
+  server.get('/chat/messages', async (request) => {
+    const { channel = 'global', limit = 100 } = request.query as { channel?: string; limit?: number };
+
+    const messages = await db
+      .select()
+      .from(chatMessages)
+      .where(eq(chatMessages.channel, channel))
+      .orderBy(desc(chatMessages.createdAt))
+      .limit(Number(limit));
+
+    return { messages: messages.reverse() };
+  });
+
+  server.delete('/chat/messages/:id', async (request) => {
+    const { id } = request.params as { id: string };
+    const actor = getAuthUser(request);
+
+    await db.delete(chatMessages).where(eq(chatMessages.id, id));
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'chat_message_delete',
+      targetType: 'chat_message',
+      targetId: id,
+      payload: {},
+      ipAddress: request.ip,
+    });
+
+    return { success: true };
   });
 }

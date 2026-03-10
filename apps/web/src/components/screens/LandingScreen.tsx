@@ -135,6 +135,9 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 0.95,
     color: theme.text.primary,
     margin: 0,
+    fontFamily: "'Orbitron', sans-serif",
+    letterSpacing: '2px',
+    textTransform: 'uppercase' as const,
   },
   tagline: {
     fontSize: '14px',

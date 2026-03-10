@@ -1,31 +1,48 @@
-import type { CSSProperties, ReactNode } from 'react';
-import { Sidebar, type Page } from './Sidebar';
+import type { CSSProperties } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { Sidebar } from './Sidebar';
+import { useAuthStore } from '../stores/authStore';
 import { theme } from '../styles/theme';
 
-interface LayoutProps {
-  activePage: Page;
-  onNavigate: (page: Page) => void;
-  onLogout: () => void;
-  username: string | null;
-  children: ReactNode;
-}
+const pageTitles: Record<string, string> = {
+  '/': 'Dashboard',
+  '/users': 'Users',
+  '/treasury': 'Treasury',
+  '/rounds': 'Rounds',
+  '/fairness': 'Fairness',
+  '/game-config': 'Game Config',
+  '/feature-flags': 'Feature Flags',
+  '/risk': 'Risk Flags',
+  '/audit': 'Audit Log',
+  '/analytics': 'Analytics',
+  '/chat': 'Chat Moderation',
+  '/deposit-wallets': 'Deposit Wallets',
+  '/referrals': 'Referrals',
+  '/settings': 'Settings',
+};
 
-export function Layout({ activePage, onNavigate, onLogout, username, children }: LayoutProps) {
+export function AdminLayout() {
+  const { username, logout } = useAuthStore();
+  const location = useLocation();
+
+  const path = location.pathname;
+  const title = path.startsWith('/users/') && path !== '/users'
+    ? 'User Detail'
+    : pageTitles[path] || 'Admin';
+
   return (
     <div style={styles.container}>
-      <Sidebar activePage={activePage} onNavigate={onNavigate} onLogout={onLogout} />
+      <Sidebar onLogout={logout} />
       <div style={styles.main}>
         <header style={styles.topbar}>
-          <div style={styles.breadcrumb}>
-            {activePage.charAt(0).toUpperCase() + activePage.slice(1).replace(/([A-Z])/g, ' $1')}
-          </div>
+          <div style={styles.breadcrumb}>{title}</div>
           <div style={styles.user}>
             <span style={styles.userIcon}>●</span>
             <span style={styles.userName}>{username || 'Admin'}</span>
           </div>
         </header>
         <div style={styles.content}>
-          {children}
+          <Outlet />
         </div>
       </div>
     </div>

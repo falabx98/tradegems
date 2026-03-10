@@ -12,6 +12,10 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('ref') || '';
+  });
   const { login, register, connectWallet, isLoading, error, clearError } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,7 +24,7 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
       if (mode === 'login') {
         await login(email, password);
       } else {
-        await register(email, username, password);
+        await register(email, username, password, referralCode || undefined);
       }
       onSuccess();
     } catch {
@@ -111,6 +115,20 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             />
           </div>
+
+          {mode === 'register' && (
+            <div style={styles.field}>
+              <label style={styles.label}>Referral Code (optional)</label>
+              <input
+                type="text"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                placeholder="Enter referral code"
+                style={styles.input}
+                maxLength={20}
+              />
+            </div>
+          )}
 
           <button
             type="submit"
@@ -214,6 +232,9 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1.1,
     color: theme.text.primary,
     margin: 0,
+    fontFamily: "'Orbitron', sans-serif",
+    letterSpacing: '1px',
+    textTransform: 'uppercase' as const,
   },
   toggle: {
     display: 'grid',
@@ -229,15 +250,17 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.bg.tertiary,
     border: 'none',
     cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
-    fontSize: '13px',
-    fontWeight: 600,
+    fontFamily: 'Rajdhani, sans-serif',
+    fontSize: '14px',
+    fontWeight: 700,
     color: theme.text.muted,
     transition: 'all 0.15s ease',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   },
   toggleBtnActive: {
     color: '#c084fc',
-    background: 'rgba(153, 69, 255, 0.1)',
+    background: 'rgba(153, 69, 255, 0.18)',
   },
   error: {
     width: '100%',
@@ -271,7 +294,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${theme.border.medium}`,
     borderRadius: '8px',
     color: theme.text.primary,
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
     fontSize: '14px',
     outline: 'none',
     transition: 'border-color 0.15s ease',
@@ -280,23 +303,26 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '12px',
+    padding: '14px',
     background: '#9945FF',
     border: 'none',
-    borderRadius: '10px',
+    borderRadius: '12px',
     cursor: 'pointer',
-    transition: 'all 0.15s ease',
+    transition: 'all 0.1s ease',
     marginTop: '4px',
-    fontSize: '14px',
+    fontSize: '15px',
     fontWeight: 700,
     color: '#fff',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    boxShadow: '0 4px 0 #7325d4, 0 6px 12px rgba(153, 69, 255, 0.3)',
   },
   switchBtn: {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
     fontSize: '12px',
     color: theme.text.secondary,
     transition: 'color 0.15s ease',
@@ -323,16 +349,19 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     gap: '10px',
     width: '100%',
-    padding: '12px',
+    padding: '14px',
     background: '#8b8bf5',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '12px',
     cursor: 'pointer',
-    transition: 'all 0.15s ease',
+    transition: 'all 0.1s ease',
     fontSize: '14px',
-    fontWeight: 600,
+    fontWeight: 700,
     color: '#fff',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    boxShadow: '0 4px 0 #6565c4, 0 6px 12px rgba(139, 139, 245, 0.3)',
   },
   phantomIcon: {
     fontSize: '18px',
@@ -341,7 +370,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: theme.accent.purple,
     textDecoration: 'none',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
   },
   version: {
     fontSize: '11px',

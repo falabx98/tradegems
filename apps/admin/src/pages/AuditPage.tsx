@@ -76,8 +76,6 @@ export function AuditPage() {
 
   return (
     <div style={styles.page}>
-      <h3 style={styles.title}>Audit Log</h3>
-
       {loading ? (
         <div style={styles.loading}>Loading audit logs...</div>
       ) : (

@@ -98,6 +98,7 @@ export interface PlayerProfile {
   xpToNext: number;
   vipTier: VipTier;
   rakebackRate: number;
+  avatarUrl: string | null;
   balance: number;
   totalWagered: number;
   totalWon: number;

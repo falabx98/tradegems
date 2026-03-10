@@ -11,6 +11,10 @@ import { HistoryScreen } from './components/screens/HistoryScreen';
 import { LeaderboardScreen } from './components/screens/LeaderboardScreen';
 import { RewardsScreen } from './components/screens/RewardsScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
+import { BattleScreen } from './components/screens/BattleScreen';
+import { OnboardingModal, useOnboarding } from './components/OnboardingModal';
+import { ChatPanel } from './components/ChatPanel';
+import { ChatToggle } from './components/layout/ChatToggle';
 import './styles/global.css';
 
 export default function App() {
@@ -19,6 +23,7 @@ export default function App() {
   const syncProfile = useGameStore((state) => state.syncProfile);
   const { isAuthenticated, checkAuth } = useAuthStore();
   const [authChecked, setAuthChecked] = useState(false);
+  const { showOnboarding, closeOnboarding } = useOnboarding();
 
   // Check auth on mount
   useEffect(() => {
@@ -52,6 +57,12 @@ export default function App() {
   // Auth screen overlays on top of the lobby
   return (
     <AppLayout>
+      {showOnboarding && !isAuthenticated && (
+        <OnboardingModal onClose={() => {
+          closeOnboarding();
+          if (!isAuthenticated) setScreen('auth');
+        }} />
+      )}
       {(screen === 'lobby' || screen === 'auth') && <LobbyScreen />}
       {screen === 'setup' && <LobbyScreen />}
       {screen === 'result' && <ResultScreen />}
@@ -60,12 +71,15 @@ export default function App() {
       {screen === 'leaderboard' && <LeaderboardScreen />}
       {screen === 'rewards' && <RewardsScreen />}
       {screen === 'settings' && <SettingsScreen />}
+      {screen === 'battle' && <BattleScreen />}
       {screen === 'auth' && (
         <AuthScreen onSuccess={() => {
           syncProfile();
           setScreen('lobby');
         }} />
       )}
+      {isAuthenticated && <ChatToggle />}
+      {isAuthenticated && <ChatPanel />}
     </AppLayout>
   );
 }

@@ -1,13 +1,13 @@
 /* ─── Trading Arena Global Styles ─────────────────────────────────────────── */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg-primary: #0b0e1a;
-  --bg-secondary: #111527;
-  --bg-tertiary: #161b2e;
-  --bg-card: #151a2d;
-  --bg-elevated: #1a2038;
+  --bg-primary: #0e0a16;
+  --bg-secondary: #150f21;
+  --bg-tertiary: #1c142a;
+  --bg-card: #181125;
+  --bg-elevated: #201830;
 
   --text-primary: #e8e8f0;
   --text-secondary: #7e7fa0;
@@ -21,10 +21,11 @@
   --warning: #fbbf24;
   --danger: #f87171;
 
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-medium: rgba(255, 255, 255, 0.09);
+  --border-subtle: rgba(153, 69, 255, 0.12);
+  --border-medium: rgba(153, 69, 255, 0.18);
 
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-sans: 'Rajdhani', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-display: 'Orbitron', 'Rajdhani', sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
 }
 
@@ -44,7 +45,10 @@ html {
 
 body {
   font-family: var(--font-sans);
-  background: var(--bg-primary);
+  background:
+    radial-gradient(ellipse at 15% 10%, rgba(153, 69, 255, 0.07), transparent 50%),
+    radial-gradient(ellipse at 85% 90%, rgba(20, 241, 149, 0.04), transparent 50%),
+    var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
   overflow-x: hidden;
@@ -146,8 +150,10 @@ body {
   position: relative;
   border: none;
   border-radius: 12px;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Rajdhani', sans-serif;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   cursor: pointer;
   transition: all 0.1s ease;
   transform: translateY(0);
@@ -167,7 +173,7 @@ body {
 
 .btn-3d-success {
   background: #14F195;
-  color: #0b0e1a;
+  color: #0e0a16;
   box-shadow: 0 4px 0 #0ec47a, 0 6px 12px rgba(20, 241, 149, 0.3);
 }
 
@@ -243,6 +249,144 @@ body {
   75% { transform: translate(15%, -20%); }
 }
 
+/* ─── Gaming Keyframes ───────────────────────────────────────────────────── */
+
+@keyframes cardEntrance {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(153, 69, 255, 0.2); }
+  50%      { box-shadow: 0 0 20px rgba(153, 69, 255, 0.4); }
+}
+
+@keyframes metallicSweep {
+  0%   { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes progressGrow {
+  from { width: 0%; }
+}
+
+/* ─── Glassmorphism Card ─────────────────────────────────────────────────── */
+
+.glass-card {
+  background: rgba(21, 26, 45, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(153, 69, 255, 0.12);
+  border-radius: 14px;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.glass-card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 16px rgba(153, 69, 255, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  border-color: rgba(153, 69, 255, 0.2);
+}
+
+/* ─── Gradient Border ────────────────────────────────────────────────────── */
+
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(153, 69, 255, 0.3), rgba(20, 241, 149, 0.15));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ─── Neon Text ──────────────────────────────────────────────────────────── */
+
+.neon-text-purple {
+  text-shadow: 0 0 8px rgba(153, 69, 255, 0.4), 0 0 20px rgba(153, 69, 255, 0.15);
+}
+.neon-text-green {
+  text-shadow: 0 0 8px rgba(52, 211, 153, 0.4), 0 0 20px rgba(52, 211, 153, 0.15);
+}
+.neon-text-red {
+  text-shadow: 0 0 8px rgba(248, 113, 113, 0.4), 0 0 20px rgba(248, 113, 113, 0.15);
+}
+
+/* ─── Metallic Badge Sheen ───────────────────────────────────────────────── */
+
+.badge-metallic {
+  position: relative;
+  overflow: hidden;
+}
+.badge-metallic::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.12) 45%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.12) 55%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: metallicSweep 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ─── Table Row Hover ────────────────────────────────────────────────────── */
+
+.table-row-hover {
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+.table-row-hover:hover {
+  background-color: rgba(153, 69, 255, 0.04);
+  transform: translateX(2px);
+}
+
+/* ─── Card Entrance Animation ────────────────────────────────────────────── */
+
+.card-enter {
+  animation: cardEntrance 0.4s ease-out both;
+}
+.card-enter-1 { animation-delay: 0.05s; }
+.card-enter-2 { animation-delay: 0.1s; }
+.card-enter-3 { animation-delay: 0.15s; }
+.card-enter-4 { animation-delay: 0.2s; }
+.card-enter-5 { animation-delay: 0.25s; }
+
+/* ─── Progress Bar Glow ──────────────────────────────────────────────────── */
+
+.progress-glow {
+  box-shadow: 0 0 8px rgba(153, 69, 255, 0.3);
+  animation: progressGrow 0.8s ease-out;
+}
+
+/* ─── 3D Button Hover Glow ───────────────────────────────────────────────── */
+
+.btn-3d-primary:hover {
+  box-shadow: 0 4px 0 #7325d4, 0 6px 20px rgba(153, 69, 255, 0.5), 0 0 30px rgba(153, 69, 255, 0.2);
+}
+.btn-3d-success:hover {
+  box-shadow: 0 4px 0 #0ec47a, 0 6px 20px rgba(20, 241, 149, 0.5), 0 0 30px rgba(20, 241, 149, 0.2);
+}
+.btn-3d-danger:hover {
+  box-shadow: 0 4px 0 #d14545, 0 6px 20px rgba(248, 113, 113, 0.5), 0 0 30px rgba(248, 113, 113, 0.2);
+}
+
 /* ─── Mobile utilities ───────────────────────────────────────────────────── */
 
 @media (max-width: 767px) {
@@ -251,4 +395,54 @@ body {
 
 @media (min-width: 768px) {
   .hide-desktop { display: none !important; }
+}
+
+/* ─── Mystery Box Animations ──────────────────────────────────────────── */
+
+@keyframes mysteryBoxShake {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  10% { transform: rotate(-12deg) scale(1.05); }
+  20% { transform: rotate(12deg) scale(1.1); }
+  30% { transform: rotate(-15deg) scale(1.12); }
+  40% { transform: rotate(15deg) scale(1.15); }
+  50% { transform: rotate(-18deg) scale(1.18); }
+  60% { transform: rotate(18deg) scale(1.2); }
+  70% { transform: rotate(-15deg) scale(1.15); }
+  80% { transform: rotate(15deg) scale(1.1); }
+  90% { transform: rotate(-8deg) scale(1.05); }
+}
+
+@keyframes mysteryBoxBurst {
+  0% { transform: scale(0.3); opacity: 0; }
+  50% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes rarityGlow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.4); }
+}
+
+.mystery-box-shake {
+  animation: mysteryBoxShake 0.3s ease-in-out infinite;
+}
+
+.mystery-box-burst {
+  animation: mysteryBoxBurst 0.6s ease-out forwards;
+}
+
+.rarity-glow {
+  animation: rarityGlow 1.5s ease-in-out infinite;
+}
+
+/* ─── Chat Panel Animations ──────────────────────────────────────────────── */
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+@keyframes chatBtnPulse {
+  0%, 100% { box-shadow: 0 4px 0 #7325d4, 0 0 12px rgba(153, 69, 255, 0.3); }
+  50%      { box-shadow: 0 4px 0 #7325d4, 0 0 20px rgba(153, 69, 255, 0.5); }
 }

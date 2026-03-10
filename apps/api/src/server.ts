@@ -14,6 +14,9 @@ import { gameplayRoutes } from './routes/gameplay.routes.js';
 import { rewardsRoutes } from './routes/rewards.routes.js';
 import { leaderboardRoutes } from './routes/leaderboard.routes.js';
 import { adminRoutes } from './routes/admin.routes.js';
+import { battleRoutes } from './routes/battle.routes.js';
+import { referralRoutes } from './routes/referral.routes.js';
+import { chatRoutes } from './routes/chat.routes.js';
 
 export async function buildServer() {
   const server = Fastify({
@@ -24,6 +27,7 @@ export async function buildServer() {
         : undefined,
     },
     genReqId: () => crypto.randomUUID(),
+    bodyLimit: 1_048_576, // 1 MB for avatar uploads (base64)
   });
 
   // ─── Plugins ─────────────────────────────────────────────
@@ -70,6 +74,9 @@ export async function buildServer() {
   await server.register(rewardsRoutes, { prefix: '/v1/rewards' });
   await server.register(leaderboardRoutes, { prefix: '/v1/leaderboards' });
   await server.register(adminRoutes, { prefix: '/v1/admin' });
+  await server.register(battleRoutes, { prefix: '/v1/battles' });
+  await server.register(referralRoutes, { prefix: '/v1/referrals' });
+  await server.register(chatRoutes, { prefix: '/v1/chat' });
 
   return server;
 }

@@ -1,0 +1,3 @@
+-- Add bonus tracking columns
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bonus_claimed BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE balances ADD COLUMN IF NOT EXISTS bonus_amount BIGINT NOT NULL DEFAULT 0;

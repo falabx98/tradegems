@@ -34,7 +34,7 @@ export function WalletScreen() {
 
   // Deposit address
   const [treasuryAddress, setTreasuryAddress] = useState('');
-
+  const [copied, setCopied] = useState(false);
 
   // Phantom quick-send
   const [depositAmount, setDepositAmount] = useState('0.1');
@@ -50,10 +50,20 @@ export function WalletScreen() {
 
   const [linkedAddress, setLinkedAddress] = useState<string | null>(walletAddress);
 
+  // Bonus status
+  const [bonusStatus, setBonusStatus] = useState<{
+    claimed: boolean;
+    bonusAmount: number;
+    profitRequired: number;
+    currentProfit: number;
+    withdrawalUnlocked: boolean;
+  } | null>(null);
+
   useEffect(() => {
     loadTransactions();
     loadLinkedWallet();
     loadDepositAddress();
+    loadBonusStatus();
   }, []);
 
   async function loadDepositAddress() {
@@ -71,6 +81,13 @@ export function WalletScreen() {
     } catch {} finally {
       setLoading(false);
     }
+  }
+
+  async function loadBonusStatus() {
+    try {
+      const status = await api.getBonusStatus();
+      setBonusStatus(status);
+    } catch {}
   }
 
   async function loadLinkedWallet() {
@@ -163,18 +180,19 @@ export function WalletScreen() {
       case 'deposit_confirmed': return 'Deposit';
       case 'withdraw_complete': return 'Withdraw';
       case 'rakeback_credit': return 'Rakeback';
+      case 'signup_bonus': return 'Bonus';
       default: return type.replace(/_/g, ' ');
     }
   }
 
   function txColor(type: string) {
-    if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock'].includes(type)) return '#34d399';
+    if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock', 'signup_bonus'].includes(type)) return '#34d399';
     if (['bet_lock', 'bet_settle', 'withdraw_complete'].includes(type)) return '#f87171';
     return theme.text.secondary;
   }
 
   function txSign(type: string) {
-    if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock'].includes(type)) return '+';
+    if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock', 'signup_bonus'].includes(type)) return '+';
     if (['bet_lock', 'bet_settle', 'withdraw_complete'].includes(type)) return '-';
     return '';
   }
@@ -182,7 +200,7 @@ export function WalletScreen() {
   return (
     <div style={s.root}>
       {/* ── Balance Hero ── */}
-      <div style={s.balanceCard}>
+      <div style={s.balanceCard} className="gradient-border card-enter card-enter-1">
         <div style={s.balanceRow}>
           <div>
             <div style={s.balanceLabel}>Total Balance</div>
@@ -206,7 +224,7 @@ export function WalletScreen() {
       </div>
 
       {/* ── Tabs ── */}
-      <div style={s.tabBar}>
+      <div style={s.tabBar} className="card-enter card-enter-2">
         <button
           style={tab === 'deposit' ? s.tabActive : s.tab}
           onClick={() => setTab('deposit')}
@@ -223,9 +241,54 @@ export function WalletScreen() {
 
       {/* ── Deposit Tab ── */}
       {tab === 'deposit' && (
-        <div style={s.card}>
+        <div style={s.card} className="card-enter card-enter-3">
 
           <div style={s.section}>
+              {/* ── Deposit Address Card ── */}
+              <div style={s.depositAddressCard}>
+                <div style={s.depositAddressLabel}>Your Deposit Address</div>
+                <div style={s.depositAddressDesc}>
+                  Send SOL to this address from any wallet
+                </div>
+                {treasuryAddress ? (
+                  <>
+                    <div style={s.depositAddressBox}>
+                      <span style={s.depositAddressText} className="mono">
+                        {treasuryAddress}
+                      </span>
+                    </div>
+                    <button
+                      style={{
+                        ...s.copyBtn,
+                        background: copied ? 'rgba(52, 211, 153, 0.15)' : 'rgba(153, 69, 255, 0.12)',
+                        borderColor: copied ? 'rgba(52, 211, 153, 0.3)' : 'rgba(153, 69, 255, 0.3)',
+                        color: copied ? '#34d399' : '#c084fc',
+                      }}
+                      onClick={() => {
+                        navigator.clipboard.writeText(treasuryAddress);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }}
+                    >
+                      {copied ? '✓ Copied!' : 'Copy Address'}
+                    </button>
+                  </>
+                ) : (
+                  <div style={s.depositAddressBox}>
+                    <span style={{ ...s.depositAddressText, color: '#555570' }} className="mono">
+                      Loading address...
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Divider ── */}
+              <div style={s.depositDivider}>
+                <div style={s.depositDividerLine} />
+                <span style={s.depositDividerText}>or quick deposit</span>
+                <div style={s.depositDividerLine} />
+              </div>
+
               <div style={s.fieldLabel}>Amount</div>
               <div style={s.amountInputRow}>
                 <input
@@ -254,33 +317,22 @@ export function WalletScreen() {
                 ))}
               </div>
 
-              {isPhantomInstalled() ? (
-                <button
-                  style={{
-                    ...s.primaryBtn,
-                    opacity: depositState === 'sending' || depositState === 'verifying' ? 0.7 : 1,
-                  }}
-                  onClick={handleDeposit}
-                  disabled={depositState === 'sending' || depositState === 'verifying'}
-                >
-                  {depositState === 'idle' || depositState === 'error'
-                    ? 'Deposit with Phantom'
-                    : depositState === 'sending'
-                    ? 'Approve in Phantom...'
-                    : depositState === 'verifying'
-                    ? 'Confirming on-chain...'
-                    : 'Deposit Confirmed!'}
-                </button>
-              ) : (
-                <a
-                  href="https://phantom.app/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={s.installPhantomLink}
-                >
-                  Install Phantom Wallet to deposit
-                </a>
-              )}
+              <button
+                style={{
+                  ...s.primaryBtn,
+                  opacity: depositState === 'sending' || depositState === 'verifying' ? 0.7 : 1,
+                }}
+                onClick={handleDeposit}
+                disabled={depositState === 'sending' || depositState === 'verifying'}
+              >
+                {depositState === 'idle' || depositState === 'error'
+                  ? 'Connect Wallet for One-Click Deposit'
+                  : depositState === 'sending'
+                  ? 'Approve in Wallet...'
+                  : depositState === 'verifying'
+                  ? 'Confirming on-chain...'
+                  : 'Deposit Confirmed!'}
+              </button>
 
               {depositState === 'confirmed' && <div style={s.successMsg}>Deposit confirmed and credited!</div>}
               {depositError && <div style={s.errorMsg}>{depositError}</div>}
@@ -290,7 +342,7 @@ export function WalletScreen() {
                 <div style={s.howTitle}>How it works</div>
                 <div style={s.howStep}>
                   <span style={s.howNum}>1</span>
-                  <span style={s.howText}>Deposit SOL from your Phantom wallet</span>
+                  <span style={s.howText}>Send SOL to your deposit address from any Solana wallet</span>
                 </div>
                 <div style={s.howStep}>
                   <span style={s.howNum}>2</span>
@@ -307,7 +359,7 @@ export function WalletScreen() {
 
       {/* ── Withdraw Tab ── */}
       {tab === 'withdraw' && (
-        <div style={s.card}>
+        <div style={s.card} className="card-enter card-enter-3">
           <div style={s.section}>
             <div style={s.fieldLabel}>Amount</div>
             <div style={s.amountInputRow}>
@@ -367,6 +419,53 @@ export function WalletScreen() {
               <span style={s.infoText}>Min withdrawal: 0.01 SOL. Network fees may apply.</span>
             </div>
 
+            {/* Bonus lock info banner */}
+            {bonusStatus && bonusStatus.claimed && !bonusStatus.withdrawalUnlocked && (
+              <div style={s.bonusBanner}>
+                <div style={s.bonusBannerHeader}>
+                  <span style={s.bonusBannerIcon}>🔒</span>
+                  <span style={s.bonusBannerTitle}>Welcome Bonus Locked</span>
+                </div>
+                <div style={s.bonusBannerDesc}>
+                  Your <strong style={{ color: '#14F195' }}>1 SOL</strong> welcome bonus is not withdrawable yet. You need to earn <strong style={{ color: '#14F195' }}>1 SOL</strong> in net profit to unlock it.
+                </div>
+                <div style={s.bonusProgressWrap}>
+                  <div style={s.bonusProgressBar}>
+                    <div style={{
+                      ...s.bonusProgressFill,
+                      width: `${Math.max(0, Math.min(100, (bonusStatus.currentProfit / bonusStatus.profitRequired) * 100))}%`,
+                    }} />
+                  </div>
+                  <div style={s.bonusProgressLabels}>
+                    <span className="mono" style={{ color: bonusStatus.currentProfit >= 0 ? '#34d399' : '#f87171' }}>
+                      {(bonusStatus.currentProfit / 1_000_000_000).toFixed(4)} SOL
+                    </span>
+                    <span className="mono" style={{ color: '#8888a0' }}>
+                      / {(bonusStatus.profitRequired / 1_000_000_000).toFixed(1)} SOL
+                    </span>
+                  </div>
+                </div>
+                <div style={s.bonusTerms}>
+                  <div style={s.bonusTermTitle}>Terms</div>
+                  <ul style={s.bonusTermList}>
+                    <li>The 1 SOL bonus is free to play with immediately</li>
+                    <li>Withdrawals are restricted to deposited funds only until the profit goal is reached</li>
+                    <li>Once you reach 1 SOL net profit, the bonus + all earnings become fully withdrawable</li>
+                    <li>Net profit = total winnings - total wagered</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {bonusStatus && bonusStatus.claimed && bonusStatus.withdrawalUnlocked && (
+              <div style={s.bonusUnlockedBanner}>
+                <span style={{ fontSize: '16px' }}>🎉</span>
+                <span style={s.bonusUnlockedText}>
+                  Bonus unlocked! Your full balance is withdrawable.
+                </span>
+              </div>
+            )}
+
             <button
               className="btn-3d btn-3d-danger"
               style={{
@@ -397,7 +496,7 @@ export function WalletScreen() {
       )}
 
       {/* ── Transaction History ── */}
-      <div style={s.historyCard}>
+      <div style={s.historyCard} className="card-enter card-enter-4">
         <div style={s.historyHeader}>
           <span style={s.historyTitle}>Transactions</span>
           <span style={s.historyCount} className="mono">{transactions.length}</span>
@@ -409,9 +508,10 @@ export function WalletScreen() {
             <div style={s.emptyState}>No transactions yet</div>
           ) : (
             transactions.map((tx) => (
-              <div key={tx.id} style={s.txRow}>
+              <div key={tx.id} style={s.txRow} className="table-row-hover">
                 <div style={s.txLeft}>
                   <span style={{ ...s.txBadge, color: txColor(tx.type) }}>
+                    <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: txColor(tx.type), boxShadow: `0 0 6px ${txColor(tx.type)}`, display: 'inline-block', flexShrink: 0 }} />
                     {formatTxType(tx.type)}
                   </span>
                   <span style={s.txDate}>
@@ -451,10 +551,13 @@ const s: Record<string, React.CSSProperties> = {
 
   // ── Balance Card ──
   balanceCard: {
-    background: 'linear-gradient(145deg, #1a1a2e 0%, #16162a 100%)',
+    background: 'rgba(28, 20, 42, 0.85)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
     border: '1px solid rgba(153, 69, 255, 0.15)',
     borderRadius: '16px',
     padding: '24px',
+    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   },
   balanceRow: {
     display: 'flex',
@@ -473,6 +576,7 @@ const s: Record<string, React.CSSProperties> = {
     color: '#fff',
     lineHeight: 1,
     letterSpacing: '-0.5px',
+    textShadow: '0 0 20px rgba(153, 69, 255, 0.4), 0 0 40px rgba(153, 69, 255, 0.15)',
   },
   balanceSuffix: {
     fontSize: '14px',
@@ -484,11 +588,13 @@ const s: Record<string, React.CSSProperties> = {
   solBadge: {
     width: '48px',
     height: '48px',
-    background: 'rgba(153, 69, 255, 0.1)',
+    background: 'rgba(153, 69, 255, 0.18)',
     borderRadius: '14px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    boxShadow: '0 0 12px rgba(153, 69, 255, 0.2)',
+    border: '1px solid rgba(153, 69, 255, 0.2)',
   },
   linkedRow: {
     display: 'flex',
@@ -502,6 +608,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: '50%',
     background: '#34d399',
     display: 'inline-block',
+    boxShadow: '0 0 6px rgba(52, 211, 153, 0.5)',
   },
   linkedText: {
     fontSize: '12px',
@@ -512,8 +619,11 @@ const s: Record<string, React.CSSProperties> = {
   tabBar: {
     display: 'flex',
     gap: '4px',
-    background: '#13131f',
-    borderRadius: '12px',
+    background: 'rgba(28, 20, 42, 0.85)',
+    backdropFilter: 'blur(12px)',
+    WebkitBackdropFilter: 'blur(12px)',
+    border: '1px solid rgba(255, 255, 255, 0.06)',
+    borderRadius: '14px',
     padding: '4px',
   },
   tab: {
@@ -540,14 +650,18 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'inherit',
+    boxShadow: '0 0 12px rgba(153, 69, 255, 0.3)',
   },
 
   // ── Card ──
   card: {
-    background: '#151522',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'rgba(28, 20, 42, 0.85)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid rgba(153, 69, 255, 0.18)',
     borderRadius: '14px',
     padding: '20px',
+    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   },
 
   // ── Section ──
@@ -666,7 +780,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: '14px',
     background: '#9945FF',
     border: 'none',
-    borderRadius: '10px',
+    borderRadius: '12px',
     color: '#fff',
     fontSize: '14px',
     fontWeight: 700,
@@ -674,6 +788,7 @@ const s: Record<string, React.CSSProperties> = {
     fontFamily: 'inherit',
     marginTop: '4px',
     transition: 'opacity 0.15s',
+    boxShadow: '0 4px 0 #7325d4, 0 6px 12px rgba(153, 69, 255, 0.3)',
   },
 
   // ── Link Wallet ──
@@ -688,6 +803,73 @@ const s: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontFamily: 'inherit',
     textAlign: 'center' as const,
+  },
+
+  // ── Deposit Address Card ──
+  depositAddressCard: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '10px',
+    padding: '18px',
+    background: 'rgba(153, 69, 255, 0.06)',
+    border: '1px solid rgba(153, 69, 255, 0.2)',
+    borderRadius: '12px',
+  },
+  depositAddressLabel: {
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#c084fc',
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+  },
+  depositAddressDesc: {
+    fontSize: '12px',
+    color: '#8888a0',
+    marginTop: '-4px',
+  },
+  depositAddressBox: {
+    padding: '12px',
+    background: '#111118',
+    border: '1px solid rgba(255,255,255,0.08)',
+    borderRadius: '8px',
+    wordBreak: 'break-all' as const,
+  },
+  depositAddressText: {
+    fontSize: '12px',
+    fontWeight: 500,
+    color: '#e8e8f0',
+    lineHeight: 1.5,
+    letterSpacing: '0.3px',
+  },
+  copyBtn: {
+    padding: '10px',
+    border: '1px solid rgba(153, 69, 255, 0.3)',
+    borderRadius: '8px',
+    fontSize: '13px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: 'Rajdhani, sans-serif',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    transition: 'all 0.15s ease',
+  },
+  depositDivider: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    margin: '4px 0',
+  },
+  depositDividerLine: {
+    flex: 1,
+    height: '1px',
+    background: 'rgba(255,255,255,0.06)',
+  },
+  depositDividerText: {
+    fontSize: '11px',
+    fontWeight: 500,
+    color: '#555570',
+    whiteSpace: 'nowrap' as const,
   },
 
   // ── Install Link ──
@@ -711,17 +893,19 @@ const s: Record<string, React.CSSProperties> = {
     flexDirection: 'column' as const,
     gap: '8px',
     padding: '14px',
-    background: 'rgba(153, 69, 255, 0.04)',
-    border: '1px solid rgba(153, 69, 255, 0.1)',
+    background: 'rgba(153, 69, 255, 0.06)',
+    border: '1px solid rgba(153, 69, 255, 0.15)',
     borderRadius: '10px',
     marginTop: '4px',
+    backdropFilter: 'blur(8px)',
   },
   howTitle: {
     fontSize: '11px',
     fontWeight: 700,
     color: '#8888a0',
+    fontFamily: "'Orbitron', sans-serif",
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    letterSpacing: '1px',
   },
   howStep: {
     display: 'flex',
@@ -732,7 +916,7 @@ const s: Record<string, React.CSSProperties> = {
     width: '18px',
     height: '18px',
     borderRadius: '50%',
-    background: 'rgba(153, 69, 255, 0.15)',
+    background: 'rgba(153, 69, 255, 0.2)',
     color: '#c084fc',
     fontSize: '10px',
     fontWeight: 700,
@@ -741,6 +925,7 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     flexShrink: 0,
     marginTop: '1px',
+    boxShadow: '0 0 8px rgba(153, 69, 255, 0.3)',
   },
   howText: {
     fontSize: '12px',
@@ -764,33 +949,42 @@ const s: Record<string, React.CSSProperties> = {
 
   // ── Transaction History ──
   historyCard: {
-    background: '#151522',
-    border: '1px solid rgba(255,255,255,0.06)',
+    background: 'rgba(28, 20, 42, 0.85)',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
+    border: '1px solid rgba(153, 69, 255, 0.18)',
     borderRadius: '14px',
     overflow: 'hidden',
     flex: 1,
     display: 'flex',
     flexDirection: 'column' as const,
+    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   },
   historyHeader: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '14px 16px',
-    borderBottom: '1px solid rgba(255,255,255,0.06)',
+    background: 'rgba(32, 24, 48, 0.95)',
+    borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
   },
   historyTitle: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 700,
     color: '#ececef',
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
   },
   historyCount: {
     fontSize: '12px',
     fontWeight: 600,
-    color: '#6b6b8a',
-    background: 'rgba(255,255,255,0.04)',
+    color: '#c084fc',
+    background: 'rgba(153, 69, 255, 0.18)',
+    border: '1px solid rgba(153, 69, 255, 0.2)',
     padding: '2px 10px',
     borderRadius: '20px',
+    boxShadow: '0 0 8px rgba(153, 69, 255, 0.15)',
   },
   historyList: {
     flex: 1,
@@ -811,6 +1005,9 @@ const s: Record<string, React.CSSProperties> = {
   txBadge: {
     fontSize: '13px',
     fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
   },
   txDate: {
     fontSize: '11px',
@@ -825,5 +1022,95 @@ const s: Record<string, React.CSSProperties> = {
     textAlign: 'center' as const,
     fontSize: '13px',
     color: '#555570',
+  },
+
+  // ── Bonus Banner ──
+  bonusBanner: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '10px',
+    padding: '14px',
+    background: 'rgba(251, 191, 36, 0.06)',
+    border: '1px solid rgba(251, 191, 36, 0.2)',
+    borderRadius: '10px',
+  },
+  bonusBannerHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  bonusBannerIcon: {
+    fontSize: '16px',
+  },
+  bonusBannerTitle: {
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#fbbf24',
+  },
+  bonusBannerDesc: {
+    fontSize: '12px',
+    color: '#8888a0',
+    lineHeight: 1.5,
+  },
+  bonusProgressWrap: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '4px',
+  },
+  bonusProgressBar: {
+    height: '6px',
+    background: 'rgba(255,255,255,0.06)',
+    borderRadius: '3px',
+    overflow: 'hidden',
+  },
+  bonusProgressFill: {
+    height: '100%',
+    background: 'linear-gradient(90deg, #9945FF, #14F195)',
+    borderRadius: '3px',
+    transition: 'width 0.3s ease',
+    minWidth: '2px',
+  },
+  bonusProgressLabels: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    fontSize: '11px',
+    fontWeight: 600,
+  },
+  bonusTerms: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '6px',
+    borderTop: '1px solid rgba(251, 191, 36, 0.1)',
+    paddingTop: '10px',
+    marginTop: '2px',
+  },
+  bonusTermTitle: {
+    fontSize: '10px',
+    fontWeight: 700,
+    color: '#6b6b8a',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+  },
+  bonusTermList: {
+    margin: 0,
+    paddingLeft: '16px',
+    fontSize: '11px',
+    color: '#6b6b8a',
+    lineHeight: 1.6,
+    listStyleType: 'disc' as const,
+  },
+  bonusUnlockedBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '12px 14px',
+    background: 'rgba(52, 211, 153, 0.08)',
+    border: '1px solid rgba(52, 211, 153, 0.2)',
+    borderRadius: '10px',
+  },
+  bonusUnlockedText: {
+    fontSize: '12px',
+    fontWeight: 600,
+    color: '#34d399',
   },
 };

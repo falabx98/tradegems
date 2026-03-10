@@ -89,8 +89,9 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 5,
   },
   popup: {
-    fontFamily: '"JetBrains Mono", monospace',
+    fontFamily: "'Orbitron', sans-serif",
     fontSize: '28px',
     fontWeight: 800,
+    textShadow: '0 0 12px currentColor',
   },
 };

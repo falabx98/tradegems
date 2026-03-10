@@ -67,7 +67,7 @@ export class UserService {
     if (data.displayName !== undefined || data.avatarUrl !== undefined) {
       const update: Record<string, unknown> = { updatedAt: new Date() };
       if (data.displayName !== undefined) update.displayName = data.displayName;
-      if (data.avatarUrl !== undefined) update.avatarUrl = data.avatarUrl;
+      if (data.avatarUrl !== undefined) update.avatarUrl = data.avatarUrl || null;
       await this.db.update(userProfiles)
         .set(update)
         .where(eq(userProfiles.userId, userId));

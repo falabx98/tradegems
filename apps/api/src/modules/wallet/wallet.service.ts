@@ -1,8 +1,11 @@
 import { eq, and, sql, desc } from 'drizzle-orm';
-import { balances, balanceLedgerEntries, deposits, withdrawals, linkedWallets } from '@tradingarena/db';
+import { balances, balanceLedgerEntries, deposits, withdrawals, linkedWallets, users, userProfiles } from '@tradingarena/db';
 import { getDb } from '../../config/database.js';
 import { getRedis } from '../../config/redis.js';
 import { AppError } from '../../middleware/errorHandler.js';
+
+const BONUS_AMOUNT = 1_000_000_000; // 1 SOL in lamports
+const BONUS_PROFIT_THRESHOLD = 1_000_000_000; // Must profit 1 SOL to unlock withdrawal
 
 interface LedgerRef {
   type: string;
@@ -45,6 +48,7 @@ export class WalletService {
         available: String(r.availableAmount),
         locked: String(r.lockedAmount),
         pending: String(r.pendingAmount),
+        bonus: String(r.bonusAmount ?? 0),
       })),
     };
   }
@@ -137,14 +141,23 @@ export class WalletService {
     const totalLocked = betAmount + fee;
 
     // Unlock bet + credit payout in one go
-    await this.db.execute(sql`
+    // Guard: only update if locked_amount is sufficient (prevents double-settlement)
+    const result = await this.db.execute(sql`
       UPDATE balances
       SET locked_amount = locked_amount - ${totalLocked},
           available_amount = available_amount + ${payoutAmount},
           updated_at = now()
       WHERE user_id = ${userId}
         AND asset = ${asset}
+        AND locked_amount >= ${totalLocked}
     `);
+
+    // If no row was updated, the settlement was already processed (or insufficient locked funds)
+    const rowsAffected = (result as any)?.rowCount ?? (result as any)?.length ?? 1;
+    if (rowsAffected === 0) {
+      console.warn(`[Wallet] settlePayout skipped — insufficient locked funds for user ${userId}, ref ${ref.type}:${ref.id}`);
+      return;
+    }
 
     const bal = await this.db.query.balances.findFirst({
       where: and(eq(balances.userId, userId), eq(balances.asset, asset)),
@@ -264,25 +277,145 @@ export class WalletService {
     });
   }
 
-  // ─── Dev: Credit balance (for testing) ───────────────────
+  // ─── Bonus: Claim new user bonus ─────────────────────────
 
-  async devCreditBalance(userId: string, amount: number, asset: string = 'SOL') {
+  async claimNewUserBonus(userId: string): Promise<{ success: boolean; message: string; amount?: number }> {
+    // Check if user already claimed
+    const user = await this.db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    if (!user) {
+      throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+    }
+
+    if (user.bonusClaimed) {
+      return { success: false, message: 'Bonus already claimed' };
+    }
+
+    // Credit the bonus to available balance AND track in bonusAmount
     await this.db.execute(sql`
-      INSERT INTO balances (user_id, asset, available_amount, locked_amount, pending_amount)
-      VALUES (${userId}, ${asset}, ${amount}, 0, 0)
+      INSERT INTO balances (user_id, asset, available_amount, locked_amount, pending_amount, bonus_amount)
+      VALUES (${userId}, 'SOL', ${BONUS_AMOUNT}, 0, 0, ${BONUS_AMOUNT})
       ON CONFLICT (user_id, asset)
-      DO UPDATE SET available_amount = balances.available_amount + ${amount},
+      DO UPDATE SET available_amount = balances.available_amount + ${BONUS_AMOUNT},
+                    bonus_amount = balances.bonus_amount + ${BONUS_AMOUNT},
                     updated_at = now()
     `);
 
+    // Mark user as bonus claimed
+    await this.db.execute(sql`
+      UPDATE users SET bonus_claimed = true, updated_at = now()
+      WHERE id = ${userId}
+    `);
+
+    // Record ledger entry
+    const bal = await this.db.query.balances.findFirst({
+      where: and(eq(balances.userId, userId), eq(balances.asset, 'SOL')),
+    });
+
     await this.db.insert(balanceLedgerEntries).values({
       userId,
-      asset,
-      entryType: 'admin_adjustment',
-      amount,
-      balanceAfter: amount, // approximate
-      referenceType: 'admin',
-      referenceId: 'dev-credit',
+      asset: 'SOL',
+      entryType: 'signup_bonus',
+      amount: BONUS_AMOUNT,
+      balanceAfter: bal?.availableAmount ?? BONUS_AMOUNT,
+      referenceType: 'bonus',
+      referenceId: 'new-user-bonus',
+      metadata: { bonusAmount: BONUS_AMOUNT, profitThreshold: BONUS_PROFIT_THRESHOLD },
     });
+
+    return { success: true, message: 'Welcome bonus of 1 SOL claimed!', amount: BONUS_AMOUNT };
   }
+
+  // ─── Bonus: Get bonus status ────────────────────────────
+
+  async getBonusStatus(userId: string): Promise<{
+    claimed: boolean;
+    bonusAmount: number;
+    profitRequired: number;
+    currentProfit: number;
+    withdrawalUnlocked: boolean;
+  }> {
+    const user = await this.db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+
+    const bal = await this.db.query.balances.findFirst({
+      where: and(eq(balances.userId, userId), eq(balances.asset, 'SOL')),
+    });
+
+    const profile = await this.db.query.userProfiles.findFirst({
+      where: eq(userProfiles.userId, userId),
+    });
+
+    const totalWagered = profile?.totalWagered ?? 0;
+    const totalWon = profile?.totalWon ?? 0;
+    const currentProfit = totalWon - totalWagered;
+    const bonusAmount = bal?.bonusAmount ?? 0;
+    const withdrawalUnlocked = bonusAmount === 0 || currentProfit >= BONUS_PROFIT_THRESHOLD;
+
+    return {
+      claimed: user?.bonusClaimed ?? false,
+      bonusAmount,
+      profitRequired: BONUS_PROFIT_THRESHOLD,
+      currentProfit,
+      withdrawalUnlocked,
+    };
+  }
+
+  // ─── Bonus: Check withdrawal eligibility ────────────────
+
+  async checkWithdrawalEligibility(userId: string, requestedAmount: number): Promise<{
+    eligible: boolean;
+    maxWithdrawable: number;
+    reason?: string;
+  }> {
+    const bal = await this.db.query.balances.findFirst({
+      where: and(eq(balances.userId, userId), eq(balances.asset, 'SOL')),
+    });
+
+    if (!bal) {
+      return { eligible: false, maxWithdrawable: 0, reason: 'No balance found' };
+    }
+
+    const bonusAmount = bal.bonusAmount ?? 0;
+    const availableAmount = bal.availableAmount;
+
+    // If no bonus, full balance is withdrawable
+    if (bonusAmount === 0) {
+      return { eligible: requestedAmount <= availableAmount, maxWithdrawable: availableAmount };
+    }
+
+    // Check profit threshold
+    const profile = await this.db.query.userProfiles.findFirst({
+      where: eq(userProfiles.userId, userId),
+    });
+
+    const totalWagered = profile?.totalWagered ?? 0;
+    const totalWon = profile?.totalWon ?? 0;
+    const currentProfit = totalWon - totalWagered;
+
+    if (currentProfit >= BONUS_PROFIT_THRESHOLD) {
+      // Profit threshold met! Unlock bonus — clear it from balance tracking
+      await this.db.execute(sql`
+        UPDATE balances SET bonus_amount = 0, updated_at = now()
+        WHERE user_id = ${userId} AND asset = 'SOL'
+      `);
+      return { eligible: requestedAmount <= availableAmount, maxWithdrawable: availableAmount };
+    }
+
+    // Profit threshold not met — only allow withdrawal of non-bonus funds
+    const withdrawable = Math.max(0, availableAmount - bonusAmount);
+    if (requestedAmount > withdrawable) {
+      return {
+        eligible: false,
+        maxWithdrawable: withdrawable,
+        reason: `Your 1 SOL welcome bonus is locked until you earn 1 SOL in profit. Current profit: ${(currentProfit / 1_000_000_000).toFixed(4)} SOL`,
+      };
+    }
+
+    return { eligible: true, maxWithdrawable: withdrawable };
+  }
+
 }

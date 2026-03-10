@@ -23,8 +23,10 @@ export function SideNav() {
   const activeId = screen === 'lobby' || screen === 'setup' ? 'lobby' : screen;
 
   const handleNav = (id: string) => {
-    if (id === 'lobby' || id === 'solo' || id === 'battle') {
+    if (id === 'lobby' || id === 'solo') {
       setScreen('lobby');
+    } else if (id === 'battle') {
+      setScreen('battle' as any);
     } else if (id === 'leaderboard' || id === 'rewards' || id === 'wallet' || id === 'history' || id === 'settings') {
       setScreen(id as any);
     }
@@ -135,17 +137,19 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '8px',
     cursor: 'pointer',
     transition: 'background 0.15s ease',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
   },
   navItemActive: {
     background: `rgba(153, 69, 255, 0.08)`,
   },
   navLabel: {
     fontSize: '8px',
-    fontWeight: 600,
+    fontWeight: 700,
     color: theme.text.muted,
     transition: 'color 0.15s ease',
     textAlign: 'center',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.3px',
   },
   navLabelActive: {
     color: '#c084fc',

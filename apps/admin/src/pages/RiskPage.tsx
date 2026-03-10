@@ -3,6 +3,7 @@ import { theme } from '../styles/theme';
 import { DataTable, type Column } from '../components/DataTable';
 import { Modal } from '../components/Modal';
 import { adminApi } from '../utils/api';
+import { useToastStore } from '../stores/toastStore';
 
 interface RiskFlag {
   id: string;
@@ -38,15 +39,18 @@ export function RiskPage() {
     setLoading(false);
   }
 
+  const addToast = useToastStore((s) => s.addToast);
+
   async function handleResolve() {
     if (!resolveTarget) return;
     try {
       await adminApi.resolveRiskFlag(resolveTarget.id, { notes: resolveNotes });
+      addToast('Risk flag resolved');
       setResolveTarget(null);
       setResolveNotes('');
       loadFlags();
     } catch {
-      // silent
+      addToast('Failed to resolve flag', 'error');
     }
   }
 
@@ -86,7 +90,7 @@ export function RiskPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <h3 style={styles.title}>Risk Flags</h3>
+        <div style={{ flex: 1 }} />
         <button
           style={{ ...styles.filterBtn, background: showResolved ? theme.bg.tertiary : theme.bg.card }}
           onClick={() => setShowResolved(!showResolved)}

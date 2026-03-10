@@ -42,7 +42,7 @@ export function BottomNav() {
   const handleMoreItem = (id: string) => {
     setShowMore(false);
     if (id === 'battle') {
-      setScreen('lobby');
+      setScreen('battle' as any);
     } else {
       setScreen(id as any);
     }
@@ -122,7 +122,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-around',
-    background: 'rgba(17, 21, 39, 0.92)',
+    background: 'rgba(21, 15, 33, 0.92)',
     backdropFilter: 'blur(12px)',
     WebkitBackdropFilter: 'blur(12px)',
     borderTop: `1px solid ${theme.border.subtle}`,
@@ -138,7 +138,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
     padding: 0,
   },
   overlay: {
@@ -172,7 +172,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
   },
   moreItemActive: {
     background: 'rgba(153, 69, 255, 0.08)',

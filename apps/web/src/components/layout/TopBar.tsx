@@ -5,6 +5,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { useSolPrice } from '../../hooks/useSolPrice';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
+import { isPhotoAvatar, getAvatarGradient, getInitials } from '../../utils/avatars';
 
 export function TopBar() {
   const profile = useGameStore((s) => s.profile);
@@ -49,9 +50,20 @@ export function TopBar() {
             <button style={styles.depositBtn} onClick={() => setScreen('wallet')}>Deposit</button>
 
             <div style={styles.profilePill} className="profile-glow">
-              <div style={styles.avatar}>
-                {profile.username.charAt(0).toUpperCase()}
-              </div>
+              {isPhotoAvatar(profile.avatarUrl) ? (
+                <img
+                  src={profile.avatarUrl!}
+                  alt={profile.username}
+                  style={styles.avatarImg}
+                />
+              ) : (
+                <div style={{
+                  ...styles.avatar,
+                  background: getAvatarGradient(null, profile.username),
+                }}>
+                  {getInitials(profile.username)}
+                </div>
+              )}
               {!isMobile && (
                 <div style={styles.profileInfo}>
                   <span style={styles.profileName}>{profile.username}</span>
@@ -137,15 +149,19 @@ const styles: Record<string, React.CSSProperties> = {
     animation: 'fadeIn 0.2s ease',
   },
   depositBtn: {
-    padding: '6px 14px',
+    padding: '7px 16px',
     fontSize: '12px',
-    fontWeight: 600,
+    fontWeight: 700,
     color: '#fff',
     background: '#9945FF',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: '8px',
     cursor: 'pointer',
-    fontFamily: 'Inter, sans-serif',
+    fontFamily: 'Rajdhani, sans-serif',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    boxShadow: '0 3px 0 #7325d4, 0 4px 8px rgba(153, 69, 255, 0.3)',
+    transition: 'all 0.1s ease',
   },
   profilePill: {
     display: 'flex',
@@ -161,13 +177,18 @@ const styles: Record<string, React.CSSProperties> = {
     width: '28px',
     height: '28px',
     borderRadius: '50%',
-    background: theme.bg.card,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '11px',
     fontWeight: 700,
-    color: theme.text.primary,
+    color: '#fff',
+  },
+  avatarImg: {
+    width: '28px',
+    height: '28px',
+    borderRadius: '50%',
+    objectFit: 'cover' as const,
   },
   profileInfo: {
     display: 'flex',

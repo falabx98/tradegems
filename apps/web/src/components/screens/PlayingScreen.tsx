@@ -6,6 +6,13 @@ import { MultiplierPopup } from '../hud/MultiplierPopup';
 import { theme } from '../../styles/theme';
 import { GameNode } from '../../types/game';
 import { formatSol } from '../../utils/sol';
+import {
+  playNodeActivatedSound,
+  playNodeMiss,
+  playNearMiss,
+  playCountdownBeep,
+  playRoundEnd,
+} from '../../utils/sounds';
 
 const ROUND_DURATION = 15;
 const COUNTDOWN_DURATION = 3;
@@ -33,6 +40,7 @@ export function PlayingScreen() {
   const countdownRef = useRef<number>(COUNTDOWN_DURATION);
   const isCountingDown = useRef(true);
   const countdownDisplayRef = useRef<HTMLDivElement>(null);
+  const lastCountdownBeep = useRef<number>(0);
 
   useEffect(() => {
     if (!roundConfig) return;
@@ -45,7 +53,12 @@ export function PlayingScreen() {
       const timeSinceMount = (now - (startTimeRef.current - COUNTDOWN_DURATION * 1000)) / 1000;
 
       if (timeSinceMount < COUNTDOWN_DURATION) {
-        countdownRef.current = Math.ceil(COUNTDOWN_DURATION - timeSinceMount);
+        const newCount = Math.ceil(COUNTDOWN_DURATION - timeSinceMount);
+        if (newCount !== lastCountdownBeep.current && newCount > 0 && newCount <= COUNTDOWN_DURATION) {
+          lastCountdownBeep.current = newCount;
+          playCountdownBeep(newCount);
+        }
+        countdownRef.current = newCount;
         if (countdownDisplayRef.current) {
           const numEl = countdownDisplayRef.current.querySelector('[data-count]');
           if (numEl) numEl.textContent = String(countdownRef.current);
@@ -66,6 +79,9 @@ export function PlayingScreen() {
 
       if (gameElapsed >= ROUND_DURATION) {
         updateElapsed(ROUND_DURATION);
+        // Play end sound based on multiplier
+        const mult = useGameStore.getState().currentMultiplier;
+        playRoundEnd(mult >= 1.0);
         endRound();
         return;
       }
@@ -82,15 +98,29 @@ export function PlayingScreen() {
   }, [roundConfig, updateElapsed, endRound]);
 
   const handleNodeActivated = useCallback((node: GameNode) => {
+    const prevState = useGameStore.getState();
+    const prevMult = prevState.currentMultiplier;
+    const prevShields = prevState.shields;
+
     activateNode(node);
+
+    // Play sound after state update
+    const newState = useGameStore.getState();
+    const shieldBlocked = node.type === 'divider' && newState.shields < prevShields;
+    playNodeActivatedSound(
+      node.type, node.value, node.rarity || 'common',
+      prevMult, newState.currentMultiplier, shieldBlocked,
+    );
   }, [activateNode]);
 
   const handleNodeMissed = useCallback((node: GameNode) => {
     missNode(node);
+    playNodeMiss();
   }, [missNode]);
 
   const handleNodeNearMissed = useCallback((node: GameNode) => {
     nearMissNode(node);
+    playNearMiss();
   }, [nearMissNode]);
 
   if (!roundConfig) return null;

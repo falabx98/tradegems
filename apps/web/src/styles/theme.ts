@@ -1,14 +1,14 @@
 // ─── TRADESOL Theme (Shuffle.com-inspired dark casino) ──────────────────────
 
 export const theme = {
-  // Core backgrounds — deep navy, not pure black
+  // Core backgrounds — deep purple-magenta
   bg: {
-    primary: '#0b0e1a',
-    secondary: '#111527',
-    tertiary: '#161b2e',
-    card: '#151a2d',
-    elevated: '#1a2038',
-    overlay: 'rgba(11, 14, 26, 0.92)',
+    primary: '#0e0a16',
+    secondary: '#150f21',
+    tertiary: '#1c142a',
+    card: '#181125',
+    elevated: '#201830',
+    overlay: 'rgba(14, 10, 22, 0.92)',
   },
 
   // Text
@@ -16,7 +16,7 @@ export const theme = {
     primary: '#e8e8f0',
     secondary: '#7e7fa0',
     muted: '#4a4b6a',
-    inverse: '#0b0e1a',
+    inverse: '#0e0a16',
   },
 
   // Accent colors
@@ -34,7 +34,7 @@ export const theme = {
     solanaHover: 'linear-gradient(135deg, #8839e6, #12d986)',
     chart: 'linear-gradient(90deg, #9945FF, #c084fc)',
     purple: 'linear-gradient(135deg, #9945FF, #c084fc)',
-    card: 'linear-gradient(145deg, #1a1f35 0%, #141830 100%)',
+    card: 'linear-gradient(145deg, #201530 0%, #180e25 100%)',
   },
 
   // Semantic colors
@@ -75,12 +75,12 @@ export const theme = {
     frozen: '#6366f1',
   },
 
-  // Borders — subtle purple-tinted
+  // Borders — Solana gradient-tinted
   border: {
-    subtle: 'rgba(255, 255, 255, 0.06)',
-    medium: 'rgba(255, 255, 255, 0.09)',
-    strong: 'rgba(255, 255, 255, 0.13)',
-    accent: 'rgba(153, 69, 255, 0.2)',
+    subtle: 'rgba(153, 69, 255, 0.12)',
+    medium: 'rgba(153, 69, 255, 0.18)',
+    strong: 'rgba(153, 69, 255, 0.25)',
+    accent: 'rgba(153, 69, 255, 0.3)',
   },
 
   // Shadows

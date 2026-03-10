@@ -19,7 +19,7 @@ import { api } from '../utils/api';
 
 interface GameState {
   // Current view
-  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings';
+  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'battle';
   mode: GameMode;
 
   // Round state
@@ -49,8 +49,20 @@ interface GameState {
   // Result
   result: RoundResult | null;
 
+  // Battle state (continuous loop)
+  battlePhase: 'idle' | 'betting' | 'active' | 'results';
+  battleRoundNumber: number | null;
+  battleRoundConfig: RoundConfig | null;
+  battleJoined: boolean;
+  battlePlayers: any[];
+  battleResults: any | null;
+
   // Player profile
   profile: PlayerProfile;
+
+  // Chat
+  chatOpen: boolean;
+  unreadChat: number;
 
   // Actions
   setScreen: (screen: GameState['screen']) => void;
@@ -66,6 +78,12 @@ interface GameState {
   resetRound: () => void;
   playAgain: () => void;
   syncProfile: () => Promise<void>;
+  joinBattle: () => Promise<void>;
+  enterBattle: () => void;
+  resetBattle: () => void;
+  toggleChat: () => void;
+  clearUnreadChat: () => void;
+  incrementUnreadChat: (count: number) => void;
 }
 
 const DEFAULT_PROFILE: PlayerProfile = {
@@ -76,6 +94,7 @@ const DEFAULT_PROFILE: PlayerProfile = {
   xpToNext: 100,
   vipTier: 'bronze',
   rakebackRate: 0.01,
+  avatarUrl: null,
   balance: 0, // lamports
   totalWagered: 0,
   totalWon: 0,
@@ -103,7 +122,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   nearMissNodeIds: new Set(),
   engineConfig: DEFAULT_ENGINE_CONFIG,
   result: null,
+  battlePhase: 'idle',
+  battleRoundNumber: null,
+  battleRoundConfig: null,
+  battleJoined: false,
+  battlePlayers: [],
+  battleResults: null,
   profile: DEFAULT_PROFILE,
+  chatOpen: false,
+  unreadChat: 0,
 
   setScreen: (screen) => set({ screen }),
   setMode: (mode) => set({ mode }),
@@ -112,6 +139,9 @@ export const useGameStore = create<GameState>((set, get) => ({
 
   startRound: () => {
     const state = get();
+
+    // Guard: never start a solo round while in battle mode
+    if (state.screen === 'battle') return;
 
     // Generate round locally (deterministic engine)
     const config = generateRound(undefined, state.engineConfig);
@@ -281,6 +311,42 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
+  joinBattle: async () => {
+    const state = get();
+    try {
+      const res = await api.joinBattle({
+        betAmount: state.betAmount,
+        riskTier: state.riskTier,
+      });
+      set({
+        battleJoined: true,
+        battleRoundNumber: res.roundNumber,
+      });
+    } catch (err) {
+      console.error('Failed to join battle:', err);
+    }
+  },
+
+  enterBattle: () => {
+    set({ screen: 'battle' });
+  },
+
+  resetBattle: () => {
+    set({
+      battlePhase: 'idle',
+      battleRoundNumber: null,
+      battleRoundConfig: null,
+      battleJoined: false,
+      battlePlayers: [],
+      battleResults: null,
+      screen: 'lobby',
+    });
+  },
+
+  toggleChat: () => set((s) => ({ chatOpen: !s.chatOpen, unreadChat: !s.chatOpen ? 0 : s.unreadChat })),
+  clearUnreadChat: () => set({ unreadChat: 0 }),
+  incrementUnreadChat: (count: number) => set((s) => ({ unreadChat: s.chatOpen ? 0 : s.unreadChat + count })),
+
   syncProfile: async () => {
     try {
       const [me, balances] = await Promise.all([
@@ -305,6 +371,7 @@ export const useGameStore = create<GameState>((set, get) => ({
           username: me.username || state.profile.username,
           level: me.level || state.profile.level,
           vipTier: (me.vipTier as any) || state.profile.vipTier,
+          avatarUrl: me.avatarUrl ?? state.profile.avatarUrl,
           balance: availableLamports, // stored as lamports
           totalWagered: stats.totalWagered || state.profile.totalWagered,
           totalWon: stats.totalWon || state.profile.totalWon,

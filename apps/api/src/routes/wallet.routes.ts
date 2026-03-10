@@ -74,7 +74,7 @@ export async function walletRoutes(server: FastifyInstance) {
 
   // ─── Withdrawal ───────────────────────────────────────────
 
-  server.post('/withdraw', async (request) => {
+  server.post('/withdraw', async (request, reply) => {
     const body = withdrawSchema.parse(request.body);
     const userId = getAuthUser(request).userId;
     const amount = parseInt(body.amount);
@@ -82,13 +82,23 @@ export async function walletRoutes(server: FastifyInstance) {
     // Check bonus withdrawal restriction
     const eligibility = await walletService.checkWithdrawalEligibility(userId, amount);
     if (!eligibility.eligible) {
-      return {
+      return reply.status(400).send({
         error: {
           code: 'BONUS_LOCKED',
           message: eligibility.reason || 'Withdrawal restricted',
           maxWithdrawable: String(eligibility.maxWithdrawable),
         },
-      };
+      });
+    }
+
+    // Ensure treasury is configured for on-chain withdrawals
+    if (!env.TREASURY_PRIVATE_KEY) {
+      return reply.status(503).send({
+        error: {
+          code: 'WITHDRAWALS_UNAVAILABLE',
+          message: 'Withdrawals are temporarily unavailable. Please try again later.',
+        },
+      });
     }
 
     return withdrawalService.requestWithdrawal(

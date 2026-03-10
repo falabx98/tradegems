@@ -147,11 +147,11 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '50%',
   },
   phaseText: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 700,
   },
   timer: {
-    fontSize: '22px',
+    fontSize: '24px',
     fontWeight: 700,
     color: theme.text.primary,
     lineHeight: 1,
@@ -163,12 +163,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '2px',
   },
   multLabel: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   multValue: {
-    fontSize: '36px',
+    fontSize: '38px',
     fontWeight: 900,
     lineHeight: 1,
     letterSpacing: '-1px',
@@ -186,12 +186,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '1px',
   },
   payoutLabel: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   payoutValue: {
-    fontSize: '16px',
+    fontSize: '18px',
     fontWeight: 700,
     lineHeight: 1,
   },
@@ -201,7 +201,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   metaItem: {
-    fontSize: '9px',
+    fontSize: '11px',
     fontWeight: 600,
     color: theme.text.muted,
   },

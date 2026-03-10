@@ -459,7 +459,7 @@ export function WalletScreen() {
 
             {bonusStatus && bonusStatus.claimed && bonusStatus.withdrawalUnlocked && (
               <div style={s.bonusUnlockedBanner}>
-                <span style={{ fontSize: '16px' }}>🎉</span>
+                <span style={{ fontSize: '18px' }}>🎉</span>
                 <span style={s.bonusUnlockedText}>
                   Bonus unlocked! Your full balance is withdrawable.
                 </span>
@@ -470,7 +470,7 @@ export function WalletScreen() {
               className="btn-3d btn-3d-danger"
               style={{
                 padding: '14px',
-                fontSize: '14px',
+                fontSize: '16px',
                 width: '100%',
                 marginTop: '4px',
                 opacity: withdrawState === 'processing' ? 0.7 : 1,
@@ -565,13 +565,13 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   balanceLabel: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 500,
     color: '#8888a0',
     marginBottom: '6px',
   },
   balanceValue: {
-    fontSize: '32px',
+    fontSize: '34px',
     fontWeight: 800,
     color: '#fff',
     lineHeight: 1,
@@ -579,7 +579,7 @@ const s: Record<string, React.CSSProperties> = {
     textShadow: '0 0 20px rgba(153, 69, 255, 0.4), 0 0 40px rgba(153, 69, 255, 0.15)',
   },
   balanceSuffix: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 600,
     color: '#8888a0',
     marginLeft: '8px',
@@ -611,7 +611,7 @@ const s: Record<string, React.CSSProperties> = {
     boxShadow: '0 0 6px rgba(52, 211, 153, 0.5)',
   },
   linkedText: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: '#6b6b8a',
   },
 
@@ -633,7 +633,7 @@ const s: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '10px',
     color: '#6b6b8a',
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 600,
     cursor: 'pointer',
     fontFamily: 'inherit',
@@ -646,7 +646,7 @@ const s: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '10px',
     color: '#fff',
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'inherit',
@@ -671,7 +671,7 @@ const s: Record<string, React.CSSProperties> = {
     gap: '10px',
   },
   fieldLabel: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: '#8888a0',
     textTransform: 'uppercase' as const,
@@ -693,14 +693,14 @@ const s: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     color: '#fff',
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: 700,
     fontFamily: '"JetBrains Mono", monospace',
     outline: 'none',
     width: '100%',
   },
   amountSuffix: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 600,
     color: '#6b6b8a',
     flexShrink: 0,
@@ -718,7 +718,7 @@ const s: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: '8px',
     color: '#8888a0',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
     fontFamily: '"JetBrains Mono", monospace',
@@ -730,7 +730,7 @@ const s: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(153, 69, 255, 0.3)',
     borderRadius: '8px',
     color: '#c084fc',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
     fontFamily: '"JetBrains Mono", monospace',
@@ -748,7 +748,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: '50%',
     background: 'rgba(153, 69, 255, 0.12)',
     color: '#9945FF',
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
@@ -756,7 +756,7 @@ const s: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   infoText: {
-    fontSize: '11px',
+    fontSize: '13px',
     color: '#6b6b8a',
     lineHeight: 1.4,
   },
@@ -769,7 +769,7 @@ const s: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: '10px',
     color: '#fff',
-    fontSize: '12px',
+    fontSize: '14px',
     fontFamily: '"JetBrains Mono", monospace',
     outline: 'none',
     boxSizing: 'border-box' as const,
@@ -782,7 +782,7 @@ const s: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '12px',
     color: '#fff',
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'inherit',
@@ -798,7 +798,7 @@ const s: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(153, 69, 255, 0.2)',
     borderRadius: '8px',
     color: '#c084fc',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
     fontFamily: 'inherit',
@@ -816,7 +816,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: '12px',
   },
   depositAddressLabel: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     color: '#c084fc',
     fontFamily: "'Orbitron', sans-serif",
@@ -824,7 +824,7 @@ const s: Record<string, React.CSSProperties> = {
     letterSpacing: '0.5px',
   },
   depositAddressDesc: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: '#8888a0',
     marginTop: '-4px',
   },
@@ -836,7 +836,7 @@ const s: Record<string, React.CSSProperties> = {
     wordBreak: 'break-all' as const,
   },
   depositAddressText: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 500,
     color: '#e8e8f0',
     lineHeight: 1.5,
@@ -846,7 +846,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: '10px',
     border: '1px solid rgba(153, 69, 255, 0.3)',
     borderRadius: '8px',
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
@@ -866,7 +866,7 @@ const s: Record<string, React.CSSProperties> = {
     background: 'rgba(255,255,255,0.06)',
   },
   depositDividerText: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 500,
     color: '#555570',
     whiteSpace: 'nowrap' as const,
@@ -880,7 +880,7 @@ const s: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(139, 139, 245, 0.2)',
     borderRadius: '10px',
     color: '#8b8bf5',
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 600,
     textAlign: 'center' as const,
     textDecoration: 'none',
@@ -900,7 +900,7 @@ const s: Record<string, React.CSSProperties> = {
     backdropFilter: 'blur(8px)',
   },
   howTitle: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 700,
     color: '#8888a0',
     fontFamily: "'Orbitron', sans-serif",
@@ -918,7 +918,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: '50%',
     background: 'rgba(153, 69, 255, 0.2)',
     color: '#c084fc',
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
@@ -928,20 +928,20 @@ const s: Record<string, React.CSSProperties> = {
     boxShadow: '0 0 8px rgba(153, 69, 255, 0.3)',
   },
   howText: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: '#8888a0',
     lineHeight: 1.4,
   },
 
   // ── Messages ──
   successMsg: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: '#34d399',
     textAlign: 'center' as const,
   },
   errorMsg: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: '#f87171',
     textAlign: 'center' as const,
@@ -969,7 +969,7 @@ const s: Record<string, React.CSSProperties> = {
     borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
   },
   historyTitle: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     color: '#ececef',
     fontFamily: "'Orbitron', sans-serif",
@@ -977,7 +977,7 @@ const s: Record<string, React.CSSProperties> = {
     letterSpacing: '1px',
   },
   historyCount: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: '#c084fc',
     background: 'rgba(153, 69, 255, 0.18)',
@@ -1003,24 +1003,24 @@ const s: Record<string, React.CSSProperties> = {
     gap: '3px',
   },
   txBadge: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
   },
   txDate: {
-    fontSize: '11px',
+    fontSize: '13px',
     color: '#555570',
   },
   txAmount: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 700,
   },
   emptyState: {
     padding: '32px',
     textAlign: 'center' as const,
-    fontSize: '13px',
+    fontSize: '15px',
     color: '#555570',
   },
 
@@ -1040,15 +1040,15 @@ const s: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   bonusBannerIcon: {
-    fontSize: '16px',
+    fontSize: '18px',
   },
   bonusBannerTitle: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     color: '#fbbf24',
   },
   bonusBannerDesc: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: '#8888a0',
     lineHeight: 1.5,
   },
@@ -1073,7 +1073,7 @@ const s: Record<string, React.CSSProperties> = {
   bonusProgressLabels: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 600,
   },
   bonusTerms: {
@@ -1085,7 +1085,7 @@ const s: Record<string, React.CSSProperties> = {
     marginTop: '2px',
   },
   bonusTermTitle: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 700,
     color: '#6b6b8a',
     textTransform: 'uppercase' as const,
@@ -1094,7 +1094,7 @@ const s: Record<string, React.CSSProperties> = {
   bonusTermList: {
     margin: 0,
     paddingLeft: '16px',
-    fontSize: '11px',
+    fontSize: '13px',
     color: '#6b6b8a',
     lineHeight: 1.6,
     listStyleType: 'disc' as const,
@@ -1109,7 +1109,7 @@ const s: Record<string, React.CSSProperties> = {
     borderRadius: '10px',
   },
   bonusUnlockedText: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: '#34d399',
   },

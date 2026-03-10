@@ -84,7 +84,7 @@ export function LandingScreen({ onEnter }: LandingScreenProps) {
             onClick={onEnter}
             style={{
               padding: '16px 56px',
-              fontSize: '15px',
+              fontSize: '17px',
               fontWeight: 600,
               borderRadius: '10px',
             }}
@@ -124,7 +124,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center' as const,
   },
   preTitle: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 500,
     color: theme.text.secondary,
     marginBottom: '12px',
@@ -140,7 +140,7 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase' as const,
   },
   tagline: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 500,
     color: theme.text.muted,
     marginTop: '16px',
@@ -171,12 +171,12 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
   },
   featureTitle: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 600,
     color: theme.text.primary,
   },
   featureDesc: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: theme.text.muted,
     marginTop: '2px',
   },
@@ -187,11 +187,11 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '12px',
   },
   ctaHint: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: theme.text.muted,
   },
   version: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 500,
     color: theme.text.muted,
     marginTop: '20px',

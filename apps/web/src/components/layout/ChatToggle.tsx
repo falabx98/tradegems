@@ -51,7 +51,7 @@ const styles: Record<string, React.CSSProperties> = {
     animation: 'chatBtnPulse 3s ease-in-out infinite',
   },
   icon: {
-    fontSize: '24px',
+    fontSize: '26px',
     lineHeight: 1,
   },
   badge: {
@@ -63,7 +63,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '10px',
     background: theme.danger,
     color: '#fff',
-    fontSize: '11px',
+    fontSize: '13px',
     fontFamily: 'Rajdhani, sans-serif',
     fontWeight: 700,
     display: 'flex',

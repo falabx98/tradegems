@@ -458,7 +458,7 @@ export function BattleScreen() {
                   <span style={{ color: isMe ? '#c084fc' : theme.text.primary }}>
                     {r.username} {isMe && <span style={styles.youTag}>you</span>}
                   </span>
-                  <span style={{ fontSize: '10px', color: bandColor }}>● {r.band}</span>
+                  <span style={{ fontSize: '12px', color: bandColor }}>● {r.band}</span>
                 </div>
                 <span style={{
                   ...styles.resultMultSmall,
@@ -507,7 +507,7 @@ export function BattleScreen() {
   return (
     <div style={styles.container}>
       <div style={styles.idle}>
-        <div style={{ fontSize: '48px' }}>⚔️</div>
+        <div style={{ fontSize: '52px' }}>⚔️</div>
         <div style={styles.idleTitle}>Battle Arena</div>
         <div style={styles.idleDesc}>
           {error ? error : 'Connecting to battle...'}
@@ -538,14 +538,14 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     padding: '16px 20px 8px',
   },
-  headerIcon: { fontSize: '24px' },
-  headerTitle: { fontSize: '20px', fontWeight: 700, color: theme.text.primary, flex: 1, fontFamily: "'Orbitron', sans-serif", textTransform: 'uppercase' as const, letterSpacing: '1px' },
+  headerIcon: { fontSize: '26px' },
+  headerTitle: { fontSize: '22px', fontWeight: 700, color: theme.text.primary, flex: 1, fontFamily: "'Orbitron', sans-serif", textTransform: 'uppercase' as const, letterSpacing: '1px' },
   roundBadge: {
     padding: '4px 12px',
     borderRadius: '20px',
     background: 'rgba(153, 69, 255, 0.15)',
     color: '#c084fc',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
   },
 
@@ -559,8 +559,8 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${theme.border.medium}`,
     overflow: 'hidden',
   },
-  countdownLabel: { fontSize: '11px', color: theme.text.muted, marginBottom: '4px' },
-  countdownValue: { fontSize: '32px', fontWeight: 900, color: '#c084fc', fontFamily: "'Orbitron', sans-serif" },
+  countdownLabel: { fontSize: '13px', color: theme.text.muted, marginBottom: '4px' },
+  countdownValue: { fontSize: '34px', fontWeight: 900, color: '#c084fc', fontFamily: "'Orbitron', sans-serif" },
   countdownProgress: {
     position: 'absolute',
     bottom: 0,
@@ -575,7 +575,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: '16px',
     padding: '8px 20px',
-    fontSize: '12px',
+    fontSize: '14px',
     color: theme.text.secondary,
   },
 
@@ -606,7 +606,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'absolute',
     top: '4px',
     right: '6px',
-    fontSize: '8px',
+    fontSize: '10px',
     fontWeight: 700,
     color: '#c084fc',
     background: 'rgba(153, 69, 255, 0.2)',
@@ -621,10 +621,10 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: '#fff', fontSize: '14px', fontWeight: 700 },
-  playerName: { fontSize: '11px', fontWeight: 600, color: theme.text.primary, textAlign: 'center' as const },
-  playerMeta: { fontSize: '9px', color: theme.text.muted },
-  playerBet: { fontSize: '10px', color: theme.text.secondary },
+  avatarText: { color: '#fff', fontSize: '16px', fontWeight: 700 },
+  playerName: { fontSize: '13px', fontWeight: 600, color: theme.text.primary, textAlign: 'center' as const },
+  playerMeta: { fontSize: '11px', color: theme.text.muted },
+  playerBet: { fontSize: '12px', color: theme.text.secondary },
   emptySlot: {
     display: 'flex',
     flexDirection: 'column',
@@ -636,8 +636,8 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px dashed ${theme.border.subtle}`,
     opacity: 0.4,
   },
-  emptyIcon: { fontSize: '24px', opacity: 0.5 },
-  emptyText: { fontSize: '10px', color: theme.text.muted },
+  emptyIcon: { fontSize: '26px', opacity: 0.5 },
+  emptyText: { fontSize: '12px', color: theme.text.muted },
 
   // Actions
   actions: {
@@ -653,7 +653,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     background: '#9945FF',
     color: '#fff',
-    fontSize: '15px',
+    fontSize: '17px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
@@ -668,7 +668,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '12px',
     background: 'rgba(20, 241, 149, 0.1)',
     color: '#14F195',
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 600,
     border: '1px solid rgba(20, 241, 149, 0.2)',
   },
@@ -679,7 +679,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${theme.border.medium}`,
     background: 'transparent',
     color: theme.text.muted,
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 500,
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
@@ -687,7 +687,7 @@ const styles: Record<string, React.CSSProperties> = {
   playerCount: {
     textAlign: 'center' as const,
     padding: '8px',
-    fontSize: '12px',
+    fontSize: '14px',
     color: theme.text.muted,
     borderTop: `1px solid ${theme.border.subtle}`,
   },
@@ -699,10 +699,10 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     padding: '10px 20px',
     color: theme.text.primary,
-    fontSize: '14px',
+    fontSize: '16px',
   },
   timer: {
-    fontSize: '24px',
+    fontSize: '26px',
     fontWeight: 900,
     color: '#c084fc',
   },
@@ -731,7 +731,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     height: '100%',
     color: theme.text.muted,
-    fontSize: '14px',
+    fontSize: '16px',
   },
   hudOverlay: {
     position: 'absolute',
@@ -744,7 +744,7 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 5,
   },
   hudMultiplier: {
-    fontSize: '28px',
+    fontSize: '30px',
     fontWeight: 900,
     textShadow: '0 2px 8px rgba(0,0,0,0.5)',
   },
@@ -753,7 +753,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '6px',
     background: 'rgba(20, 241, 149, 0.2)',
     color: '#14F195',
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 700,
   },
   leaderboard: {
@@ -766,7 +766,7 @@ const styles: Record<string, React.CSSProperties> = {
   leaderboardHeader: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: theme.text.primary,
     marginBottom: '6px',
@@ -783,12 +783,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(153, 69, 255, 0.08)',
     border: '1px solid rgba(153, 69, 255, 0.15)',
   },
-  rankEmoji: { fontSize: '14px', width: '24px', textAlign: 'center' as const },
-  rankName: { flex: 1, fontSize: '12px', fontWeight: 600 },
-  rankMult: { fontSize: '13px', fontWeight: 700, width: '55px', textAlign: 'right' as const },
-  rankPnl: { fontSize: '11px', fontWeight: 600, width: '65px', textAlign: 'right' as const },
+  rankEmoji: { fontSize: '16px', width: '24px', textAlign: 'center' as const },
+  rankName: { flex: 1, fontSize: '14px', fontWeight: 600 },
+  rankMult: { fontSize: '15px', fontWeight: 700, width: '55px', textAlign: 'right' as const },
+  rankPnl: { fontSize: '13px', fontWeight: 600, width: '65px', textAlign: 'right' as const },
   youTag: {
-    fontSize: '8px',
+    fontSize: '10px',
     fontWeight: 700,
     color: '#c084fc',
     background: 'rgba(153, 69, 255, 0.2)',
@@ -799,7 +799,7 @@ const styles: Record<string, React.CSSProperties> = {
   poolFooter: {
     textAlign: 'center' as const,
     padding: '6px',
-    fontSize: '11px',
+    fontSize: '13px',
     color: theme.text.muted,
     borderTop: `1px solid ${theme.border.subtle}`,
   },
@@ -812,16 +812,16 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '24px 20px 16px',
     gap: '4px',
   },
-  resultRankBig: { fontSize: '48px' },
-  resultPlace: { fontSize: '22px', fontWeight: 700, color: theme.text.primary },
-  resultMult: { fontSize: '36px', fontWeight: 900 },
-  resultPnl: { fontSize: '14px', fontWeight: 600 },
+  resultRankBig: { fontSize: '52px' },
+  resultPlace: { fontSize: '24px', fontWeight: 700, color: theme.text.primary },
+  resultMult: { fontSize: '38px', fontWeight: 900 },
+  resultPnl: { fontSize: '16px', fontWeight: 600 },
 
   rankingsTable: {
     padding: '0 20px',
   },
   rankingsTitle: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     color: theme.text.primary,
     marginBottom: '8px',
@@ -842,17 +842,17 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(153, 69, 255, 0.08)',
     border: '1px solid rgba(153, 69, 255, 0.15)',
   },
-  resultRank: { fontSize: '16px', width: '28px', textAlign: 'center' as const },
+  resultRank: { fontSize: '18px', width: '28px', textAlign: 'center' as const },
   resultInfo: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
     gap: '1px',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
   },
-  resultMultSmall: { fontSize: '13px', fontWeight: 700, width: '55px', textAlign: 'right' as const },
-  resultPnlSmall: { fontSize: '11px', fontWeight: 600, width: '65px', textAlign: 'right' as const },
+  resultMultSmall: { fontSize: '15px', fontWeight: 700, width: '55px', textAlign: 'right' as const },
+  resultPnlSmall: { fontSize: '13px', fontWeight: 600, width: '65px', textAlign: 'right' as const },
 
   poolSummary: {
     margin: '12px 20px',
@@ -864,7 +864,7 @@ const styles: Record<string, React.CSSProperties> = {
   poolRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '12px',
+    fontSize: '14px',
     color: theme.text.secondary,
     padding: '3px 0',
   },
@@ -872,7 +872,7 @@ const styles: Record<string, React.CSSProperties> = {
   nextRoundNotice: {
     textAlign: 'center' as const,
     padding: '16px',
-    fontSize: '13px',
+    fontSize: '15px',
     color: '#c084fc',
     fontWeight: 600,
   },
@@ -887,6 +887,6 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '12px',
     padding: '40px',
   },
-  idleTitle: { fontSize: '22px', fontWeight: 700, color: theme.text.primary, fontFamily: "'Orbitron', sans-serif", textTransform: 'uppercase' as const, letterSpacing: '1px' },
-  idleDesc: { fontSize: '14px', color: theme.text.muted, textAlign: 'center' as const },
+  idleTitle: { fontSize: '24px', fontWeight: 700, color: theme.text.primary, fontFamily: "'Orbitron', sans-serif", textTransform: 'uppercase' as const, letterSpacing: '1px' },
+  idleDesc: { fontSize: '16px', color: theme.text.muted, textAlign: 'center' as const },
 };

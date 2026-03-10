@@ -106,7 +106,7 @@ export function LeaderboardScreen() {
           </div>
           {/* 1st place */}
           <div style={{ ...styles.podiumCard, ...styles.podiumFirst, border: `1px solid ${rankInfo(1)!.border}`, boxShadow: `0 0 20px ${rankInfo(1)!.shadow}` }}>
-            <span style={{ ...styles.podiumTrophy, fontSize: '36px' }}>🏆</span>
+            <span style={{ ...styles.podiumTrophy, fontSize: '38px' }}>🏆</span>
             <span className="badge-metallic" style={{ ...styles.podiumRank, background: `${rankInfo(1)!.color}20`, color: rankInfo(1)!.color }}>1st</span>
             <span style={styles.podiumName}>{top3[0].username || 'Anonymous'}</span>
             <span style={styles.podiumScore} className="mono">{formatScore(top3[0].score, activeTab)}</span>
@@ -203,7 +203,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '8px',
     color: theme.text.muted,
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
@@ -223,7 +223,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '6px',
     color: theme.text.muted,
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 600,
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
@@ -257,11 +257,11 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '24px 16px',
   },
   podiumTrophy: {
-    fontSize: '28px',
+    fontSize: '30px',
     lineHeight: 1,
   },
   podiumRank: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 700,
     padding: '3px 8px',
     borderRadius: '6px',
@@ -269,7 +269,7 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   podiumName: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: theme.text.primary,
     textAlign: 'center',
@@ -279,7 +279,7 @@ const styles: Record<string, React.CSSProperties> = {
     maxWidth: '100%',
   },
   podiumScore: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: '#c084fc',
     textShadow: '0 0 8px rgba(192, 132, 252, 0.4)',
@@ -305,7 +305,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(32, 24, 48, 0.95)',
   },
   th: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 600,
     color: theme.text.muted,
   },
@@ -326,11 +326,11 @@ const styles: Record<string, React.CSSProperties> = {
     borderLeft: '3px solid #9945FF',
   },
   rank: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
   },
   badge: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 700,
     padding: '3px 8px',
     borderRadius: '6px',
@@ -338,7 +338,7 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   username: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 600,
     color: theme.text.primary,
     display: 'flex',
@@ -346,7 +346,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   meTag: {
-    fontSize: '9px',
+    fontSize: '11px',
     fontWeight: 700,
     color: '#c084fc',
     padding: '2px 6px',
@@ -356,7 +356,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 0 8px rgba(153, 69, 255, 0.2)',
   },
   score: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     color: '#c084fc',
     textShadow: '0 0 8px rgba(192, 132, 252, 0.4)',
@@ -364,7 +364,7 @@ const styles: Record<string, React.CSSProperties> = {
   empty: {
     padding: '40px',
     textAlign: 'center',
-    fontSize: '12px',
+    fontSize: '14px',
     color: theme.text.muted,
   },
 };

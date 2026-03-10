@@ -77,7 +77,7 @@ export function HistoryScreen() {
                     <span style={{
                       color: resultColor,
                       fontWeight: 700,
-                      fontSize: '10px',
+                      fontSize: '12px',
                       background: `${resultColor}15`,
                       border: `1px solid ${resultColor}30`,
                       padding: '2px 8px',
@@ -155,7 +155,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(32, 24, 48, 0.95)',
   },
   panelTitle: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
@@ -164,7 +164,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '1px',
   },
   panelCount: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: '#c084fc',
     background: 'rgba(153, 69, 255, 0.18)',
@@ -181,7 +181,7 @@ const styles: Record<string, React.CSSProperties> = {
     minWidth: '580px',
   },
   th: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 600,
     color: theme.text.muted,
   },
@@ -200,14 +200,14 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background-color 0.15s ease, transform 0.1s ease',
   },
   td: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 500,
     color: theme.text.secondary,
   },
   empty: {
     padding: '40px',
     textAlign: 'center',
-    fontSize: '12px',
+    fontSize: '14px',
     color: theme.text.muted,
   },
 };

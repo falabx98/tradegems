@@ -61,7 +61,7 @@ export function ResultScreen() {
               style={{
                 ...styles.heroMultiplier,
                 color: resultColor,
-                ...(isMobile ? { fontSize: '48px' } : {}),
+                ...(isMobile ? { fontSize: '52px' } : {}),
               }}
               className="mono"
             >
@@ -101,7 +101,7 @@ export function ResultScreen() {
                 alignItems: 'center',
                 gap: '3px',
                 padding: '14px 24px',
-                fontSize: '14px',
+                fontSize: '16px',
                 width: '100%',
               }}
             >
@@ -208,12 +208,12 @@ const summaryRowStyles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
   },
   label: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   value: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
@@ -258,17 +258,17 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid transparent',
   },
   resultTag: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
   },
   heroMultiplier: {
-    fontSize: '72px',
+    fontSize: '76px',
     fontWeight: 900,
     lineHeight: 1,
     letterSpacing: '-2px',
   },
   heroPnl: {
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: 600,
     marginTop: '4px',
   },
@@ -289,7 +289,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.bg.tertiary,
   },
   summaryTitle: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
@@ -298,7 +298,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '1px',
   },
   nodeCount: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: theme.text.secondary,
   },
@@ -322,17 +322,17 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: `1px solid ${theme.border.subtle}`,
   },
   nodeLabel: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: theme.text.secondary,
   },
   nodeStatus: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 700,
   },
   emptyNode: {
     padding: '12px',
-    fontSize: '12px',
+    fontSize: '14px',
     color: theme.text.muted,
     textAlign: 'center',
   },
@@ -357,7 +357,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'width 0.5s ease',
   },
   xpBarLabel: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 600,
     color: theme.text.muted,
     textAlign: 'right',
@@ -383,13 +383,13 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.1s ease',
   },
   primaryBtnText: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 700,
     color: '#fff',
     fontFamily: 'Rajdhani, sans-serif',
   },
   primaryBtnSub: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 500,
     color: 'rgba(255,255,255,0.6)',
     display: 'flex',
@@ -402,7 +402,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '8px',
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: theme.text.muted,
   },
@@ -418,12 +418,12 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '8px',
   },
   balanceLabel: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   balanceValue: {
-    fontSize: '16px',
+    fontSize: '18px',
     fontWeight: 700,
     color: '#c084fc',
     display: 'flex',

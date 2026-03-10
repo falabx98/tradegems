@@ -236,7 +236,7 @@ const styles: Record<string, React.CSSProperties> = {
     lineHeight: 1,
   },
   countdownLabel: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 600,
     color: theme.text.secondary,
   },
@@ -244,7 +244,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 500,
     color: theme.text.muted,
     marginTop: '8px',
@@ -263,7 +263,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   feedItem: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
   },
 };

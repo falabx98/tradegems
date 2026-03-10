@@ -122,7 +122,7 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative',
   },
   balanceLabel: {
-    fontSize: '9px',
+    fontSize: '11px',
     fontWeight: 500,
     color: theme.text.muted,
   },
@@ -136,13 +136,13 @@ const styles: Record<string, React.CSSProperties> = {
     height: '28px',
   },
   balanceValue: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 700,
     color: theme.text.primary,
     lineHeight: 1.1,
   },
   usdValue: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 500,
     color: theme.text.secondary,
     marginTop: '1px',
@@ -150,7 +150,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   depositBtn: {
     padding: '7px 16px',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: '#fff',
     background: '#9945FF',
@@ -180,7 +180,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 700,
     color: '#fff',
   },
@@ -195,13 +195,13 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
   },
   profileName: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 600,
     color: theme.text.primary,
     lineHeight: 1.2,
   },
   profileTier: {
-    fontSize: '9px',
+    fontSize: '11px',
     fontWeight: 500,
     color: theme.text.muted,
   },

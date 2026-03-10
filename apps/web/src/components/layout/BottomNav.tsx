@@ -67,7 +67,7 @@ export function BottomNav() {
                 >
                   <NavIcon name={item.icon} size={20} color={isActive ? '#c084fc' : theme.text.secondary} />
                   <span style={{
-                    fontSize: '13px',
+                    fontSize: '15px',
                     fontWeight: 600,
                     color: isActive ? '#c084fc' : theme.text.primary,
                   }}>
@@ -96,7 +96,7 @@ export function BottomNav() {
                 color={isActive ? '#c084fc' : theme.text.muted}
               />
               <span style={{
-                fontSize: '9px',
+                fontSize: '11px',
                 fontWeight: 600,
                 color: isActive ? '#c084fc' : theme.text.muted,
                 marginTop: '2px',

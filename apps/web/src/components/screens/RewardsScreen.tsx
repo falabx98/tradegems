@@ -407,7 +407,7 @@ export function RewardsScreen() {
           <>
             <div style={styles.panelHeader}>
               <span style={styles.panelTitle}>Affiliate Program</span>
-              <span style={{ fontSize: '10px', color: theme.text.muted }}>Earn 20% of platform fees</span>
+              <span style={{ fontSize: '12px', color: theme.text.muted }}>Earn 20% of platform fees</span>
             </div>
             <div style={{ flex: 1, overflow: 'auto', padding: '16px' }}>
               {loading ? (
@@ -416,7 +416,7 @@ export function RewardsScreen() {
                 <>
                   {/* Referral Code Card */}
                   <div style={affStyles.codeCard} className="gradient-border">
-                    <div style={{ fontSize: '11px', color: theme.text.muted }}>Your referral code</div>
+                    <div style={{ fontSize: '13px', color: theme.text.muted }}>Your referral code</div>
                     <div style={affStyles.codeRow}>
                       <span className="mono" style={affStyles.code}>{referralStats.referralCode}</span>
                       <button
@@ -430,7 +430,7 @@ export function RewardsScreen() {
                         {copied ? 'Copied!' : 'Copy'}
                       </button>
                     </div>
-                    <div style={{ fontSize: '10px', color: theme.text.muted, marginTop: '4px' }}>
+                    <div style={{ fontSize: '12px', color: theme.text.muted, marginTop: '4px' }}>
                       Share this code — you earn 20% of platform fees from your referrals' bets
                     </div>
                   </div>
@@ -460,14 +460,14 @@ export function RewardsScreen() {
                   {/* Claim Section */}
                   {referralStats.claimable > 0 && (
                     <div style={affStyles.claimCard}>
-                      <div style={{ fontSize: '11px', color: theme.text.muted }}>Claimable Earnings</div>
+                      <div style={{ fontSize: '13px', color: theme.text.muted }}>Claimable Earnings</div>
                       <div className="mono" style={affStyles.claimableAmount}>
                         <img src="/sol-coin.png" alt="SOL" style={{ width: 24, height: 24, marginRight: 4 }} />
                         {formatSol(referralStats.claimable)} SOL
                       </div>
                       <button
                         className="btn-3d btn-3d-success"
-                        style={{ padding: '10px 28px', fontSize: '13px' }}
+                        style={{ padding: '10px 28px', fontSize: '15px' }}
                         onClick={handleClaimReferral}
                         disabled={claiming === 'referral'}
                       >
@@ -479,23 +479,23 @@ export function RewardsScreen() {
                   {/* Referred Users List */}
                   {referralStats.referredUsers.length > 0 && (
                     <div style={{ marginTop: '16px' }}>
-                      <div style={{ fontSize: '12px', fontWeight: 600, color: theme.text.secondary, marginBottom: '8px' }}>
+                      <div style={{ fontSize: '14px', fontWeight: 600, color: theme.text.secondary, marginBottom: '8px' }}>
                         Your Referrals
                       </div>
                       {referralStats.referredUsers.map((u) => (
                         <div key={u.username} className="table-row-hover" style={affStyles.userRow}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: '12px', fontWeight: 600, color: theme.text.primary }}>{u.username}</div>
-                            <div style={{ fontSize: '10px', color: theme.text.muted }}>
+                            <div style={{ fontSize: '14px', fontWeight: 600, color: theme.text.primary }}>{u.username}</div>
+                            <div style={{ fontSize: '12px', color: theme.text.muted }}>
                               Joined {new Date(u.joinedAt).toLocaleDateString()}
                             </div>
                           </div>
                           <div style={{ textAlign: 'right' as const }}>
-                            <div className="mono" style={{ fontSize: '11px', color: theme.text.primary, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' }}>
+                            <div className="mono" style={{ fontSize: '13px', color: theme.text.primary, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' }}>
                               <img src="/sol-coin.png" alt="SOL" style={{ width: 14, height: 14 }} />
                               {formatSol(u.totalWagered)} wagered
                             </div>
-                            <div className="mono" style={{ fontSize: '11px', color: theme.success, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' }}>
+                            <div className="mono" style={{ fontSize: '13px', color: theme.success, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '3px' }}>
                               <img src="/sol-coin.png" alt="SOL" style={{ width: 14, height: 14 }} />
                               +{formatSol(u.yourEarnings)} earned
                             </div>
@@ -520,7 +520,7 @@ export function RewardsScreen() {
           <>
             <div style={styles.panelHeader}>
               <span style={styles.panelTitle}>Daily Mystery Box</span>
-              <span style={{ fontSize: '10px', color: theme.text.muted }}>
+              <span style={{ fontSize: '12px', color: theme.text.muted }}>
                 {dailyBoxInfo ? `${dailyBoxInfo.vipTier.charAt(0).toUpperCase() + dailyBoxInfo.vipTier.slice(1)} · Lv ${dailyBoxInfo.level}` : ''}
               </span>
             </div>
@@ -534,9 +534,9 @@ export function RewardsScreen() {
                     {isOpening && !boxResult ? (
                       /* Opening animation */
                       <div style={dbStyles.boxOpening}>
-                        <div className="mystery-box-shake" style={{ fontSize: '56px', lineHeight: 1 }}>📦</div>
-                        <div style={{ fontSize: '20px', marginTop: '4px', animation: 'glowPulse 0.5s ease-in-out infinite' }}>✨</div>
-                        <div style={{ fontSize: '11px', color: theme.text.muted, marginTop: '8px' }}>Opening...</div>
+                        <div className="mystery-box-shake" style={{ fontSize: '60px', lineHeight: 1 }}>📦</div>
+                        <div style={{ fontSize: '22px', marginTop: '4px', animation: 'glowPulse 0.5s ease-in-out infinite' }}>✨</div>
+                        <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '8px' }}>Opening...</div>
                       </div>
                     ) : boxResult ? (
                       /* Result reveal */
@@ -546,7 +546,7 @@ export function RewardsScreen() {
                         boxShadow: `0 0 30px ${RARITY_GLOW[boxResult.rarity] || 'rgba(156,163,175,0.3)'}, 0 0 60px ${RARITY_GLOW[boxResult.rarity] || 'rgba(156,163,175,0.3)'}`,
                       }}>
                         <div style={{
-                          fontSize: '10px',
+                          fontSize: '12px',
                           fontWeight: 700,
                           color: RARITY_COLORS[boxResult.rarity] || '#9ca3af',
                           textTransform: 'uppercase',
@@ -556,7 +556,7 @@ export function RewardsScreen() {
                           {boxResult.rarity}
                         </div>
                         <div className="mono rarity-glow" style={{
-                          fontSize: '28px',
+                          fontSize: '30px',
                           fontWeight: 900,
                           color: RARITY_COLORS[boxResult.rarity] || '#9ca3af',
                           textShadow: `0 0 20px ${RARITY_GLOW[boxResult.rarity] || 'rgba(156,163,175,0.3)'}`,
@@ -567,10 +567,10 @@ export function RewardsScreen() {
                           <img src="/sol-coin.png" alt="SOL" style={{ width: 28, height: 28 }} />
                           {formatSol(boxResult.amountLamports)} SOL
                         </div>
-                        <div style={{ fontSize: '32px', marginTop: '4px' }}>🎉</div>
+                        <div style={{ fontSize: '34px', marginTop: '4px' }}>🎉</div>
                         <button
                           className="btn-3d btn-3d-primary"
-                          style={{ marginTop: '12px', padding: '8px 28px', fontSize: '12px' }}
+                          style={{ marginTop: '12px', padding: '8px 28px', fontSize: '14px' }}
                           onClick={() => { setBoxResult(null); setIsOpening(false); }}
                         >
                           Collect
@@ -579,23 +579,23 @@ export function RewardsScreen() {
                     ) : (
                       /* Idle state */
                       <div style={dbStyles.boxIdle}>
-                        <div style={{ fontSize: '56px', lineHeight: 1 }}>🎁</div>
-                        <div style={{ fontSize: '11px', color: theme.text.muted, marginTop: '6px' }}>
+                        <div style={{ fontSize: '60px', lineHeight: 1 }}>🎁</div>
+                        <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '6px' }}>
                           Daily Mystery Box
                         </div>
                         {dailyBoxInfo.available ? (
                           <button
                             className="btn-3d btn-3d-success"
-                            style={{ padding: '10px 28px', fontSize: '13px', marginTop: '10px' }}
+                            style={{ padding: '10px 28px', fontSize: '15px', marginTop: '10px' }}
                             onClick={handleClaimDailyBox}
                           >
                             Open Mystery Box
                           </button>
                         ) : (
                           <div style={{ textAlign: 'center', marginTop: '10px' }}>
-                            <div style={{ fontSize: '10px', color: theme.text.muted }}>Next box in</div>
+                            <div style={{ fontSize: '12px', color: theme.text.muted }}>Next box in</div>
                             <div className="mono" style={{
-                              fontSize: '18px',
+                              fontSize: '20px',
                               fontWeight: 700,
                               color: '#c084fc',
                               textShadow: '0 0 12px rgba(192, 132, 252, 0.4)',
@@ -621,7 +621,7 @@ export function RewardsScreen() {
                           boxShadow: `0 0 6px ${RARITY_GLOW[r.rarity] || 'rgba(156,163,175,0.3)'}`,
                         }} />
                         <span style={{
-                          fontSize: '12px',
+                          fontSize: '14px',
                           fontWeight: 600,
                           color: RARITY_COLORS[r.rarity] || '#9ca3af',
                           flex: 1,
@@ -629,10 +629,10 @@ export function RewardsScreen() {
                         }}>
                           {r.rarity}
                         </span>
-                        <span className="mono" style={{ fontSize: '11px', color: theme.text.muted, width: '50px', textAlign: 'right' }}>
+                        <span className="mono" style={{ fontSize: '13px', color: theme.text.muted, width: '50px', textAlign: 'right' }}>
                           {(r.probability * 100).toFixed(1)}%
                         </span>
-                        <span className="mono" style={{ fontSize: '12px', fontWeight: 700, color: theme.text.primary, width: '100px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                        <span className="mono" style={{ fontSize: '14px', fontWeight: 700, color: theme.text.primary, width: '100px', textAlign: 'right', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
                           <img src="/sol-coin.png" alt="SOL" style={{ width: 16, height: 16 }} />
                           {formatSol(r.amountLamports)} SOL
                         </span>
@@ -647,12 +647,12 @@ export function RewardsScreen() {
                     if (!cur || !nxt) return null;
                     return (
                       <div style={dbStyles.nextTierBox}>
-                        <div style={{ fontSize: '11px', color: theme.text.muted }}>
+                        <div style={{ fontSize: '13px', color: theme.text.muted }}>
                           Level up to <span style={{ color: '#c084fc', fontWeight: 600 }}>
                             {dailyBoxInfo.nextTierRewards!.tier.charAt(0).toUpperCase() + dailyBoxInfo.nextTierRewards!.tier.slice(1)}
                           </span> for better rewards
                         </div>
-                        <div style={{ fontSize: '11px', color: theme.text.muted, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           Legendary: {formatSol(cur.amountLamports)} →{' '}
                           <img src="/sol-coin.png" alt="SOL" style={{ width: 14, height: 14 }} />
                           <span className="mono" style={{ color: '#fbbf24', fontWeight: 700 }}>
@@ -675,7 +675,7 @@ export function RewardsScreen() {
                             boxShadow: `0 0 6px ${RARITY_GLOW[h.rarity] || 'rgba(156,163,175,0.3)'}`,
                           }} />
                           <span style={{
-                            fontSize: '11px',
+                            fontSize: '13px',
                             color: RARITY_COLORS[h.rarity] || '#9ca3af',
                             fontWeight: 600,
                             textTransform: 'capitalize',
@@ -683,11 +683,11 @@ export function RewardsScreen() {
                           }}>
                             {h.rarity}
                           </span>
-                          <span className="mono" style={{ fontSize: '11px', color: theme.text.primary, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          <span className="mono" style={{ fontSize: '13px', color: theme.text.primary, display: 'flex', alignItems: 'center', gap: '3px' }}>
                             <img src="/sol-coin.png" alt="SOL" style={{ width: 14, height: 14 }} />
                             {formatSol(h.amountLamports)} SOL
                           </span>
-                          <span style={{ fontSize: '10px', color: theme.text.muted, marginLeft: '8px' }}>
+                          <span style={{ fontSize: '12px', color: theme.text.muted, marginLeft: '8px' }}>
                             {new Date(h.claimedAt).toLocaleDateString()}
                           </span>
                         </div>
@@ -730,7 +730,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '8px',
     color: theme.text.muted,
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
@@ -765,7 +765,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(32, 24, 48, 0.95)',
   },
   panelTitle: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
@@ -780,11 +780,11 @@ const styles: Record<string, React.CSSProperties> = {
   empty: {
     padding: '40px',
     textAlign: 'center',
-    fontSize: '12px',
+    fontSize: '14px',
     color: theme.text.muted,
   },
   claimMsg: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: theme.success,
     textAlign: 'center',
@@ -807,7 +807,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '4px',
   },
   missionTitle: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     color: theme.text.primary,
     display: 'flex',
@@ -816,11 +816,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   checkMark: {
     color: theme.success,
-    fontSize: '13px',
+    fontSize: '15px',
     textShadow: '0 0 8px rgba(52, 211, 153, 0.5)',
   },
   missionDesc: {
-    fontSize: '11px',
+    fontSize: '13px',
     color: theme.text.muted,
   },
   progressTrack: {
@@ -836,7 +836,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'width 0.3s ease',
   },
   progressLabel: {
-    fontSize: '10px',
+    fontSize: '12px',
     color: theme.text.muted,
   },
   missionReward: {
@@ -847,12 +847,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '4px',
   },
   rewardLabel: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   rewardValue: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     color: '#c084fc',
     display: 'flex',
@@ -865,7 +865,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '8px',
     color: '#0e0a16',
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
@@ -885,7 +885,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background-color 0.15s ease',
   },
   achieveIcon: {
-    fontSize: '28px',
+    fontSize: '30px',
     color: theme.warning,
     width: '48px',
     height: '48px',
@@ -902,17 +902,17 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
   },
   achieveTitle: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     color: theme.text.primary,
   },
   achieveDesc: {
-    fontSize: '11px',
+    fontSize: '13px',
     color: theme.text.muted,
     marginTop: '2px',
   },
   statusUnlocked: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 600,
     color: theme.success,
     background: 'rgba(52, 211, 153, 0.1)',
@@ -922,7 +922,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: '0 0 8px rgba(52, 211, 153, 0.15)',
   },
   statusLocked: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 600,
     color: theme.text.muted,
     background: 'rgba(74, 75, 106, 0.1)',
@@ -953,19 +953,19 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   rakebackLabel: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   rakebackRate: {
-    fontSize: '36px',
+    fontSize: '38px',
     fontWeight: 900,
     color: '#c084fc',
     lineHeight: 1,
     textShadow: '0 0 20px rgba(192, 132, 252, 0.5), 0 0 40px rgba(192, 132, 252, 0.2)',
   },
   rakebackTier: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: theme.text.secondary,
     marginTop: '4px',
@@ -981,12 +981,12 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
   },
   claimableLabel: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   claimableValue: {
-    fontSize: '20px',
+    fontSize: '22px',
     fontWeight: 800,
     color: theme.success,
     textShadow: '0 0 12px rgba(52, 211, 153, 0.4)',
@@ -997,7 +997,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderRadius: '12px',
     color: '#0e0a16',
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
@@ -1013,7 +1013,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '12px',
   },
   rakebackText: {
-    fontSize: '12px',
+    fontSize: '14px',
     color: theme.text.muted,
     lineHeight: 1.5,
     margin: 0,
@@ -1026,7 +1026,7 @@ const styles: Record<string, React.CSSProperties> = {
   tierRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     padding: '8px 12px',
     background: 'rgba(28, 20, 42, 0.6)',
@@ -1074,7 +1074,7 @@ const dbStyles: Record<string, React.CSSProperties> = {
     marginTop: '16px',
   },
   sectionTitle: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: theme.text.secondary,
     marginBottom: '8px',
@@ -1134,7 +1134,7 @@ const affStyles: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   code: {
-    fontSize: '20px',
+    fontSize: '22px',
     fontWeight: 900,
     color: '#c084fc',
     letterSpacing: '2px',
@@ -1146,7 +1146,7 @@ const affStyles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(153, 69, 255, 0.25)',
     borderRadius: '8px',
     color: '#c084fc',
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'inherit',
@@ -1169,12 +1169,12 @@ const affStyles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(153, 69, 255, 0.08)',
   },
   statLabel: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   statValue: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 800,
     color: theme.text.primary,
     display: 'flex',
@@ -1192,7 +1192,7 @@ const affStyles: Record<string, React.CSSProperties> = {
     border: '1px solid rgba(52, 211, 153, 0.15)',
   },
   claimableAmount: {
-    fontSize: '24px',
+    fontSize: '26px',
     fontWeight: 900,
     color: theme.success,
     textShadow: '0 0 12px rgba(52, 211, 153, 0.4)',

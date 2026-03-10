@@ -289,10 +289,10 @@ export function LobbyScreen() {
                         <span style={{
                           ...styles.riskLabel,
                           color: isActive ? color : theme.text.secondary,
-                          fontSize: '13px',
+                          fontSize: '15px',
                         }}>{label}</span>
                         <span style={{
-                          fontSize: '10px',
+                          fontSize: '12px',
                           fontWeight: 500,
                           color: theme.text.muted,
                           lineHeight: 1.3,
@@ -306,13 +306,13 @@ export function LobbyScreen() {
                         flexShrink: 0,
                       }}>
                         <span style={{
-                          fontSize: '9px',
+                          fontSize: '11px',
                           fontWeight: 600,
                           color: theme.game.multiplier,
                           fontFamily: '"JetBrains Mono", monospace',
                         }}>gain {gainTag}</span>
                         <span style={{
-                          fontSize: '9px',
+                          fontSize: '11px',
                           fontWeight: 600,
                           color: theme.game.divider,
                           fontFamily: '"JetBrains Mono", monospace',
@@ -334,7 +334,7 @@ export function LobbyScreen() {
                             <span
                               key={i}
                               style={{
-                                fontSize: '9px',
+                                fontSize: '11px',
                                 fontWeight: 600,
                                 fontFamily: '"JetBrains Mono", monospace',
                                 color: rarityColors[rarity],
@@ -377,7 +377,7 @@ export function LobbyScreen() {
               alignItems: 'center',
               gap: '4px',
               padding: '14px 24px',
-              fontSize: '14px',
+              fontSize: '16px',
               width: '100%',
               opacity: isAuthenticated && betAmount > profile.balance ? 0.4 : 1,
             }}
@@ -399,7 +399,7 @@ export function LobbyScreen() {
                 <span style={styles.authDesc}>Create an account or sign in to start trading rounds.</span>
                 <button
                   className="btn-3d btn-3d-primary"
-                  style={{ padding: '12px 24px', fontSize: '14px', width: '100%' }}
+                  style={{ padding: '12px 24px', fontSize: '16px', width: '100%' }}
                   onClick={() => { setShowAuthPrompt(false); setScreen('auth'); }}
                 >
                   Sign in / Register
@@ -467,7 +467,7 @@ export function LobbyScreen() {
           {isAuthenticated && bonusClaimed === true && !bonusUnlocked && (
             <div style={styles.bonusStatusCard}>
               <div style={styles.bonusStatusRow}>
-                <span style={{ fontSize: '14px' }}>🔒</span>
+                <span style={{ fontSize: '16px' }}>🔒</span>
                 <div style={styles.bonusStatusTextWrap}>
                   <span style={styles.bonusStatusTitle}>Bonus: 1 SOL locked</span>
                   <span style={styles.bonusStatusDesc}>
@@ -493,7 +493,7 @@ export function LobbyScreen() {
           {/* Bonus Status — Unlocked */}
           {isAuthenticated && bonusClaimed === true && bonusUnlocked && (
             <div style={styles.bonusUnlockedCard}>
-              <span style={{ fontSize: '14px' }}>🎉</span>
+              <span style={{ fontSize: '16px' }}>🎉</span>
               <span style={styles.bonusUnlockedText}>Bonus unlocked! Full balance withdrawable.</span>
             </div>
           )}
@@ -697,7 +697,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: '10px',
   },
   chartOverlayText: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 500,
     color: theme.text.muted,
   },
@@ -718,7 +718,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.bg.tertiary,
   },
   panelTitle: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
@@ -727,7 +727,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '1px',
   },
   panelValue: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     color: '#c084fc',
     display: 'flex',
@@ -747,7 +747,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 700,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
@@ -772,7 +772,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     cursor: 'pointer',
     fontFamily: '"JetBrains Mono", monospace',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: theme.text.secondary,
     transition: 'all 0.12s ease',
@@ -792,7 +792,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: `1px solid ${theme.border.subtle}`,
   },
   customBetLabel: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 600,
     color: theme.text.muted,
     flexShrink: 0,
@@ -813,7 +813,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     outline: 'none',
     fontFamily: '"JetBrains Mono", monospace',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: theme.text.secondary,
     padding: '7px 0',
@@ -827,7 +827,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '5px',
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 700,
     color: '#c084fc',
     transition: 'all 0.12s ease',
@@ -866,13 +866,13 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '2px',
   },
   riskLabel: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     color: theme.text.secondary,
     transition: 'color 0.15s ease',
   },
   riskTag: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 500,
     color: theme.text.muted,
   },
@@ -900,13 +900,13 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   executeBtnText: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 700,
     color: '#fff',
     fontFamily: 'Rajdhani, sans-serif',
   },
   executeBtnSub: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 500,
     color: 'rgba(255,255,255,0.6)',
     display: 'flex',
@@ -926,12 +926,12 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
   },
   statLabel: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   statValue: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
@@ -952,7 +952,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Live Feed
   liveBadge: {
-    fontSize: '9px',
+    fontSize: '11px',
     fontWeight: 600,
     color: theme.success,
     padding: '2px 6px',
@@ -971,7 +971,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderBottom: `1px solid ${theme.border.subtle}`,
   },
   feedUser: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 500,
     color: theme.text.secondary,
     flex: 1,
@@ -980,19 +980,19 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
   },
   feedMult: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 700,
     minWidth: '38px',
     textAlign: 'right',
   },
   feedAmount: {
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 600,
     minWidth: '70px',
     textAlign: 'right',
   },
   feedTime: {
-    fontSize: '10px',
+    fontSize: '12px',
     color: theme.text.muted,
     minWidth: '38px',
     textAlign: 'right',
@@ -1016,12 +1016,12 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.bg.secondary,
   },
   quickStatLabel: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   quickStatValue: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 700,
     color: theme.text.primary,
     display: 'flex',
@@ -1052,7 +1052,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center' as const,
   },
   authTitle: {
-    fontSize: '16px',
+    fontSize: '18px',
     fontWeight: 700,
     color: theme.text.primary,
     fontFamily: "'Orbitron', sans-serif",
@@ -1060,7 +1060,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.5px',
   },
   authDesc: {
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 500,
     color: theme.text.muted,
     lineHeight: 1.4,
@@ -1071,7 +1071,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     cursor: 'pointer',
     fontFamily: 'Rajdhani, sans-serif',
-    fontSize: '12px',
+    fontSize: '14px',
     fontWeight: 500,
     color: theme.text.muted,
   },
@@ -1104,7 +1104,7 @@ const styles: Record<string, React.CSSProperties> = {
     zIndex: 1,
   },
   bonusIcon: {
-    fontSize: '28px',
+    fontSize: '30px',
     flexShrink: 0,
   },
   bonusTextWrap: {
@@ -1114,19 +1114,19 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '2px',
   },
   bonusTitle: {
-    fontSize: '14px',
+    fontSize: '16px',
     fontWeight: 700,
     color: '#14F195',
   },
   bonusDesc: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 500,
     color: theme.text.muted,
     lineHeight: 1.3,
   },
   bonusBtn: {
     padding: '8px 16px',
-    fontSize: '13px',
+    fontSize: '15px',
     fontWeight: 700,
     whiteSpace: 'nowrap' as const,
     flexShrink: 0,
@@ -1154,17 +1154,17 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '1px',
   },
   bonusStatusTitle: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 700,
     color: '#fbbf24',
   },
   bonusStatusDesc: {
-    fontSize: '10px',
+    fontSize: '12px',
     fontWeight: 500,
     color: theme.text.muted,
   },
   bonusStatusProgress: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 700,
     flexShrink: 0,
   },
@@ -1191,7 +1191,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '8px',
   },
   bonusUnlockedText: {
-    fontSize: '11px',
+    fontSize: '13px',
     fontWeight: 600,
     color: '#34d399',
   },

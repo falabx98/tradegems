@@ -90,7 +90,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   popup: {
     fontFamily: "'Orbitron', sans-serif",
-    fontSize: '28px',
+    fontSize: '30px',
     fontWeight: 800,
     textShadow: '0 0 12px currentColor',
   },

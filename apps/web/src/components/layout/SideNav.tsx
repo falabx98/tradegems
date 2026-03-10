@@ -143,7 +143,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: `rgba(153, 69, 255, 0.08)`,
   },
   navLabel: {
-    fontSize: '8px',
+    fontSize: '10px',
     fontWeight: 700,
     color: theme.text.muted,
     transition: 'color 0.15s ease',

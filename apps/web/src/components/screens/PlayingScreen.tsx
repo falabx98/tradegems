@@ -200,7 +200,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
   },
   countdownNumber: {
-    fontSize: '100px',
+    fontSize: 'clamp(64px, 12vw, 100px)',
     fontWeight: 900,
     color: '#c084fc',
     lineHeight: 1,

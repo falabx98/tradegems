@@ -1,4 +1,5 @@
 import { useGameStore } from '../../stores/gameStore';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { formatMultiplier } from '../../engine/roundEngine';
 import { theme } from '../../styles/theme';
 import { GameNode } from '../../types/game';
@@ -27,6 +28,7 @@ function nodeColor(node: GameNode): string {
 }
 
 export function ResultScreen() {
+  const isMobile = useIsMobile();
   const { result, profile, playAgain, resetRound, betAmount, riskTier } = useGameStore();
 
   if (!result) return null;
@@ -37,8 +39,14 @@ export function ResultScreen() {
   const resultColor = isWin ? theme.game.multiplier : theme.game.divider;
 
   return (
-    <div style={styles.container}>
-      <div style={styles.columns}>
+    <div style={{
+      ...styles.container,
+      ...(isMobile ? { padding: '12px' } : {}),
+    }}>
+      <div style={{
+        ...styles.columns,
+        ...(isMobile ? { gridTemplateColumns: '1fr', gap: '10px' } : {}),
+      }}>
         {/* Left: Hero result */}
         <div style={styles.heroCol}>
           <div style={{
@@ -50,7 +58,11 @@ export function ResultScreen() {
               {isWin ? 'Round won' : 'Round lost'}
             </span>
             <span
-              style={{ ...styles.heroMultiplier, color: resultColor }}
+              style={{
+                ...styles.heroMultiplier,
+                color: resultColor,
+                ...(isMobile ? { fontSize: '48px' } : {}),
+              }}
               className="mono"
             >
               {formatMultiplier(result.finalMultiplier)}
@@ -80,7 +92,19 @@ export function ResultScreen() {
 
           {/* Actions */}
           <div style={styles.actions}>
-            <button onClick={playAgain} style={styles.primaryBtn}>
+            <button
+              onClick={playAgain}
+              className="btn-3d btn-3d-primary"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '3px',
+                padding: '14px 24px',
+                fontSize: '14px',
+                width: '100%',
+              }}
+            >
               <span style={styles.primaryBtnText}>Play again</span>
               <span style={styles.primaryBtnSub} className="mono">
                 <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', marginRight: '4px', verticalAlign: 'middle' }} />

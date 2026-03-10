@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 import { RiskTier } from '../../types/game';
 import { generateChartPath } from '../../engine/chartGenerator';
@@ -42,6 +43,7 @@ function timeAgo(dateStr: string) {
 }
 
 export function LobbyScreen() {
+  const isMobile = useIsMobile();
   const { mode, setMode, betAmount, setBetAmount, riskTier, setRiskTier, startRound, profile, syncProfile } = useGameStore();
   const [crediting, setCrediting] = useState(false);
   const [activityFeed, setActivityFeed] = useState<FeedItem[]>([]);
@@ -90,11 +92,17 @@ export function LobbyScreen() {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.columns}>
+    <div style={{
+      ...styles.container,
+      ...(isMobile ? { padding: '12px' } : {}),
+    }}>
+      <div style={{
+        ...styles.columns,
+        ...(isMobile ? { gridTemplateColumns: '1fr', gap: '10px' } : {}),
+      }}>
         {/* Left column: Configuration */}
         <div style={styles.leftCol}>
-          <ChartPreview />
+          {!isMobile && <ChartPreview />}
 
           {/* Mode */}
           <div style={styles.panel}>
@@ -185,12 +193,19 @@ export function LobbyScreen() {
             </div>
           </div>
 
-          {/* Start Round Button */}
+          {/* Start Round Button — Duolingo 3D style */}
           <button
             onClick={startRound}
             disabled={betAmount > profile.balance}
+            className="btn-3d btn-3d-primary"
             style={{
-              ...styles.executeBtn,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '14px 24px',
+              fontSize: '14px',
+              width: '100%',
               opacity: betAmount > profile.balance ? 0.4 : 1,
             }}
           >

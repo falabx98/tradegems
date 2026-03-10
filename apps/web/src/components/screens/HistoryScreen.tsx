@@ -148,6 +148,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 12px',
     borderBottom: `1px solid ${theme.border.subtle}`,
     background: theme.bg.tertiary,
+    minWidth: '580px',
   },
   th: {
     fontSize: '11px',
@@ -157,12 +158,15 @@ const styles: Record<string, React.CSSProperties> = {
   tableBody: {
     flex: 1,
     overflow: 'auto',
+    overflowX: 'auto',
+    WebkitOverflowScrolling: 'touch',
   },
   tableRow: {
     display: 'flex',
     padding: '8px 12px',
     borderBottom: `1px solid ${theme.border.subtle}`,
     alignItems: 'center',
+    minWidth: '580px',
   },
   td: {
     fontSize: '12px',

@@ -1,5 +1,7 @@
 import { TopBar } from './TopBar';
 import { SideNav } from './SideNav';
+import { BottomNav } from './BottomNav';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 
 interface AppLayoutProps {
@@ -8,9 +10,12 @@ interface AppLayoutProps {
 }
 
 export function AppLayout({ children, hideChrome = false }: AppLayoutProps) {
+  const isMobile = useIsMobile();
+
   if (hideChrome) {
     return (
       <div style={styles.fullscreen}>
+        <div className="neon-grid" />
         {children}
       </div>
     );
@@ -18,13 +23,18 @@ export function AppLayout({ children, hideChrome = false }: AppLayoutProps) {
 
   return (
     <div style={styles.root}>
+      <div className="neon-grid" />
       <TopBar />
       <div style={styles.body}>
-        <SideNav />
-        <main style={styles.main}>
+        {!isMobile && <SideNav />}
+        <main style={{
+          ...styles.main,
+          ...(isMobile ? { paddingBottom: '64px' } : {}),
+        }}>
           {children}
         </main>
       </div>
+      {isMobile && <BottomNav />}
     </div>
   );
 }

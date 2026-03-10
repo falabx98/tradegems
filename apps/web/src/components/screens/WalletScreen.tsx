@@ -387,8 +387,12 @@ export function WalletScreen() {
                 placeholder="Paste transaction hash..."
               />
               <button
+                className="btn-3d btn-3d-success"
                 style={{
-                  ...s.primaryBtn,
+                  padding: '14px',
+                  fontSize: '14px',
+                  width: '100%',
+                  marginTop: '4px',
                   opacity: verifyState === 'verifying' ? 0.7 : 1,
                 }}
                 onClick={handleVerifyTxHash}
@@ -471,8 +475,12 @@ export function WalletScreen() {
             </div>
 
             <button
+              className="btn-3d btn-3d-danger"
               style={{
-                ...s.primaryBtn,
+                padding: '14px',
+                fontSize: '14px',
+                width: '100%',
+                marginTop: '4px',
                 opacity: withdrawState === 'processing' ? 0.7 : 1,
               }}
               onClick={handleWithdraw}

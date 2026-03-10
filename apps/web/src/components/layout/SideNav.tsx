@@ -1,18 +1,19 @@
 import { useGameStore } from '../../stores/gameStore';
 import { theme } from '../../styles/theme';
+import { NavIcon } from './NavIcons';
 
 const NAV_ITEMS = [
-  { id: 'lobby', label: 'Lobby', icon: '◈' },
-  { id: 'solo', label: 'Solo', icon: '▶' },
-  { id: 'battle', label: 'Battle', icon: '⚔' },
-  { id: 'leaderboard', label: 'Ranks', icon: '☰' },
-  { id: 'rewards', label: 'Rewards', icon: '★' },
-  { id: 'wallet', label: 'Wallet', icon: '◆' },
+  { id: 'lobby', label: 'Lobby', icon: 'grid' },
+  { id: 'solo', label: 'Solo', icon: 'play' },
+  { id: 'battle', label: 'Battle', icon: 'swords' },
+  { id: 'leaderboard', label: 'Ranks', icon: 'trophy' },
+  { id: 'rewards', label: 'Rewards', icon: 'gift' },
+  { id: 'wallet', label: 'Wallet', icon: 'wallet' },
 ] as const;
 
 const BOTTOM_ITEMS = [
-  { id: 'history', label: 'History', icon: '↻' },
-  { id: 'settings', label: 'Settings', icon: '⚙' },
+  { id: 'history', label: 'History', icon: 'clock' },
+  { id: 'settings', label: 'Settings', icon: 'gear' },
 ] as const;
 
 export function SideNav() {
@@ -43,12 +44,11 @@ export function SideNav() {
                 ...(isActive ? styles.navItemActive : {}),
               }}
             >
-              <span style={{
-                ...styles.navIcon,
-                ...(isActive ? styles.navIconActive : {}),
-              }}>
-                {item.icon}
-              </span>
+              <NavIcon
+                name={item.icon}
+                size={18}
+                color={isActive ? '#c084fc' : theme.text.muted}
+              />
               <span style={{
                 ...styles.navLabel,
                 ...(isActive ? styles.navLabelActive : {}),
@@ -74,12 +74,11 @@ export function SideNav() {
                 ...(isActive ? styles.navItemActive : {}),
               }}
             >
-              <span style={{
-                ...styles.navIcon,
-                ...(isActive ? styles.navIconActive : {}),
-              }}>
-                {item.icon}
-              </span>
+              <NavIcon
+                name={item.icon}
+                size={18}
+                color={isActive ? '#c084fc' : theme.text.muted}
+              />
               <span style={{
                 ...styles.navLabel,
                 ...(isActive ? styles.navLabelActive : {}),
@@ -140,15 +139,6 @@ const styles: Record<string, React.CSSProperties> = {
   },
   navItemActive: {
     background: `rgba(153, 69, 255, 0.08)`,
-  },
-  navIcon: {
-    fontSize: '16px',
-    lineHeight: 1,
-    color: theme.text.muted,
-    transition: 'color 0.15s ease',
-  },
-  navIconActive: {
-    color: '#c084fc',
   },
   navLabel: {
     fontSize: '8px',

@@ -122,3 +122,133 @@ body {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }
 }
+
+@keyframes borderGlow {
+  0%, 100% {
+    border-color: rgba(153, 69, 255, 0.4);
+    box-shadow: 0 0 8px rgba(153, 69, 255, 0.15);
+  }
+  50% {
+    border-color: rgba(20, 241, 149, 0.4);
+    box-shadow: 0 0 8px rgba(20, 241, 149, 0.15);
+  }
+}
+
+/* ─── Profile glow effect ────────────────────────────────────────────────── */
+
+.profile-glow {
+  animation: borderGlow 3s ease-in-out infinite;
+}
+
+/* ─── Duolingo-style 3D Buttons ──────────────────────────────────────────── */
+
+.btn-3d {
+  position: relative;
+  border: none;
+  border-radius: 12px;
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  transform: translateY(0);
+  user-select: none;
+}
+
+.btn-3d-primary {
+  background: #9945FF;
+  color: #fff;
+  box-shadow: 0 4px 0 #7325d4, 0 6px 12px rgba(153, 69, 255, 0.3);
+}
+
+.btn-3d-primary:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #7325d4, 0 2px 4px rgba(153, 69, 255, 0.2);
+}
+
+.btn-3d-success {
+  background: #14F195;
+  color: #0b0e1a;
+  box-shadow: 0 4px 0 #0ec47a, 0 6px 12px rgba(20, 241, 149, 0.3);
+}
+
+.btn-3d-success:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #0ec47a, 0 2px 4px rgba(20, 241, 149, 0.2);
+}
+
+.btn-3d-danger {
+  background: #f87171;
+  color: #fff;
+  box-shadow: 0 4px 0 #d14545, 0 6px 12px rgba(248, 113, 113, 0.3);
+}
+
+.btn-3d-danger:active {
+  transform: translateY(3px);
+  box-shadow: 0 1px 0 #d14545, 0 2px 4px rgba(248, 113, 113, 0.2);
+}
+
+/* ─── Animated Neon Grid Background ─────────────────────────────────────── */
+
+.neon-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background-image:
+    linear-gradient(rgba(153, 69, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(153, 69, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.neon-grid::before {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+    ellipse 300px 300px at 50% 50%,
+    rgba(153, 69, 255, 0.08),
+    transparent 70%
+  );
+  animation: neonMove1 12s ease-in-out infinite;
+}
+
+.neon-grid::after {
+  content: '';
+  position: absolute;
+  inset: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(
+    ellipse 200px 200px at 50% 50%,
+    rgba(192, 132, 252, 0.06),
+    transparent 70%
+  );
+  animation: neonMove2 16s ease-in-out infinite;
+}
+
+@keyframes neonMove1 {
+  0%, 100% { transform: translate(-20%, -20%); }
+  25% { transform: translate(20%, -10%); }
+  50% { transform: translate(10%, 20%); }
+  75% { transform: translate(-10%, 10%); }
+}
+
+@keyframes neonMove2 {
+  0%, 100% { transform: translate(20%, 20%); }
+  25% { transform: translate(-15%, 10%); }
+  50% { transform: translate(-20%, -15%); }
+  75% { transform: translate(15%, -20%); }
+}
+
+/* ─── Mobile utilities ───────────────────────────────────────────────────── */
+
+@media (max-width: 767px) {
+  .hide-mobile { display: none !important; }
+}
+
+@media (min-width: 768px) {
+  .hide-desktop { display: none !important; }
+}

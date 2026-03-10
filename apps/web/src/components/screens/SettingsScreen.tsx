@@ -56,8 +56,8 @@ export function SettingsScreen() {
           <StatBox label="Total wagered" value={`${formatSol(profile.totalWagered)} SOL`} icon />
           <StatBox label="Total won" value={`${formatSol(profile.totalWon)} SOL`} color={theme.success} icon />
           <StatBox label="Win rate" value={`${(profile.winRate * 100).toFixed(1)}%`} />
-          <StatBox label="Best mult" value={`${profile.bestMultiplier.toFixed(2)}x`} color={theme.accent.cyan} />
-          <StatBox label="Balance" value={`${formatSol(profile.balance)} SOL`} color={theme.accent.cyan} icon />
+          <StatBox label="Best mult" value={`${profile.bestMultiplier.toFixed(2)}x`} color="#c084fc" />
+          <StatBox label="Balance" value={`${formatSol(profile.balance)} SOL`} color="#c084fc" icon />
         </div>
       </div>
 
@@ -236,7 +236,7 @@ const styles: Record<string, React.CSSProperties> = {
   prefValue: {
     fontSize: '12px',
     fontWeight: 600,
-    color: theme.accent.cyan,
+    color: '#c084fc',
   },
   dangerCard: {
     padding: '16px',

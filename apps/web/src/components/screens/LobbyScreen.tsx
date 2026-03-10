@@ -212,7 +212,7 @@ export function LobbyScreen() {
               <span style={styles.panelTitle}>Stats</span>
             </div>
             <div style={styles.statsBody}>
-              <StatRow label="Balance" value={`${formatSol(profile.balance)} SOL`} color={theme.accent.cyan} icon />
+              <StatRow label="Balance" value={`${formatSol(profile.balance)} SOL`} color="#c084fc" icon />
               {profile.balance < 5 && (
                 <button
                   onClick={handleGetCredits}
@@ -341,8 +341,8 @@ function ChartPreview() {
 
     // Chart fill
     const gradient = ctx.createLinearGradient(0, 0, 0, h);
-    gradient.addColorStop(0, 'rgba(108, 156, 255, 0.06)');
-    gradient.addColorStop(1, 'rgba(108, 156, 255, 0.0)');
+    gradient.addColorStop(0, 'rgba(153, 69, 255, 0.06)');
+    gradient.addColorStop(1, 'rgba(153, 69, 255, 0.0)');
 
     ctx.beginPath();
     ctx.moveTo(0, h);
@@ -358,7 +358,7 @@ function ChartPreview() {
 
     // Chart line with blue→purple gradient
     const lineGrad = ctx.createLinearGradient(0, 0, w, 0);
-    lineGrad.addColorStop(0, '#6c9cff');
+    lineGrad.addColorStop(0, '#9945FF');
     lineGrad.addColorStop(0.5, '#8b7bff');
     lineGrad.addColorStop(1, '#9945FF');
 
@@ -374,7 +374,7 @@ function ChartPreview() {
     ctx.stroke();
 
     // Overlay text
-    ctx.fillStyle = 'rgba(108, 156, 255, 0.1)';
+    ctx.fillStyle = 'rgba(153, 69, 255, 0.1)';
     ctx.font = 'bold 40px "JetBrains Mono", monospace';
     ctx.textAlign = 'center';
     ctx.fillText('PREVIEW', w / 2, h / 2 + 14);
@@ -464,7 +464,7 @@ const styles: Record<string, React.CSSProperties> = {
   panelValue: {
     fontSize: '12px',
     fontWeight: 700,
-    color: theme.accent.cyan,
+    color: '#c084fc',
     display: 'flex',
     alignItems: 'center',
   },
@@ -488,8 +488,8 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s ease',
   },
   modeBtnActive: {
-    color: theme.accent.cyan,
-    background: 'rgba(108, 156, 255, 0.06)',
+    color: '#c084fc',
+    background: 'rgba(153, 69, 255, 0.08)',
   },
 
   // Bet Grid
@@ -512,8 +512,8 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
   },
   betChipActive: {
-    color: theme.accent.cyan,
-    background: 'rgba(108, 156, 255, 0.08)',
+    color: '#c084fc',
+    background: 'rgba(153, 69, 255, 0.08)',
   },
 
   // Risk Profile
@@ -565,9 +565,9 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '4px',
     padding: '14px 24px',
-    background: theme.gradient.solana,
+    background: '#9945FF',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
@@ -610,14 +610,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   creditBtn: {
     padding: '6px 12px',
-    background: 'rgba(108, 156, 255, 0.08)',
-    border: `1px solid rgba(108, 156, 255, 0.15)`,
+    background: 'rgba(153, 69, 255, 0.08)',
+    border: `1px solid rgba(153, 69, 255, 0.15)`,
     borderRadius: '6px',
     cursor: 'pointer',
     fontFamily: 'Inter, sans-serif',
     fontSize: '11px',
     fontWeight: 600,
-    color: theme.accent.cyan,
+    color: '#c084fc',
     marginTop: '2px',
   },
   xpBarContainer: {
@@ -629,7 +629,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   xpBar: {
     height: '100%',
-    background: theme.gradient.solana,
+    background: '#9945FF',
     borderRadius: '2px',
     transition: 'width 0.3s ease',
   },

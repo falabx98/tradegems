@@ -55,7 +55,7 @@ export class BetService {
     const totalCost = input.amount + fee;
 
     // Determine bet size tier
-    const betTier = getBetTier(input.amount / 1_000_000_000, DEFAULT_ENGINE_CONFIG); // lamports → SOL
+    const betTier = getBetTier(input.amount, DEFAULT_ENGINE_CONFIG); // lamports (tiers are in lamports)
     const betSizeTier = betTier.label.toLowerCase();
 
     // Lock funds

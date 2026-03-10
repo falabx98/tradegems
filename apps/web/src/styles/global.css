@@ -3,26 +3,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg-primary: #111114;
-  --bg-secondary: #18181b;
-  --bg-tertiary: #1f1f23;
-  --bg-card: #222226;
-  --bg-elevated: #2a2a2e;
+  --bg-primary: #0b0e1a;
+  --bg-secondary: #111527;
+  --bg-tertiary: #161b2e;
+  --bg-card: #151a2d;
+  --bg-elevated: #1a2038;
 
-  --text-primary: #ececef;
-  --text-secondary: #8a8a8e;
-  --text-muted: #555559;
+  --text-primary: #e8e8f0;
+  --text-secondary: #7e7fa0;
+  --text-muted: #4a4b6a;
 
-  --accent-primary: #6c9cff;
-  --accent-secondary: #8b8bf5;
+  --accent-primary: #9945FF;
+  --accent-secondary: #c084fc;
   --accent-blue: #5b8def;
 
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
 
-  --border-subtle: rgba(255, 255, 255, 0.07);
-  --border-medium: rgba(255, 255, 255, 0.10);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.09);
 
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
@@ -80,7 +80,7 @@ body {
 /* ─── Selection ───────────────────────────────────────────────────────────── */
 
 ::selection {
-  background: rgba(108, 156, 255, 0.2);
+  background: rgba(153, 69, 255, 0.2);
   color: #fff;
 }
 

@@ -14,6 +14,7 @@
     "dev:api": "turbo run dev --filter=@tradingarena/api",
     "dev:ws": "turbo run dev --filter=@tradingarena/ws-gateway",
     "dev:workers": "turbo run dev --filter=@tradingarena/workers",
+    "dev:admin": "turbo run dev --filter=@tradingarena/admin",
     "db:generate": "turbo run db:generate --filter=@tradingarena/db",
     "db:migrate": "turbo run db:migrate --filter=@tradingarena/db",
     "db:studio": "turbo run db:studio --filter=@tradingarena/db"

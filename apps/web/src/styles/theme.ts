@@ -1,38 +1,40 @@
-// ─── Trading Arena Theme ─────────────────────────────────────────────────────
+// ─── TRADESOL Theme (Shuffle.com-inspired dark casino) ──────────────────────
 
 export const theme = {
-  // Core backgrounds
+  // Core backgrounds — deep navy, not pure black
   bg: {
-    primary: '#111114',
-    secondary: '#18181b',
-    tertiary: '#1f1f23',
-    card: '#222226',
-    elevated: '#2a2a2e',
-    overlay: 'rgba(17, 17, 20, 0.88)',
+    primary: '#0b0e1a',
+    secondary: '#111527',
+    tertiary: '#161b2e',
+    card: '#151a2d',
+    elevated: '#1a2038',
+    overlay: 'rgba(11, 14, 26, 0.92)',
   },
 
   // Text
   text: {
-    primary: '#ececef',
-    secondary: '#8a8a8e',
-    muted: '#555559',
-    inverse: '#111114',
+    primary: '#e8e8f0',
+    secondary: '#7e7fa0',
+    muted: '#4a4b6a',
+    inverse: '#0b0e1a',
   },
 
   // Accent colors
   accent: {
-    cyan: '#6c9cff',
+    cyan: '#c084fc',
     purple: '#9945FF',
     blue: '#5b8def',
     indigo: '#8b8bf5',
     green: '#14F195',
   },
 
-  // Solana gradient for buttons
+  // Primary gradients
   gradient: {
     solana: 'linear-gradient(135deg, #9945FF, #14F195)',
     solanaHover: 'linear-gradient(135deg, #8839e6, #12d986)',
-    chart: 'linear-gradient(90deg, #6c9cff, #9945FF)',
+    chart: 'linear-gradient(90deg, #9945FF, #c084fc)',
+    purple: 'linear-gradient(135deg, #9945FF, #c084fc)',
+    card: 'linear-gradient(145deg, #1a1f35 0%, #141830 100%)',
   },
 
   // Semantic colors
@@ -48,9 +50,9 @@ export const theme = {
     shield: '#5b8def',
     fakeBreakout: '#fbbf24',
     volatilitySpike: '#8b8bf5',
-    chartLine: '#6c9cff',
-    chartGlow: 'rgba(108, 156, 255, 0.2)',
-    chartFill: 'rgba(108, 156, 255, 0.04)',
+    chartLine: '#9945FF',
+    chartGlow: 'rgba(153, 69, 255, 0.2)',
+    chartFill: 'rgba(153, 69, 255, 0.04)',
     nodeGlow: 'rgba(52, 211, 153, 0.4)',
     nodeDanger: 'rgba(248, 113, 113, 0.4)',
   },
@@ -73,19 +75,19 @@ export const theme = {
     frozen: '#6366f1',
   },
 
-  // Borders
+  // Borders — subtle purple-tinted
   border: {
-    subtle: 'rgba(255, 255, 255, 0.07)',
-    medium: 'rgba(255, 255, 255, 0.10)',
-    strong: 'rgba(255, 255, 255, 0.14)',
-    accent: 'rgba(108, 156, 255, 0.2)',
+    subtle: 'rgba(255, 255, 255, 0.06)',
+    medium: 'rgba(255, 255, 255, 0.09)',
+    strong: 'rgba(255, 255, 255, 0.13)',
+    accent: 'rgba(153, 69, 255, 0.2)',
   },
 
   // Shadows
   shadow: {
-    sm: '0 1px 3px rgba(0, 0, 0, 0.3)',
-    md: '0 2px 8px rgba(0, 0, 0, 0.4)',
-    lg: '0 4px 16px rgba(0, 0, 0, 0.4)',
+    sm: '0 1px 3px rgba(0, 0, 0, 0.4)',
+    md: '0 2px 8px rgba(0, 0, 0, 0.5)',
+    lg: '0 4px 20px rgba(0, 0, 0, 0.5)',
   },
 
   // Radii

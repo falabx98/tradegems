@@ -154,16 +154,8 @@ export function simulateRound(
   const maxMult = engineConfig.maxFinalMultiplier;
   state.currentMultiplier = Math.max(0, Math.min(maxMult, state.currentMultiplier));
 
-  // Apply platform fee on winnings (only when payout > bet)
-  const grossPayout = betAmount * state.currentMultiplier;
-  const feeRate = engineConfig.platformFeeRate ?? 0;
-  if (grossPayout > betAmount && feeRate > 0) {
-    const winnings = grossPayout - betAmount;
-    const fee = winnings * feeRate;
-    state.finalPayout = grossPayout - fee;
-  } else {
-    state.finalPayout = grossPayout;
-  }
+  // Calculate payout (fee is already charged at bet placement, not here)
+  state.finalPayout = betAmount * state.currentMultiplier;
 
   // XP calculation
   const baseXP = 10;

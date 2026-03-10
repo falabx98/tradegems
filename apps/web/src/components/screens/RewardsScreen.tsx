@@ -111,7 +111,7 @@ export function RewardsScreen() {
                       <div style={{
                         ...styles.progressFill,
                         width: `${Math.min((m.progress / m.target) * 100, 100)}%`,
-                        background: m.completed ? theme.success : theme.accent.cyan,
+                        background: m.completed ? theme.success : '#9945FF',
                       }} />
                     </div>
                     <div style={styles.progressLabel} className="mono">
@@ -192,7 +192,7 @@ export function RewardsScreen() {
                   ].map((t) => (
                     <div key={t.tier} style={{
                       ...styles.tierRow,
-                      color: t.tier.toLowerCase() === rakebackInfo.tier ? theme.accent.cyan : theme.text.muted,
+                      color: t.tier.toLowerCase() === rakebackInfo.tier ? '#c084fc' : theme.text.muted,
                     }}>
                       <span>{t.tier}</span>
                       <span className="mono">{t.rate}</span>
@@ -233,9 +233,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'Inter, sans-serif',
   },
   tabActive: {
-    background: 'rgba(108, 156, 255, 0.08)',
-    border: '1px solid rgba(108, 156, 255, 0.15)',
-    color: theme.accent.cyan,
+    background: 'rgba(153, 69, 255, 0.08)',
+    border: '1px solid rgba(153, 69, 255, 0.15)',
+    color: '#c084fc',
   },
   panel: {
     background: theme.bg.secondary,
@@ -325,7 +325,7 @@ const styles: Record<string, React.CSSProperties> = {
   rewardValue: {
     fontSize: '14px',
     fontWeight: 700,
-    color: theme.accent.cyan,
+    color: '#c084fc',
     display: 'flex',
     alignItems: 'center',
   },
@@ -382,7 +382,7 @@ const styles: Record<string, React.CSSProperties> = {
   rakebackRate: {
     fontSize: '36px',
     fontWeight: 900,
-    color: theme.accent.cyan,
+    color: '#c084fc',
     lineHeight: 1,
   },
   rakebackTier: {

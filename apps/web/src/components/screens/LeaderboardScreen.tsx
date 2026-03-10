@@ -169,9 +169,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'Inter, sans-serif',
   },
   tabActive: {
-    background: 'rgba(108, 156, 255, 0.08)',
-    border: '1px solid rgba(108, 156, 255, 0.15)',
-    color: theme.accent.cyan,
+    background: 'rgba(153, 69, 255, 0.08)',
+    border: '1px solid rgba(153, 69, 255, 0.15)',
+    color: '#c084fc',
   },
   tabSpacer: { flex: 1 },
   periodBtn: {
@@ -221,8 +221,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   rowMe: {
-    background: 'rgba(108, 156, 255, 0.05)',
-    borderLeft: `2px solid ${theme.accent.cyan}`,
+    background: 'rgba(153, 69, 255, 0.05)',
+    borderLeft: `2px solid #9945FF`,
   },
   rank: {
     fontSize: '12px',
@@ -245,15 +245,15 @@ const styles: Record<string, React.CSSProperties> = {
   meTag: {
     fontSize: '9px',
     fontWeight: 700,
-    color: theme.accent.cyan,
+    color: '#c084fc',
     padding: '1px 5px',
-    background: 'rgba(108, 156, 255, 0.08)',
+    background: 'rgba(153, 69, 255, 0.08)',
     borderRadius: '3px',
   },
   score: {
     fontSize: '13px',
     fontWeight: 700,
-    color: theme.accent.cyan,
+    color: '#c084fc',
   },
   empty: {
     padding: '40px',

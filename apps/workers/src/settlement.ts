@@ -83,13 +83,13 @@ export class SettlementWorker {
       try {
         const result = simulateRound(
           config,
-          bet.amount / 100,
+          bet.amount, // lamports — simulateRound works with raw amounts
           bet.riskTier as RiskTier,
         );
 
-        const payoutCents = Math.floor(result.payout * 100);
-        const resultType = payoutCents > bet.amount ? 'win'
-          : payoutCents < bet.amount ? 'loss'
+        const payoutLamports = Math.floor(result.payout);
+        const resultType = payoutLamports > bet.amount ? 'win'
+          : payoutLamports < bet.amount ? 'loss'
           : 'breakeven';
 
         // Insert bet result
@@ -99,7 +99,7 @@ export class SettlementWorker {
           roundId,
           finalMultiplier: String(result.finalMultiplier),
           finalScore: String(result.payout),
-          payoutAmount: payoutCents,
+          payoutAmount: payoutLamports,
           xpAwarded: result.xpGained,
           nodesHit: result.nodesHit.length,
           nodesMissed: result.nodesMissed.length,
@@ -116,21 +116,40 @@ export class SettlementWorker {
         await this.db.execute(sql`
           UPDATE balances
           SET locked_amount = locked_amount - ${totalLocked},
-              available_amount = available_amount + ${payoutCents},
+              available_amount = available_amount + ${payoutLamports},
               updated_at = now()
-          WHERE user_id = ${bet.userId} AND asset = 'USDC'
+          WHERE user_id = ${bet.userId} AND asset = 'SOL'
         `);
 
-        // Ledger entry
+        // Query actual balance for ledger entries
+        const bal = await this.db.query.balances.findFirst({
+          where: eq(balances.userId, bet.userId),
+        });
+        const balAfter = bal?.availableAmount ?? 0;
+
+        // Ledger entry: settle (unlock)
         await this.db.insert(balanceLedgerEntries).values({
           userId: bet.userId,
-          asset: 'USDC',
+          asset: 'SOL',
           entryType: 'bet_settle',
-          amount: payoutCents - totalLocked,
-          balanceAfter: 0, // Will be recalculated
+          amount: -totalLocked,
+          balanceAfter: balAfter,
           referenceType: 'round',
           referenceId: roundId,
         });
+
+        // Ledger entry: payout credit
+        if (payoutLamports > 0) {
+          await this.db.insert(balanceLedgerEntries).values({
+            userId: bet.userId,
+            asset: 'SOL',
+            entryType: 'payout_credit',
+            amount: payoutLamports,
+            balanceAfter: balAfter,
+            referenceType: 'round',
+            referenceId: roundId,
+          });
+        }
 
         // Update bet status
         await this.db.update(bets).set({
@@ -143,14 +162,14 @@ export class SettlementWorker {
           UPDATE user_profiles
           SET rounds_played = rounds_played + 1,
               total_wagered = total_wagered + ${bet.amount},
-              total_won = total_won + ${payoutCents},
+              total_won = total_won + ${payoutLamports},
               best_multiplier = GREATEST(best_multiplier, ${result.finalMultiplier}),
               current_streak = CASE
-                WHEN ${payoutCents} > ${bet.amount} THEN current_streak + 1
+                WHEN ${payoutLamports} > ${bet.amount} THEN current_streak + 1
                 ELSE 0
               END,
               best_streak = GREATEST(best_streak, CASE
-                WHEN ${payoutCents} > ${bet.amount} THEN current_streak + 1
+                WHEN ${payoutLamports} > ${bet.amount} THEN current_streak + 1
                 ELSE 0
               END),
               xp = xp + ${result.xpGained},
@@ -164,7 +183,7 @@ export class SettlementWorker {
           roundId,
           payload: {
             finalMultiplier: result.finalMultiplier,
-            payout: payoutCents,
+            payout: payoutLamports,
             resultType,
             xpGained: result.xpGained,
             nodesHit: result.nodesHit.length,

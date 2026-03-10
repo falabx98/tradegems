@@ -209,24 +209,24 @@ function drawChartPath(ctx: CanvasRenderingContext2D, config: RoundConfig, area:
   ctx.closePath();
 
   const fillGrad = ctx.createLinearGradient(area.x, 0, area.x + area.w, 0);
-  fillGrad.addColorStop(0, 'rgba(108, 156, 255, 0.08)');
+  fillGrad.addColorStop(0, 'rgba(153, 69, 255, 0.08)');
   fillGrad.addColorStop(0.5, 'rgba(140, 120, 255, 0.06)');
   fillGrad.addColorStop(1, 'rgba(153, 69, 255, 0.04)');
 
   const fillVertGrad = ctx.createLinearGradient(0, area.y, 0, area.y + area.h);
-  fillVertGrad.addColorStop(0, 'rgba(108, 156, 255, 0.10)');
-  fillVertGrad.addColorStop(1, 'rgba(108, 156, 255, 0)');
+  fillVertGrad.addColorStop(0, 'rgba(153, 69, 255, 0.10)');
+  fillVertGrad.addColorStop(1, 'rgba(153, 69, 255, 0)');
   ctx.fillStyle = fillVertGrad;
   ctx.fill();
 
   // Main line with blue→purple gradient
   const lineGrad = ctx.createLinearGradient(area.x, 0, area.x + area.w, 0);
-  lineGrad.addColorStop(0, '#6c9cff');
+  lineGrad.addColorStop(0, '#9945FF');
   lineGrad.addColorStop(0.5, '#8b7bff');
   lineGrad.addColorStop(1, '#9945FF');
 
   ctx.save();
-  ctx.shadowColor = 'rgba(108, 156, 255, 0.25)';
+  ctx.shadowColor = 'rgba(153, 69, 255, 0.25)';
   ctx.shadowBlur = 6;
 
   ctx.beginPath();
@@ -479,18 +479,18 @@ function drawLeadingPoint(ctx: CanvasRenderingContext2D, config: RoundConfig, ar
 
   // Large outer glow
   ctx.save();
-  ctx.shadowColor = '#6c9cff';
+  ctx.shadowColor = '#9945FF';
   ctx.shadowBlur = 8;
 
   ctx.beginPath();
   ctx.arc(x, y, 10, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(108, 156, 255, 0.15)';
+  ctx.fillStyle = 'rgba(153, 69, 255, 0.15)';
   ctx.fill();
 
   // Inner bright point
   ctx.beginPath();
   ctx.arc(x, y, 4.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#6c9cff';
+  ctx.fillStyle = '#9945FF';
   ctx.fill();
   ctx.restore();
 
@@ -504,7 +504,7 @@ function drawLeadingPoint(ctx: CanvasRenderingContext2D, config: RoundConfig, ar
   ctx.beginPath();
   ctx.moveTo(area.x, y);
   ctx.lineTo(x - 14, y);
-  ctx.strokeStyle = 'rgba(108, 156, 255, 0.06)';
+  ctx.strokeStyle = 'rgba(153, 69, 255, 0.06)';
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 3]);
   ctx.stroke();
@@ -515,12 +515,12 @@ function drawLeadingPoint(ctx: CanvasRenderingContext2D, config: RoundConfig, ar
   const badgeW = 38;
   const badgeH = 18;
 
-  ctx.fillStyle = 'rgba(108, 156, 255, 0.15)';
+  ctx.fillStyle = 'rgba(153, 69, 255, 0.15)';
   ctx.beginPath();
   ctx.roundRect(area.x - badgeW - 4, y - badgeH / 2, badgeW, badgeH, 3);
   ctx.fill();
 
-  ctx.fillStyle = '#6c9cff';
+  ctx.fillStyle = '#9945FF';
   ctx.font = '600 10px "JetBrains Mono", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -546,7 +546,7 @@ function drawTimeScale(ctx: CanvasRenderingContext2D, area: Area, duration: numb
   for (let t = 0; t <= 15; t += 3) {
     const x = area.x + (t / duration) * area.w;
     const isPast = t <= elapsed;
-    ctx.fillStyle = isPast ? 'rgba(108, 156, 255, 0.25)' : 'rgba(255,255,255,0.12)';
+    ctx.fillStyle = isPast ? 'rgba(153, 69, 255, 0.25)' : 'rgba(255,255,255,0.12)';
     ctx.fillText(`${t}s`, x, area.y + area.h + 20);
   }
 
@@ -556,7 +556,7 @@ function drawTimeScale(ctx: CanvasRenderingContext2D, area: Area, duration: numb
     ctx.beginPath();
     ctx.moveTo(px, area.y + area.h + 2);
     ctx.lineTo(px, area.y + area.h + 8);
-    ctx.strokeStyle = '#6c9cff';
+    ctx.strokeStyle = '#9945FF';
     ctx.lineWidth = 2;
     ctx.stroke();
   }

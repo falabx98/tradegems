@@ -202,7 +202,7 @@ const styles: Record<string, React.CSSProperties> = {
   countdownNumber: {
     fontSize: '100px',
     fontWeight: 900,
-    color: theme.accent.cyan,
+    color: '#c084fc',
     lineHeight: 1,
   },
   countdownLabel: {

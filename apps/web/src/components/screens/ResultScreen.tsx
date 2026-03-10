@@ -325,7 +325,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   xpBarFill: {
     height: '100%',
-    background: theme.gradient.solana,
+    background: '#9945FF',
     borderRadius: '2px',
     transition: 'width 0.5s ease',
   },
@@ -348,9 +348,9 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '3px',
     padding: '14px 24px',
-    background: theme.gradient.solana,
+    background: '#9945FF',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '10px',
     cursor: 'pointer',
   },
   primaryBtnText: {
@@ -396,7 +396,7 @@ const styles: Record<string, React.CSSProperties> = {
   balanceValue: {
     fontSize: '16px',
     fontWeight: 700,
-    color: theme.accent.cyan,
+    color: '#c084fc',
     display: 'flex',
     alignItems: 'center',
   },

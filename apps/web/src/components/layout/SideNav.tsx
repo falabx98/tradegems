@@ -139,7 +139,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'Inter, sans-serif',
   },
   navItemActive: {
-    background: `rgba(108, 156, 255, 0.08)`,
+    background: `rgba(153, 69, 255, 0.08)`,
   },
   navIcon: {
     fontSize: '16px',
@@ -148,7 +148,7 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'color 0.15s ease',
   },
   navIconActive: {
-    color: theme.accent.cyan,
+    color: '#c084fc',
   },
   navLabel: {
     fontSize: '8px',
@@ -158,7 +158,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
   },
   navLabelActive: {
-    color: theme.accent.cyan,
+    color: '#c084fc',
   },
   activeBar: {
     position: 'absolute',
@@ -168,6 +168,6 @@ const styles: Record<string, React.CSSProperties> = {
     width: '2px',
     height: '20px',
     borderRadius: '0 2px 2px 0',
-    background: theme.accent.cyan,
+    background: '#9945FF',
   },
 };

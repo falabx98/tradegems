@@ -13,7 +13,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   primary: {
-    background: theme.gradient.solana,
+    background: '#9945FF',
     color: '#fff',
     border: 'none',
     fontWeight: 600,

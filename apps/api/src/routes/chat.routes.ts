@@ -114,7 +114,7 @@ export async function chatRoutes(server: FastifyInstance) {
     const now = Date.now();
     const lastSend = rateLimitMap.get(user.userId) || 0;
     if (now - lastSend < 1000) {
-      return reply.status(429).send({ error: 'Too fast! Wait a moment before sending.' });
+      return reply.status(429).send({ error: { code: 'RATE_LIMITED', message: 'Too fast! Wait a moment before sending.' } });
     }
     rateLimitMap.set(user.userId, now);
 
@@ -132,7 +132,7 @@ export async function chatRoutes(server: FastifyInstance) {
       .limit(3);
 
     if (recentOwn.length >= 3 && recentOwn.every(m => m.message === body.message)) {
-      return reply.status(400).send({ error: 'Please don\'t spam the same message.' });
+      return reply.status(400).send({ error: { code: 'SPAM_DETECTED', message: 'Please don\'t spam the same message.' } });
     }
 
     // Get username, level, and avatar from DB

@@ -49,21 +49,12 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
         </button>
 
         {/* Logo */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '6px' }}>
-          <svg width="36" height="36" viewBox="0 0 32 32" fill="none">
-            <path d="M16 2L28 12L16 30L4 12L16 2Z" fill="url(#ag)" />
-            <path d="M16 2L28 12L16 16L4 12L16 2Z" fill="rgba(255,255,255,0.2)" />
-            <defs>
-              <linearGradient id="ag" x1="4" y1="2" x2="28" y2="30">
-                <stop stopColor="#14F195" />
-                <stop offset="1" stopColor="#9945FF" />
-              </linearGradient>
-            </defs>
-          </svg>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+          <img src="/logo.png" alt="TradeGems" style={{ height: '52px', width: 'auto', objectFit: 'contain' }} />
           <span style={{
             fontSize: '18px', fontWeight: 800, fontFamily: "'Orbitron', sans-serif",
-            background: 'linear-gradient(135deg, #9945FF, #14F195)',
-            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            color: '#ffffff',
+            letterSpacing: '1px',
           }}>
             TradeGems
           </span>
@@ -164,12 +155,7 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
             disabled={isLoading}
             className="auth-phantom"
           >
-            <svg width="20" height="20" viewBox="0 0 128 128" fill="none">
-              <rect width="128" height="128" rx="26" fill="#AB9FF2"/>
-              <path d="M110.5 64.3c0-2-.2-4-.5-5.9-.1-1.1-1-1.9-2.1-1.9h-3.6c-2.5 0-4.3-2.4-3.5-4.7 2.5-7.4 3.9-14.5 3.9-20.8 0-13.5-10.4-22-27.7-22-22 0-39 13.7-47.2 33.4-.9 2.1-3.2 3.4-5.5 3.1l-2.1-.3c-7.7-1-14.8 4.6-15.6 12.3-.4 3.6 0 10.8 0 14.5 0 22.1 18.3 40 40.8 40h22.4c22.5 0 40.7-17.9 40.7-40v-7.7z" fill="#FFF"/>
-              <circle cx="46" cy="64" r="7" fill="#AB9FF2"/>
-              <circle cx="74" cy="64" r="7" fill="#AB9FF2"/>
-            </svg>
+            <img src="/logo-phantom.svg" alt="Phantom" style={{ width: '20px', height: '20px' }} />
             <span>{isLoading ? 'Connecting...' : 'Connect Phantom'}</span>
           </button>
         ) : (

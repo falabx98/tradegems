@@ -274,6 +274,15 @@ export const adminApi = {
     return apiFetch(`/v1/chat/messages?${q}`);
   },
 
+  deleteChatMessage: (messageId: string) =>
+    apiFetch(`/v1/admin/chat/messages/${messageId}`, { method: 'DELETE' }),
+
+  muteUser: (userId: string, durationMinutes: number) =>
+    apiFetch(`/v1/admin/chat/mute`, {
+      method: 'POST',
+      body: JSON.stringify({ userId, durationMinutes }),
+    }),
+
   // ─── Referrals ────────────────────────────────────
   getReferrals: (params: { limit?: number } = {}) => {
     const q = new URLSearchParams();

@@ -483,7 +483,7 @@ function drawNodes(
     } else if (isApproaching) {
       drawApproachingNode(ctx, x, y, node, elapsed);
     } else if (isUpcoming) {
-      drawUpcomingNode(ctx, x, y, node);
+      drawUpcomingNode(ctx, x, y, node, elapsed);
     }
   }
 }
@@ -510,6 +510,213 @@ function getNodeLabel(node: GameNode): string {
   }
 }
 
+// ─── 3D Gem shape (emerald) for multipliers ───
+
+function drawGemShape(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  alpha: number,
+  glowStrength: number,
+  elapsed: number,
+) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  const r = radius * 1.15;
+  // Subtle float / bob animation
+  const bob = Math.sin(elapsed * 2.5) * 1.5;
+  const cy = y + bob;
+
+  // Outer glow aura
+  if (glowStrength > 0) {
+    ctx.shadowColor = '#34d399';
+    ctx.shadowBlur = glowStrength;
+  }
+
+  // Diamond / emerald-cut polygon (6 points)
+  const topY = cy - r;
+  const botY = cy + r;
+  const midTopY = cy - r * 0.3;
+  const midBotY = cy + r * 0.3;
+  const halfW = r * 0.65;
+
+  // Main gem body
+  ctx.beginPath();
+  ctx.moveTo(x, topY);              // top vertex
+  ctx.lineTo(x + halfW, midTopY);   // top-right
+  ctx.lineTo(x + halfW, midBotY);   // bottom-right
+  ctx.lineTo(x, botY);              // bottom vertex
+  ctx.lineTo(x - halfW, midBotY);   // bottom-left
+  ctx.lineTo(x - halfW, midTopY);   // top-left
+  ctx.closePath();
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(x - halfW, topY, x + halfW, botY);
+  grad.addColorStop(0, '#6ff5b0');
+  grad.addColorStop(0.35, '#34d399');
+  grad.addColorStop(0.7, '#1fa87a');
+  grad.addColorStop(1, '#14654a');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = `rgba(111, 245, 176, ${alpha * 0.7})`;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Inner facet lines (gives 3D cut look)
+  ctx.beginPath();
+  ctx.moveTo(x - halfW, midTopY);
+  ctx.lineTo(x, cy);
+  ctx.lineTo(x + halfW, midTopY);
+  ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.15})`;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(x, topY);
+  ctx.lineTo(x, cy);
+  ctx.lineTo(x, botY);
+  ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.08})`;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Top-left highlight facet for 3D depth
+  ctx.beginPath();
+  ctx.moveTo(x, topY);
+  ctx.lineTo(x - halfW, midTopY);
+  ctx.lineTo(x, cy);
+  ctx.closePath();
+  ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.18})`;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+// ─── Bomb shape for dividers ───
+
+function drawBombShape(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  radius: number,
+  alpha: number,
+  glowStrength: number,
+  elapsed: number,
+) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  const r = radius * 0.95;
+  // Subtle wobble
+  const wobble = Math.sin(elapsed * 4) * 0.8;
+  const cy = y + wobble;
+
+  // Outer red danger glow
+  if (glowStrength > 0) {
+    ctx.shadowColor = '#f87171';
+    ctx.shadowBlur = glowStrength;
+  }
+
+  // Bomb body (sphere)
+  ctx.beginPath();
+  ctx.arc(x, cy, r, 0, Math.PI * 2);
+  const bodyGrad = ctx.createRadialGradient(x - r * 0.3, cy - r * 0.3, r * 0.1, x, cy, r);
+  bodyGrad.addColorStop(0, '#5a2020');
+  bodyGrad.addColorStop(0.5, '#2a0a0a');
+  bodyGrad.addColorStop(1, '#1a0505');
+  ctx.fillStyle = bodyGrad;
+  ctx.fill();
+
+  // Red rim stroke
+  ctx.strokeStyle = `rgba(248, 113, 113, ${alpha * 0.7})`;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // 3D sphere highlight (top-left)
+  ctx.beginPath();
+  ctx.arc(x - r * 0.25, cy - r * 0.25, r * 0.35, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 150, 150, ${alpha * 0.2})`;
+  ctx.fill();
+
+  // Fuse line (bezier from top)
+  ctx.save();
+  ctx.shadowBlur = 0;
+  ctx.beginPath();
+  ctx.moveTo(x, cy - r);
+  ctx.quadraticCurveTo(x + r * 0.5, cy - r - r * 0.5, x + r * 0.7, cy - r - r * 0.7);
+  ctx.strokeStyle = `rgba(180, 140, 80, ${alpha * 0.8})`;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+
+  // Spark at fuse tip (flickering)
+  const sparkOn = Math.sin(elapsed * 12) > -0.2;
+  if (sparkOn) {
+    const sx = x + r * 0.7;
+    const sy = cy - r - r * 0.7;
+    const sparkSize = 3 + Math.sin(elapsed * 18) * 1.5;
+
+    ctx.save();
+    ctx.shadowColor = '#fbbf24';
+    ctx.shadowBlur = 8;
+
+    // Star-burst spark
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2 + elapsed * 6;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + Math.cos(angle) * sparkSize, sy + Math.sin(angle) * sparkSize);
+      ctx.strokeStyle = `rgba(255, 220, 80, ${alpha * 0.9})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    // Center dot
+    ctx.beginPath();
+    ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 240, 150, ${alpha})`;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// ─── Generic circle badge (fallback for shields, etc.) ───
+
+function drawCircleBadge(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  color: string,
+  radius: number,
+  alpha: number,
+  glowStrength: number,
+) {
+  ctx.save();
+  if (glowStrength > 0) {
+    ctx.shadowColor = color;
+    ctx.shadowBlur = glowStrength;
+  }
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  const a = Math.floor(alpha * 30).toString(16).padStart(2, '0');
+  ctx.fillStyle = `${color}${a}`;
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  const ba = Math.floor(alpha * 200).toString(16).padStart(2, '0');
+  ctx.strokeStyle = `${color}${ba}`;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ─── Main badge dispatcher ───
+
 function drawNodeBadge(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -519,33 +726,20 @@ function drawNodeBadge(
   radius: number,
   alpha: number,
   glowStrength: number,
-  fontSize: number
+  fontSize: number,
+  nodeType?: string,
+  elapsed?: number,
 ) {
-  ctx.save();
-
-  if (glowStrength > 0) {
-    ctx.shadowColor = color;
-    ctx.shadowBlur = glowStrength;
+  // Draw shape based on type
+  if (nodeType === 'multiplier') {
+    drawGemShape(ctx, x, y, radius, alpha, glowStrength, elapsed ?? 0);
+  } else if (nodeType === 'divider') {
+    drawBombShape(ctx, x, y, radius, alpha, glowStrength, elapsed ?? 0);
+  } else {
+    drawCircleBadge(ctx, x, y, color, radius, alpha, glowStrength);
   }
 
-  // Background circle
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  const a = Math.floor(alpha * 30).toString(16).padStart(2, '0');
-  ctx.fillStyle = `${color}${a}`;
-  ctx.fill();
-
-  // Border
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  const ba = Math.floor(alpha * 200).toString(16).padStart(2, '0');
-  ctx.strokeStyle = `${color}${ba}`;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.restore();
-
-  // Label
+  // Label text on top
   const la = Math.floor(alpha * 255).toString(16).padStart(2, '0');
   ctx.fillStyle = `${color}${la}`;
   ctx.font = `bold ${fontSize}px "JetBrains Mono", monospace`;
@@ -554,11 +748,13 @@ function drawNodeBadge(
   ctx.fillText(label, x, y + 1);
 }
 
-function drawUpcomingNode(ctx: CanvasRenderingContext2D, x: number, y: number, node: GameNode) {
+// ─── Node state renderers ───
+
+function drawUpcomingNode(ctx: CanvasRenderingContext2D, x: number, y: number, node: GameNode, elapsed?: number) {
   const color = getNodeColor(node);
   const label = getNodeLabel(node);
   const radius = getRarityRadius(node);
-  drawNodeBadge(ctx, x, y, label, color, radius, 0.4, 0, 11);
+  drawNodeBadge(ctx, x, y, label, color, radius, 0.4, 0, 11, node.type, elapsed ?? 0);
 }
 
 function drawApproachingNode(ctx: CanvasRenderingContext2D, x: number, y: number, node: GameNode, elapsed: number) {
@@ -586,7 +782,22 @@ function drawApproachingNode(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  drawNodeBadge(ctx, x, y, label, color, radius, 1.0, 20, 13);
+  // Gem sparkle particles (multiplier) or fuse flicker (divider)
+  if (node.type === 'multiplier') {
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2 + elapsed * 2;
+      const dist = radius + 6 + Math.sin(elapsed * 5 + i * 1.5) * 4;
+      const sx = x + Math.cos(angle) * dist;
+      const sy = y + Math.sin(angle) * dist;
+      const sz = 1.5 + Math.sin(elapsed * 8 + i * 2) * 0.8;
+      ctx.beginPath();
+      ctx.arc(sx, sy, sz, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200, 255, 220, ${0.5 + Math.sin(elapsed * 6 + i) * 0.3})`;
+      ctx.fill();
+    }
+  }
+
+  drawNodeBadge(ctx, x, y, label, color, radius, 1.0, 20, 13, node.type, elapsed);
 }
 
 function drawActivatedNode(ctx: CanvasRenderingContext2D, x: number, y: number, node: GameNode, elapsed: number) {
@@ -596,31 +807,94 @@ function drawActivatedNode(ctx: CanvasRenderingContext2D, x: number, y: number, 
   const fade = Math.max(0, 1 - timeSince / 2.5);
   if (fade <= 0) return;
 
-  // Expanding shockwave rings
-  for (let r = 0; r < 3; r++) {
-    const ringDelay = r * 0.15;
-    const ringT = Math.max(0, timeSince - ringDelay);
-    const ringFade = Math.max(0, 1 - ringT / 1.5);
-    if (ringFade <= 0) continue;
-    const ringRadius = 16 + ringT * 25;
-    ctx.beginPath();
-    ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
-    const ra = Math.floor(ringFade * 40).toString(16).padStart(2, '0');
-    ctx.strokeStyle = `${color}${ra}`;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
+  if (node.type === 'multiplier') {
+    // Gem shatter burst — green sparkle rays
+    for (let r = 0; r < 6; r++) {
+      const angle = (r / 6) * Math.PI * 2 + 0.3;
+      const dist = 8 + timeSince * 30;
+      const rayFade = Math.max(0, 1 - timeSince / 1.5);
+      if (rayFade <= 0) continue;
+      const ex = x + Math.cos(angle) * dist;
+      const ey = y + Math.sin(angle) * dist;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(ex, ey);
+      const ra = Math.floor(rayFade * 60).toString(16).padStart(2, '0');
+      ctx.strokeStyle = `#34d399${ra}`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
 
-  // Core glow
-  ctx.save();
-  ctx.shadowColor = color;
-  ctx.shadowBlur = 10 * fade;
-  ctx.beginPath();
-  ctx.arc(x, y, 10 * fade, 0, Math.PI * 2);
-  const fa = Math.floor(fade * 140).toString(16).padStart(2, '0');
-  ctx.fillStyle = `${color}${fa}`;
-  ctx.fill();
-  ctx.restore();
+      // Sparkle dot at end
+      ctx.beginPath();
+      ctx.arc(ex, ey, 2 * rayFade, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200, 255, 220, ${rayFade * 0.8})`;
+      ctx.fill();
+    }
+
+    // Core green flash
+    ctx.save();
+    ctx.shadowColor = '#34d399';
+    ctx.shadowBlur = 15 * fade;
+    ctx.beginPath();
+    ctx.arc(x, y, 12 * fade, 0, Math.PI * 2);
+    const fa = Math.floor(fade * 100).toString(16).padStart(2, '0');
+    ctx.fillStyle = `#34d399${fa}`;
+    ctx.fill();
+    ctx.restore();
+
+  } else if (node.type === 'divider') {
+    // Bomb explosion — red/orange expanding rings + flash
+    for (let r = 0; r < 3; r++) {
+      const ringDelay = r * 0.12;
+      const ringT = Math.max(0, timeSince - ringDelay);
+      const ringFade = Math.max(0, 1 - ringT / 1.2);
+      if (ringFade <= 0) continue;
+      const ringRadius = 12 + ringT * 30;
+      ctx.beginPath();
+      ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
+      const ra = Math.floor(ringFade * 50).toString(16).padStart(2, '0');
+      ctx.strokeStyle = r === 0 ? `#fbbf24${ra}` : `#f87171${ra}`;
+      ctx.lineWidth = r === 0 ? 2.5 : 1.5;
+      ctx.stroke();
+    }
+
+    // Orange core flash
+    ctx.save();
+    ctx.shadowColor = '#f97316';
+    ctx.shadowBlur = 18 * fade;
+    ctx.beginPath();
+    ctx.arc(x, y, 14 * fade, 0, Math.PI * 2);
+    const fa = Math.floor(fade * 120).toString(16).padStart(2, '0');
+    ctx.fillStyle = `#f97316${fa}`;
+    ctx.fill();
+    ctx.restore();
+
+  } else {
+    // Default shockwave for other types
+    for (let r = 0; r < 3; r++) {
+      const ringDelay = r * 0.15;
+      const ringT = Math.max(0, timeSince - ringDelay);
+      const ringFade = Math.max(0, 1 - ringT / 1.5);
+      if (ringFade <= 0) continue;
+      const ringRadius = 16 + ringT * 25;
+      ctx.beginPath();
+      ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
+      const ra = Math.floor(ringFade * 40).toString(16).padStart(2, '0');
+      ctx.strokeStyle = `${color}${ra}`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    ctx.save();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 10 * fade;
+    ctx.beginPath();
+    ctx.arc(x, y, 10 * fade, 0, Math.PI * 2);
+    const fa = Math.floor(fade * 140).toString(16).padStart(2, '0');
+    ctx.fillStyle = `${color}${fa}`;
+    ctx.fill();
+    ctx.restore();
+  }
 
   // Floating label
   if (fade > 0.2) {
@@ -637,14 +911,45 @@ function drawMissedNode(ctx: CanvasRenderingContext2D, x: number, y: number, nod
   const color = getNodeColor(node);
   const label = getNodeLabel(node);
 
-  // Dashed faded ring
-  ctx.beginPath();
-  ctx.arc(x, y, 14, 0, Math.PI * 2);
-  ctx.strokeStyle = `${color}15`;
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  ctx.stroke();
-  ctx.setLineDash([]);
+  if (node.type === 'multiplier') {
+    // Faded gem outline
+    const r = 14 * 1.15;
+    const halfW = r * 0.65;
+    const topY = y - r;
+    const botY = y + r;
+    const midTopY = y - r * 0.3;
+    const midBotY = y + r * 0.3;
+    ctx.beginPath();
+    ctx.moveTo(x, topY);
+    ctx.lineTo(x + halfW, midTopY);
+    ctx.lineTo(x + halfW, midBotY);
+    ctx.lineTo(x, botY);
+    ctx.lineTo(x - halfW, midBotY);
+    ctx.lineTo(x - halfW, midTopY);
+    ctx.closePath();
+    ctx.strokeStyle = `${color}15`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else if (node.type === 'divider') {
+    // Faded bomb outline
+    ctx.beginPath();
+    ctx.arc(x, y, 13, 0, Math.PI * 2);
+    ctx.strokeStyle = `${color}15`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  } else {
+    ctx.beginPath();
+    ctx.arc(x, y, 14, 0, Math.PI * 2);
+    ctx.strokeStyle = `${color}15`;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
   // Very faded label
   ctx.fillStyle = `${color}20`;

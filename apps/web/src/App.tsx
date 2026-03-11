@@ -15,6 +15,7 @@ import { BattleScreen } from './components/screens/BattleScreen';
 import { OnboardingModal, useOnboarding } from './components/OnboardingModal';
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggle } from './components/layout/ChatToggle';
+import { ToastOverlay } from './components/ToastOverlay';
 import './styles/global.css';
 
 export default function App() {
@@ -49,6 +50,7 @@ export default function App() {
     return (
       <AppLayout hideChrome>
         <PlayingScreen />
+        <ToastOverlay />
       </AppLayout>
     );
   }
@@ -80,6 +82,7 @@ export default function App() {
       )}
       {isAuthenticated && <ChatToggle />}
       {isAuthenticated && <ChatPanel />}
+      <ToastOverlay />
     </AppLayout>
   );
 }

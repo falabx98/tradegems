@@ -446,3 +446,10 @@ body {
   0%, 100% { box-shadow: 0 4px 0 #7325d4, 0 0 12px rgba(153, 69, 255, 0.3); }
   50%      { box-shadow: 0 4px 0 #7325d4, 0 0 20px rgba(153, 69, 255, 0.5); }
 }
+
+/* ─── Toast Notifications ───────────────────────────────────────────────── */
+
+@keyframes toastSlideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}

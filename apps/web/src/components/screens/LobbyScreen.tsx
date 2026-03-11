@@ -7,6 +7,7 @@ import { RiskTier } from '../../types/game';
 import { api } from '../../utils/api';
 import { formatSol, lamportsToSol, solToLamports } from '../../utils/sol';
 import { playBetPlaced, hapticMedium } from '../../utils/sounds';
+import { GiftIcon, HandshakeIcon, SwordsIcon, PackageIcon, LockIcon, PartyIcon } from '../ui/GameIcons';
 
 const BET_OPTIONS = [
   { label: '0.01', lamports: 10_000_000 },
@@ -59,7 +60,7 @@ const GAME_MODE_OPTIONS: {
 
 interface BannerData {
   id: string;
-  emoji: string;
+  icon: React.ReactNode;
   title: string;
   subtitle: string;
   cta: string;
@@ -71,7 +72,7 @@ interface BannerData {
 const BANNERS: BannerData[] = [
   {
     id: 'welcome-bonus',
-    emoji: '🎁',
+    icon: <GiftIcon size={28} color="#14F195" />,
     title: 'Claim 1 SOL Free',
     subtitle: 'New player welcome bonus — start trading risk-free today.',
     cta: 'Claim Now',
@@ -81,7 +82,7 @@ const BANNERS: BannerData[] = [
   },
   {
     id: 'referral',
-    emoji: '🤝',
+    icon: <HandshakeIcon size={28} color="#9945FF" />,
     title: 'Invite & Earn 10%',
     subtitle: 'Share your code. Earn commission on every friend\'s trade.',
     cta: 'View Referrals',
@@ -91,7 +92,7 @@ const BANNERS: BannerData[] = [
   },
   {
     id: 'battle-arena',
-    emoji: '⚔️',
+    icon: <SwordsIcon size={28} color="#f87171" />,
     title: 'PvP Trading Battles',
     subtitle: 'Challenge other traders in real-time head-to-head rounds.',
     cta: 'Enter Arena',
@@ -101,7 +102,7 @@ const BANNERS: BannerData[] = [
   },
   {
     id: 'daily-rewards',
-    emoji: '📦',
+    icon: <PackageIcon size={28} color="#fbbf24" />,
     title: 'Daily Rewards',
     subtitle: 'Claim daily rakeback and VIP rewards. Higher tiers earn more.',
     cta: 'Claim',
@@ -531,7 +532,7 @@ export function LobbyScreen() {
             <div style={styles.bonusCard} className="card-enter card-enter-1">
               <div style={styles.bonusGlow} />
               <div style={styles.bonusContent}>
-                <div style={styles.bonusIcon}>🎁</div>
+                <div style={styles.bonusIcon}><GiftIcon size={24} color="#c084fc" /></div>
                 <div style={styles.bonusTextWrap}>
                   <span style={styles.bonusTitle}>Welcome Bonus!</span>
                   <span style={styles.bonusDesc}>
@@ -555,7 +556,7 @@ export function LobbyScreen() {
           {isAuthenticated && bonusClaimed === true && !bonusUnlocked && (
             <div style={styles.bonusStatusCard}>
               <div style={styles.bonusStatusRow}>
-                <span style={{ fontSize: '16px' }}>🔒</span>
+                <LockIcon size={18} color="#f87171" />
                 <div style={styles.bonusStatusTextWrap}>
                   <span style={styles.bonusStatusTitle}>Bonus: 1 SOL locked</span>
                   <span style={styles.bonusStatusDesc}>
@@ -581,7 +582,7 @@ export function LobbyScreen() {
           {/* Bonus Status — Unlocked */}
           {isAuthenticated && bonusClaimed === true && bonusUnlocked && (
             <div style={styles.bonusUnlockedCard}>
-              <span style={{ fontSize: '16px' }}>🎉</span>
+              <PartyIcon size={18} color="#34d399" />
               <span style={styles.bonusUnlockedText}>Bonus unlocked! Full balance withdrawable.</span>
             </div>
           )}
@@ -695,7 +696,7 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
               ...(isMobile ? { flexDirection: 'column' as const, alignItems: 'flex-start', paddingTop: '16px', paddingLeft: '18px', paddingRight: '18px', paddingBottom: '16px', gap: '8px' } : {}),
             }}>
               {!isMobile && (
-                <span style={styles.carouselEmoji}>{banner.emoji}</span>
+                <span style={styles.carouselEmoji}>{banner.icon}</span>
               )}
               <div style={{
                 ...styles.carouselTextWrap,
@@ -704,8 +705,8 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
                 <span style={{
                   ...styles.carouselTitle,
                   color: banner.accentColor,
-                  ...(isMobile ? { fontSize: '16px' } : {}),
-                }}>{isMobile ? `${banner.emoji} ${banner.title}` : banner.title}</span>
+                  ...(isMobile ? { fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' } : {}),
+                }}>{isMobile && banner.icon}{banner.title}</span>
                 <span style={{
                   ...styles.carouselSubtitle,
                   ...(isMobile ? { fontSize: '13px' } : {}),

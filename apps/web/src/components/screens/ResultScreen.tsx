@@ -6,6 +6,7 @@ import { theme } from '../../styles/theme';
 import { GameNode } from '../../types/game';
 import { formatSol } from '../../utils/sol';
 import { playLevelUp, hapticHeavy } from '../../utils/sounds';
+import { GemIcon, BombIcon, ShieldIcon, LightningIcon, WaveIcon, TrophyIcon, ExplosionIcon } from '../ui/GameIcons';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -31,13 +32,13 @@ function nodeColor(node: GameNode): string {
   }
 }
 
-function nodeIcon(node: GameNode): string {
+function nodeIcon(node: GameNode): React.ReactNode {
   switch (node.type) {
-    case 'multiplier': return '💎';
-    case 'divider': return '💣';
-    case 'shield': return '🛡';
-    case 'fake_breakout': return '⚡';
-    case 'volatility_spike': return '🌊';
+    case 'multiplier': return <GemIcon size={16} />;
+    case 'divider': return <BombIcon size={16} />;
+    case 'shield': return <ShieldIcon size={16} />;
+    case 'fake_breakout': return <LightningIcon size={16} />;
+    case 'volatility_spike': return <WaveIcon size={16} />;
     default: return '•';
   }
 }
@@ -222,7 +223,7 @@ export function ResultScreen() {
               border: `1px solid ${resultColor}30`,
               color: resultColor,
             }}>
-              {isWin ? '🏆 VICTORY' : '💥 DEFEAT'}
+              {isWin ? <><TrophyIcon size={22} color={resultColor} /> VICTORY</> : <><ExplosionIcon size={22} color={resultColor} /> DEFEAT</>}
             </div>
 
             {/* Animated multiplier */}
@@ -313,7 +314,8 @@ export function ResultScreen() {
               {result.nodesHit.map((node, i) => (
                 <WaterfallStep
                   key={node.id}
-                  label={`${nodeIcon(node)} ${nodeLabel(node)}`}
+                  icon={nodeIcon(node)}
+                  label={nodeLabel(node)}
                   value={node.type === 'multiplier'
                     ? `×${node.value}`
                     : `÷${node.value}`}
@@ -324,7 +326,8 @@ export function ResultScreen() {
               {result.nodesMissed.map((node, i) => (
                 <WaterfallStep
                   key={node.id}
-                  label={`${nodeIcon(node)} ${nodeLabel(node)}`}
+                  icon={nodeIcon(node)}
+                  label={nodeLabel(node)}
                   value="MISS"
                   color={theme.text.muted}
                   missed
@@ -399,8 +402,8 @@ function StatCard({ label, value, accent }: { label: string; value: string; acce
   );
 }
 
-function WaterfallStep({ label, value, color, isFirst, missed, delay = 0 }: {
-  label: string; value: string; color: string; isFirst?: boolean; missed?: boolean; delay?: number;
+function WaterfallStep({ icon, label, value, color, isFirst, missed, delay = 0 }: {
+  icon?: React.ReactNode; label: string; value: string; color: string; isFirst?: boolean; missed?: boolean; delay?: number;
 }) {
   return (
     <div style={{
@@ -429,8 +432,9 @@ function WaterfallStep({ label, value, color, isFirst, missed, delay = 0 }: {
         flex: 1, fontSize: '13px', fontWeight: 600,
         color: missed ? theme.text.muted : theme.text.primary,
         textDecoration: missed ? 'line-through' : 'none',
+        display: 'flex', alignItems: 'center', gap: '5px',
       }}>
-        {label}
+        {icon}{label}
       </span>
       <span style={{
         fontSize: '13px', fontWeight: 700, color,
@@ -513,10 +517,14 @@ const s: Record<string, React.CSSProperties> = {
   resultBadge: {
     fontSize: '13px',
     fontWeight: 800,
-    padding: '4px 14px',
+    padding: '6px 18px',
     borderRadius: '20px',
     letterSpacing: '1.5px',
     fontFamily: "'Orbitron', sans-serif",
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    animation: 'glowPulse 2s ease-in-out infinite',
   },
   heroMultiplier: {
     fontSize: '80px',

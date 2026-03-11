@@ -5,6 +5,7 @@ import { api } from '../../utils/api';
 import { formatSol, solToLamports } from '../../utils/sol';
 import { isPhantomInstalled, connectPhantom, sendSolToTreasury, getConnectedAddress } from '../../utils/phantom';
 import { theme } from '../../styles/theme';
+import { CheckIcon, LockIcon, PartyIcon } from '../ui/GameIcons';
 
 interface Transaction {
   id: string;
@@ -270,7 +271,7 @@ export function WalletScreen() {
                         setTimeout(() => setCopied(false), 2000);
                       }}
                     >
-                      {copied ? '✓ Copied!' : 'Copy Address'}
+                      {copied ? <><CheckIcon size={14} color="#34d399" /> Copied!</> : 'Copy Address'}
                     </button>
                   </>
                 ) : (
@@ -423,7 +424,7 @@ export function WalletScreen() {
             {bonusStatus && bonusStatus.claimed && !bonusStatus.withdrawalUnlocked && (
               <div style={s.bonusBanner}>
                 <div style={s.bonusBannerHeader}>
-                  <span style={s.bonusBannerIcon}>🔒</span>
+                  <span style={s.bonusBannerIcon}><LockIcon size={18} color="#fbbf24" /></span>
                   <span style={s.bonusBannerTitle}>Welcome Bonus Locked</span>
                 </div>
                 <div style={s.bonusBannerDesc}>
@@ -459,7 +460,7 @@ export function WalletScreen() {
 
             {bonusStatus && bonusStatus.claimed && bonusStatus.withdrawalUnlocked && (
               <div style={s.bonusUnlockedBanner}>
-                <span style={{ fontSize: '18px' }}>🎉</span>
+                <PartyIcon size={18} color="#34d399" />
                 <span style={s.bonusUnlockedText}>
                   Bonus unlocked! Your full balance is withdrawable.
                 </span>

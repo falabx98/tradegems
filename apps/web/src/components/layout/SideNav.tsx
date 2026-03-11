@@ -14,7 +14,6 @@ const NAV_ITEMS = [
 ] as const;
 
 const BOTTOM_ITEMS = [
-  { id: 'stats', label: 'Stats', icon: 'chart' },
   { id: 'history', label: 'History', icon: 'clock' },
   { id: 'settings', label: 'Settings', icon: 'gear' },
 ] as const;
@@ -34,7 +33,7 @@ export function SideNav() {
       setScreen('battle' as any);
     } else if (id === 'prediction') {
       setScreen('prediction' as any);
-    } else if (id === 'leaderboard' || id === 'rewards' || id === 'wallet' || id === 'history' || id === 'settings' || id === 'stats') {
+    } else if (id === 'leaderboard' || id === 'rewards' || id === 'wallet' || id === 'history' || id === 'settings') {
       setScreen(id as any);
     }
   };

@@ -14,8 +14,14 @@ import {
   playBattleJoin,
   playRoundEnd,
 } from '../../utils/sounds';
+import { SwordsIcon, MedalIcon, CheckIcon, TrophyIcon } from '../ui/GameIcons';
 
 const ROUND_DURATION = 15;
+
+function rankBadge(rank: number): React.ReactNode {
+  if (rank >= 1 && rank <= 3) return <MedalIcon rank={rank as 1 | 2 | 3} size={20} />;
+  return `#${rank}`;
+}
 
 export function BattleScreen() {
   const {
@@ -236,7 +242,7 @@ export function BattleScreen() {
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <span style={styles.headerIcon}>⚔️</span>
+          <span style={styles.headerIcon}><SwordsIcon size={24} color="#f87171" /></span>
           <span style={styles.headerTitle}>Battle Arena</span>
           <div style={styles.roundBadge}>Round #{roundNumber}</div>
         </div>
@@ -286,10 +292,10 @@ export function BattleScreen() {
         {/* Join button */}
         <div style={styles.actions}>
           {joined ? (
-            <div style={styles.joinedBadge}>✓ Joined — waiting for round</div>
+            <div style={styles.joinedBadge}><CheckIcon size={14} color="#34d399" /> Joined — waiting for round</div>
           ) : (
             <button onClick={handleJoin} className="btn-3d btn-3d-primary" style={styles.joinButton}>
-              ⚔️ Place Bet & Join
+              ENTER BATTLE
               <span className="mono" style={{ opacity: 0.8 }}>
                 {' '}◈ {formatSol(betAmount)} · {riskTier}
               </span>
@@ -317,7 +323,7 @@ export function BattleScreen() {
       <div style={styles.container}>
         {/* Header */}
         <div style={styles.activeHeader}>
-          <span>⚔️ <strong>BATTLE IN PROGRESS</strong></span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><SwordsIcon size={16} color="#f87171" /> <strong>BATTLE IN PROGRESS</strong></span>
           <span className="mono" style={styles.timer}>{timeLeft}s</span>
         </div>
 
@@ -364,7 +370,7 @@ export function BattleScreen() {
             <span style={{ color: theme.text.muted }}>{players.length} players</span>
           </div>
           {players.slice(0, 6).map((p, idx) => {
-            const rankEmoji = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+            const rankIcon = rankBadge(idx + 1);
             const isMe = p.id === myPlayerId;
             const mult = isMe ? currentMultiplier : p.currentMultiplier;
             const pnl = (mult - 1) * p.betAmount;
@@ -373,7 +379,7 @@ export function BattleScreen() {
                 ...styles.rankRow,
                 ...(isMe ? styles.rankRowMe : {}),
               }}>
-                <span style={styles.rankEmoji}>{rankEmoji}</span>
+                <span style={styles.rankEmoji}>{rankIcon}</span>
                 <span style={{
                   ...styles.rankName,
                   color: isMe ? '#c084fc' : theme.text.primary,
@@ -412,7 +418,7 @@ export function BattleScreen() {
     const myRank = myResult?.rank || '-';
     const myMult = myResult?.finalMultiplier || currentMultiplier;
     const myPnl = myResult ? myResult.profitLoss : 0;
-    const rankEmoji = myRank === 1 ? '🥇' : myRank === 2 ? '🥈' : myRank === 3 ? '🥉' : `#${myRank}`;
+    const myRankIcon = rankBadge(myRank);
 
     const autoCountdown = Math.max(0, Math.ceil((phaseEndsAt - Date.now()) / 1000));
 
@@ -421,7 +427,7 @@ export function BattleScreen() {
         {/* Hero result */}
         {myResult && (
           <div style={styles.resultsHero}>
-            <div style={styles.resultRankBig}>{rankEmoji}</div>
+            <div style={styles.resultRankBig}>{myRankIcon}</div>
             <div style={styles.resultPlace}>
               {myRank === 1 ? '1st' : myRank === 2 ? '2nd' : myRank === 3 ? '3rd' : `${myRank}th`} Place!
             </div>
@@ -447,13 +453,13 @@ export function BattleScreen() {
             const isMe = r.playerId === myPlayerId;
             const bandColor = r.band === 'top' ? '#FFD700' : r.band === 'medium' ? '#14F195'
               : r.band === 'breakeven' ? '#60A5FA' : '#FF4B4B';
-            const rEmoji = r.rank === 1 ? '🥇' : r.rank === 2 ? '🥈' : r.rank === 3 ? '🥉' : `#${r.rank}`;
+            const rIcon = rankBadge(r.rank);
             return (
               <div key={r.playerId} style={{
                 ...styles.resultRow,
                 ...(isMe ? styles.resultRowMe : {}),
               }}>
-                <span style={styles.resultRank}>{rEmoji}</span>
+                <span style={styles.resultRank}>{rIcon}</span>
                 <div style={styles.resultInfo}>
                   <span style={{ color: isMe ? '#c084fc' : theme.text.primary }}>
                     {r.username} {isMe && <span style={styles.youTag}>you</span>}
@@ -507,7 +513,7 @@ export function BattleScreen() {
   return (
     <div style={styles.container}>
       <div style={styles.idle}>
-        <div style={{ fontSize: '52px' }}>⚔️</div>
+        <SwordsIcon size={52} color="#f87171" />
         <div style={styles.idleTitle}>Battle Arena</div>
         <div style={styles.idleDesc}>
           {error ? error : 'Connecting to battle...'}

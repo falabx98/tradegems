@@ -15,7 +15,6 @@ const TABS = [
 const MORE_ITEMS = [
   { id: 'prediction', label: 'Predict', icon: 'candles' },
   { id: 'rewards', label: 'Rewards', icon: 'gift' },
-  { id: 'stats', label: 'Stats', icon: 'chart' },
   { id: 'history', label: 'History', icon: 'clock' },
   { id: 'battle', label: 'Battle', icon: 'swords' },
   { id: 'settings', label: 'Settings', icon: 'gear' },

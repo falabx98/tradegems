@@ -19,7 +19,7 @@ import { api } from '../utils/api';
 
 interface GameState {
   // Current view
-  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'battle' | 'stats' | 'prediction';
+  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'battle' | 'prediction';
   mode: GameMode;
 
   // Round state

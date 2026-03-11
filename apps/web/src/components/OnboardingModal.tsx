@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
+import { ArrowUpIcon, GemIcon, SwordsIcon, MoneyIcon, ChartBarIcon } from './ui/GameIcons';
 
 const ONBOARDING_KEY = 'tradesol_onboarding_seen';
 
 /* ────────── tutorial steps ────────── */
 
 interface TutorialStep {
-  icon: string;
+  icon: ReactNode;
   title: string;
   desc: string;
   visual: 'chart' | 'gems' | 'bet' | 'battle' | 'wallet';
@@ -14,35 +15,35 @@ interface TutorialStep {
 
 const STEPS: TutorialStep[] = [
   {
-    icon: '📈',
+    icon: <ArrowUpIcon size={26} color="#9945FF" />,
     title: 'Predict the Chart',
     desc: 'A live chart runs for 15 seconds. Your goal is to ride the price action and hit multiplier nodes along the way.',
     visual: 'chart',
     accent: '#9945FF',
   },
   {
-    icon: '💎',
+    icon: <GemIcon size={26} color="#34d399" />,
     title: 'Collect Gems',
     desc: 'Green emerald gems boost your multiplier. Avoid red bombs that divide your gains. Shields protect you once.',
     visual: 'gems',
     accent: '#34d399',
   },
   {
-    icon: '🎰',
+    icon: <ChartBarIcon size={26} color="#fbbf24" />,
     title: 'Choose Your Risk',
     desc: 'Pick your bet size and risk tier before each round. Safe, Standard, or Degen — higher risk, higher reward.',
     visual: 'bet',
     accent: '#fbbf24',
   },
   {
-    icon: '⚔️',
+    icon: <SwordsIcon size={26} color="#f87171" />,
     title: 'Battle Other Traders',
     desc: 'Enter PvP arenas. Up to 6 players compete on the same chart. Highest multiplier wins the pot.',
     visual: 'battle',
     accent: '#f87171',
   },
   {
-    icon: '💰',
+    icon: <MoneyIcon size={26} color="#14F195" />,
     title: 'Win & Withdraw SOL',
     desc: 'Winnings hit your balance instantly. Deposit and withdraw SOL anytime using your Phantom wallet.',
     visual: 'wallet',

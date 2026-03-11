@@ -1,10 +1,11 @@
 import { useToastStore, type ToastType } from '../stores/toastStore';
+import { CheckIcon, XIcon, InfoIcon, WarningIcon } from './ui/GameIcons';
 
-const ICONS: Record<ToastType, string> = {
-  success: '✓',
-  error: '✕',
-  info: 'ℹ',
-  warning: '⚠',
+const ICON_COMPONENTS: Record<ToastType, (color: string) => React.ReactNode> = {
+  success: (c) => <CheckIcon size={14} color={c} />,
+  error: (c) => <XIcon size={14} color={c} />,
+  info: (c) => <InfoIcon size={14} color={c} />,
+  warning: (c) => <WarningIcon size={14} color={c} />,
 };
 
 const COLORS: Record<ToastType, { bg: string; border: string; text: string; icon: string }> = {
@@ -62,14 +63,14 @@ export function ToastOverlay() {
               color: c.icon,
               border: `1px solid ${c.icon}30`,
             }}>
-              {ICONS[t.type]}
+              {ICON_COMPONENTS[t.type](c.icon)}
             </div>
             <div style={styles.textWrap}>
               <span style={{ ...styles.title, color: c.text }}>{t.title}</span>
               {t.message && <span style={styles.message}>{t.message}</span>}
             </div>
             <button style={styles.close} onClick={(e) => { e.stopPropagation(); removeToast(t.id); }}>
-              ✕
+              <XIcon size={12} color="currentColor" />
             </button>
           </div>
         );

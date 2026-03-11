@@ -4,6 +4,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { MoneyIcon, GemIcon, ChartBarIcon, MedalIcon, TrophyIcon } from '../ui/GameIcons';
 
 interface LeaderboardEntry {
   rank: number;
@@ -14,9 +15,9 @@ interface LeaderboardEntry {
 }
 
 const TABS = [
-  { id: 'profit', label: 'Top Profit', icon: '💰' },
-  { id: 'multiplier', label: 'Best Mult', icon: '💎' },
-  { id: 'volume', label: 'Volume', icon: '📊' },
+  { id: 'profit', label: 'Top Profit', icon: <MoneyIcon size={16} /> },
+  { id: 'multiplier', label: 'Best Mult', icon: <GemIcon size={16} /> },
+  { id: 'volume', label: 'Volume', icon: <ChartBarIcon size={16} /> },
 ] as const;
 
 const PERIODS = [
@@ -25,10 +26,10 @@ const PERIODS = [
   { id: 'all', label: 'All' },
 ] as const;
 
-const RANK_META: Record<number, { medal: string; color: string; glow: string; bg: string; height: number }> = {
-  1: { medal: '🥇', color: '#ffd700', glow: 'rgba(255, 215, 0, 0.35)', bg: 'rgba(255, 215, 0, 0.08)', height: 100 },
-  2: { medal: '🥈', color: '#c0c0c0', glow: 'rgba(192, 192, 192, 0.25)', bg: 'rgba(192, 192, 192, 0.06)', height: 74 },
-  3: { medal: '🥉', color: '#cd7f32', glow: 'rgba(205, 127, 50, 0.25)', bg: 'rgba(205, 127, 50, 0.06)', height: 56 },
+const RANK_META: Record<number, { rank: 1 | 2 | 3; color: string; glow: string; bg: string; height: number }> = {
+  1: { rank: 1, color: '#ffd700', glow: 'rgba(255, 215, 0, 0.35)', bg: 'rgba(255, 215, 0, 0.08)', height: 100 },
+  2: { rank: 2, color: '#c0c0c0', glow: 'rgba(192, 192, 192, 0.25)', bg: 'rgba(192, 192, 192, 0.06)', height: 74 },
+  3: { rank: 3, color: '#cd7f32', glow: 'rgba(205, 127, 50, 0.25)', bg: 'rgba(205, 127, 50, 0.06)', height: 56 },
 };
 
 function getInitials(name: string): string {
@@ -156,7 +157,7 @@ export function LeaderboardScreen() {
                     fontSize: actualRank === 1 ? '22px' : '18px',
                     lineHeight: 1,
                     filter: `drop-shadow(0 0 4px ${meta.glow})`,
-                  }}>{meta.medal}</span>
+                  }}><MedalIcon rank={meta.rank} size={22} /></span>
                 </div>
 
                 {/* Name */}
@@ -242,7 +243,7 @@ export function LeaderboardScreen() {
             </>
           ) : entries.length === 0 ? (
             <div style={styles.empty}>
-              <span style={{ fontSize: '32px', marginBottom: '8px' }}>🏆</span>
+              <TrophyIcon size={32} color="#fbbf24" style={{ marginBottom: '8px' }} />
               <span>No rankings yet. Play some rounds!</span>
             </div>
           ) : (
@@ -264,7 +265,7 @@ export function LeaderboardScreen() {
                   {/* Rank */}
                   <span style={{ ...styles.rankNum, width: '44px' }}>
                     {meta ? (
-                      <span style={{ fontSize: '18px', filter: `drop-shadow(0 0 3px ${meta.glow})` }}>{meta.medal}</span>
+                      <span style={{ fontSize: '18px', filter: `drop-shadow(0 0 3px ${meta.glow})` }}><MedalIcon rank={meta.rank} size={22} /></span>
                     ) : (
                       <span className="mono" style={{ color: theme.text.muted, fontSize: '13px' }}>
                         {entry.rank}

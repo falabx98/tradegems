@@ -16,6 +16,7 @@ import {
 } from '../../engine/predictionEngine';
 import { CandlestickChart } from '../arena/CandlestickChart';
 import { playBetPlaced, playCountdownBeep, playLevelUp, playRoundEnd, hapticMedium, hapticHeavy } from '../../utils/sounds';
+import { ArrowUpIcon, ArrowDownIcon, ArrowSidewaysIcon, TrophyIcon, ExplosionIcon } from '../ui/GameIcons';
 
 // ─── Confetti (lightweight version) ──────────────────────────────────────────
 
@@ -254,8 +255,10 @@ export function PredictionScreen() {
         {phase === 'countdown' && (
           <div style={s.countdownOverlay}>
             <span style={s.countdownNum}>{countdown}</span>
-            <span style={s.countdownLabel}>
-              {prediction === 'long' ? '📈 LONG' : prediction === 'short' ? '📉 SHORT' : '↔️ RANGE'}
+            <span style={{ ...s.countdownLabel, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {prediction === 'long' && <><ArrowUpIcon size={24} color="#34d399" /> LONG</>}
+              {prediction === 'short' && <><ArrowDownIcon size={24} color="#f87171" /> SHORT</>}
+              {prediction === 'range' && <><ArrowSidewaysIcon size={24} color="#fbbf24" /> RANGE</>}
             </span>
           </div>
         )}
@@ -267,20 +270,20 @@ export function PredictionScreen() {
       {/* Controls / Result */}
       {phase === 'setup' && (
         <div style={s.setupPanel}>
-          <p style={s.instruction}>Where will the price go?</p>
+          <p style={s.instruction}>CALL IT</p>
           <div style={{ ...s.dirRow, ...(isMobile ? { gap: '8px' } : {}) }}>
-            <button onClick={() => handlePrediction('long')} style={{ ...s.dirBtn, ...s.dirLong }}>
-              <span style={s.dirEmoji}>📈</span>
+            <button onClick={() => handlePrediction('long')} className="dir-btn dir-long" style={s.dirBtn}>
+              <ArrowUpIcon size={28} color="#34d399" />
               <span style={s.dirLabel}>LONG</span>
               <span style={s.dirPayout}>1.9x</span>
             </button>
-            <button onClick={() => handlePrediction('range')} style={{ ...s.dirBtn, ...s.dirRange }}>
-              <span style={s.dirEmoji}>↔️</span>
+            <button onClick={() => handlePrediction('range')} className="dir-btn dir-range" style={s.dirBtn}>
+              <ArrowSidewaysIcon size={28} color="#fbbf24" />
               <span style={s.dirLabel}>RANGE</span>
               <span style={s.dirPayout}>3.0x</span>
             </button>
-            <button onClick={() => handlePrediction('short')} style={{ ...s.dirBtn, ...s.dirShort }}>
-              <span style={s.dirEmoji}>📉</span>
+            <button onClick={() => handlePrediction('short')} className="dir-btn dir-short" style={s.dirBtn}>
+              <ArrowDownIcon size={28} color="#f87171" />
               <span style={s.dirLabel}>SHORT</span>
               <span style={s.dirPayout}>1.9x</span>
             </button>
@@ -313,7 +316,7 @@ export function PredictionScreen() {
             background: result.correct ? 'rgba(52, 211, 153, 0.12)' : 'rgba(248, 113, 113, 0.12)',
             borderColor: result.correct ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)',
           }}>
-            <span style={{ fontSize: '28px' }}>{result.correct ? '🏆' : '💥'}</span>
+            {result.correct ? <TrophyIcon size={28} color="#34d399" /> : <ExplosionIcon size={28} color="#f87171" />}
             <div>
               <div style={{
                 fontSize: '20px',
@@ -454,24 +457,11 @@ const s: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '4px',
-    padding: '16px 8px',
-    borderRadius: '12px',
-    cursor: 'pointer',
-    transition: 'transform 0.15s, box-shadow 0.15s',
+    gap: '6px',
+    padding: '18px 8px',
     fontFamily: "'Rajdhani', sans-serif",
-  },
-  dirLong: {
-    background: 'rgba(52, 211, 153, 0.08)',
-    border: '1px solid rgba(52, 211, 153, 0.25)',
-  },
-  dirRange: {
-    background: 'rgba(251, 191, 36, 0.08)',
-    border: '1px solid rgba(251, 191, 36, 0.25)',
-  },
-  dirShort: {
-    background: 'rgba(248, 113, 113, 0.08)',
-    border: '1px solid rgba(248, 113, 113, 0.25)',
+    border: 'none',
+    background: 'transparent',
   },
   dirEmoji: {
     fontSize: '24px',

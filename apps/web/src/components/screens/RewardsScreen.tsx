@@ -4,6 +4,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
+import { CheckIcon, PackageIcon, PartyIcon, GiftIcon } from '../ui/GameIcons';
 
 interface Mission {
   id: string;
@@ -264,7 +265,7 @@ export function RewardsScreen() {
                   }}>
                     <div style={styles.missionLeft}>
                       <div style={styles.missionTitle}>
-                        {m.completed && <span style={styles.checkMark}>✓</span>}
+                        {m.completed && <span style={styles.checkMark}><CheckIcon size={12} color="#34d399" /></span>}
                         {m.title}
                       </div>
                       <div style={styles.missionDesc}>{m.description}</div>
@@ -546,8 +547,8 @@ export function RewardsScreen() {
                     {isOpening && !boxResult ? (
                       /* Opening animation */
                       <div style={dbStyles.boxOpening}>
-                        <div className="mystery-box-shake" style={{ fontSize: '60px', lineHeight: 1 }}>📦</div>
-                        <div style={{ fontSize: '22px', marginTop: '4px', animation: 'glowPulse 0.5s ease-in-out infinite' }}>✨</div>
+                        <div className="mystery-box-shake" style={{ lineHeight: 1 }}><PackageIcon size={60} color="#c084fc" /></div>
+                        <div style={{ marginTop: '4px', animation: 'glowPulse 0.5s ease-in-out infinite', opacity: 0.8 }}><GiftIcon size={22} color="#fbbf24" /></div>
                         <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '8px' }}>Opening...</div>
                       </div>
                     ) : boxResult ? (
@@ -579,7 +580,7 @@ export function RewardsScreen() {
                           <img src="/sol-coin.png" alt="SOL" style={{ width: 28, height: 28 }} />
                           {formatSol(boxResult.amountLamports)} SOL
                         </div>
-                        <div style={{ fontSize: '34px', marginTop: '4px' }}>🎉</div>
+                        <div style={{ marginTop: '4px' }}><PartyIcon size={34} color={RARITY_COLORS[boxResult.rarity] || '#9ca3af'} /></div>
                         <button
                           className="btn-3d btn-3d-primary"
                           style={{ marginTop: '12px', padding: '8px 28px', fontSize: '14px' }}
@@ -591,7 +592,7 @@ export function RewardsScreen() {
                     ) : (
                       /* Idle state */
                       <div style={dbStyles.boxIdle}>
-                        <div style={{ fontSize: '60px', lineHeight: 1 }}>🎁</div>
+                        <div style={{ lineHeight: 1 }}><GiftIcon size={60} color="#c084fc" /></div>
                         <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '6px' }}>
                           Daily Mystery Box
                         </div>

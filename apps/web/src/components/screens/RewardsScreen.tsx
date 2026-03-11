@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../utils/api';
 import { useGameStore } from '../../stores/gameStore';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 
@@ -55,6 +56,7 @@ const RARITY_GLOW: Record<string, string> = {
 };
 
 export function RewardsScreen() {
+  const isMobile = useIsMobile();
   const profile = useGameStore((s) => s.profile);
   const syncProfile = useGameStore((s) => s.syncProfile);
   const [tab, setTab] = useState<'missions' | 'achievements' | 'rakeback' | 'daily-box' | 'affiliates'>('missions');
@@ -216,9 +218,15 @@ export function RewardsScreen() {
   }
 
   return (
-    <div style={styles.container}>
+    <div style={{
+      ...styles.container,
+      ...(isMobile ? { padding: '10px' } : {}),
+    }}>
       {/* Tabs */}
-      <div style={styles.tabBar} className="card-enter card-enter-1">
+      <div style={{
+        ...styles.tabBar,
+        ...(isMobile ? { overflowX: 'auto', WebkitOverflowScrolling: 'touch', gap: '2px' } : {}),
+      }} className="card-enter card-enter-1">
         {(['missions', 'achievements', 'rakeback', 'daily-box', 'affiliates'] as const).map((t) => (
           <button
             key={t}
@@ -226,6 +234,7 @@ export function RewardsScreen() {
             style={{
               ...styles.tab,
               ...(tab === t ? styles.tabActive : {}),
+              ...(isMobile ? { fontSize: '12px', padding: '8px 10px', whiteSpace: 'nowrap' } : {}),
             }}
           >
             {t === 'daily-box' ? 'Box' : t === 'affiliates' ? 'Affiliates' : t.charAt(0).toUpperCase() + t.slice(1)}
@@ -436,7 +445,10 @@ export function RewardsScreen() {
                   </div>
 
                   {/* Stats Grid */}
-                  <div style={affStyles.statsGrid}>
+                  <div style={{
+                    ...affStyles.statsGrid,
+                    ...(isMobile ? { gridTemplateColumns: 'repeat(2, 1fr)' } : {}),
+                  }}>
                     <div style={affStyles.statCard}>
                       <div style={affStyles.statLabel}>Referred Users</div>
                       <div className="mono" style={affStyles.statValue}>{referralStats.referredCount}</div>

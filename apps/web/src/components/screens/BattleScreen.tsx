@@ -288,7 +288,7 @@ export function BattleScreen() {
           {joined ? (
             <div style={styles.joinedBadge}>✓ Joined — waiting for round</div>
           ) : (
-            <button onClick={handleJoin} style={styles.joinButton}>
+            <button onClick={handleJoin} className="btn-3d btn-3d-primary" style={styles.joinButton}>
               ⚔️ Place Bet & Join
               <span className="mono" style={{ opacity: 0.8 }}>
                 {' '}◈ {formatSol(betAmount)} · {riskTier}
@@ -697,7 +697,9 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '10px 20px',
+    padding: '10px 14px',
+    borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
+    background: 'rgba(32, 24, 48, 0.95)',
     color: theme.text.primary,
     fontSize: '16px',
   },

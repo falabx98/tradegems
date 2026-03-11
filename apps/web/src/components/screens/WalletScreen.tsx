@@ -964,7 +964,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '14px 16px',
+    padding: '10px 14px',
     background: 'rgba(32, 24, 48, 0.95)',
     borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
   },

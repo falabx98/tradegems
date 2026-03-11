@@ -672,7 +672,6 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
             style={{
               width: '100%',
               display: 'block',
-              borderRadius: '12px',
             }}
           />
         </div>

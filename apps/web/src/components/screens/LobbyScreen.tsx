@@ -69,28 +69,28 @@ interface BannerData {
 const BANNERS: BannerData[] = [
   {
     id: 'welcome-bonus',
-    image: '/Welcome-Bonus.png',
+    image: '/Welcome-Bonus.jpg',
     cta: 'Claim Now',
     accentColor: '#14F195',
     action: 'bonus',
   },
   {
     id: 'referral',
-    image: '/Referral-Program.png',
+    image: '/Referral-Program.jpg',
     cta: 'View Referrals',
     accentColor: '#9945FF',
     action: 'referrals',
   },
   {
     id: 'battle-arena',
-    image: '/PvP-Battle-Arena.png',
+    image: '/PvP-Battle-Arena.jpg',
     cta: 'Enter Arena',
     accentColor: '#f87171',
     action: 'battle',
   },
   {
     id: 'daily-rewards',
-    image: '/Daily-Rewards.png',
+    image: '/Daily-Rewards.jpg',
     cta: 'Claim',
     accentColor: '#fbbf24',
     action: 'rewards',

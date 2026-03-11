@@ -4,8 +4,6 @@ import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 import { RiskTier } from '../../types/game';
-import { generateChartPath } from '../../engine/chartGenerator';
-import { SeededRandom } from '../../engine/seededRandom';
 import { api } from '../../utils/api';
 import { formatSol, lamportsToSol, solToLamports } from '../../utils/sol';
 
@@ -55,6 +53,60 @@ const GAME_MODE_OPTIONS: {
     multipliers: ['x1.06-1.31', 'x1.31-1.75', 'x1.75-2.50', 'x2.50-4.13', 'x4.13-7.25', 'x7.25-10.0'],
     gainTag: '1.25x',
     lossTag: '1.40x',
+  },
+];
+
+interface BannerData {
+  id: string;
+  emoji: string;
+  title: string;
+  subtitle: string;
+  cta: string;
+  gradient: string;
+  accentColor: string;
+  action: 'bonus' | 'referrals' | 'battle' | 'rewards';
+}
+
+const BANNERS: BannerData[] = [
+  {
+    id: 'welcome-bonus',
+    emoji: '🎁',
+    title: 'Claim 1 SOL Free',
+    subtitle: 'New player welcome bonus — start trading risk-free today.',
+    cta: 'Claim Now',
+    gradient: 'linear-gradient(135deg, rgba(20, 241, 149, 0.12) 0%, rgba(52, 211, 153, 0.06) 100%)',
+    accentColor: '#14F195',
+    action: 'bonus',
+  },
+  {
+    id: 'referral',
+    emoji: '🤝',
+    title: 'Invite & Earn 10%',
+    subtitle: 'Share your code. Earn commission on every friend\'s trade.',
+    cta: 'View Referrals',
+    gradient: 'linear-gradient(135deg, rgba(153, 69, 255, 0.12) 0%, rgba(192, 132, 252, 0.06) 100%)',
+    accentColor: '#9945FF',
+    action: 'referrals',
+  },
+  {
+    id: 'battle-arena',
+    emoji: '⚔️',
+    title: 'PvP Trading Battles',
+    subtitle: 'Challenge other traders in real-time head-to-head rounds.',
+    cta: 'Enter Arena',
+    gradient: 'linear-gradient(135deg, rgba(248, 113, 113, 0.12) 0%, rgba(251, 191, 36, 0.06) 100%)',
+    accentColor: '#f87171',
+    action: 'battle',
+  },
+  {
+    id: 'daily-rewards',
+    emoji: '📦',
+    title: 'Daily Rewards',
+    subtitle: 'Claim daily rakeback and VIP rewards. Higher tiers earn more.',
+    cta: 'Claim',
+    gradient: 'linear-gradient(135deg, rgba(251, 191, 36, 0.12) 0%, rgba(153, 69, 255, 0.06) 100%)',
+    accentColor: '#fbbf24',
+    action: 'rewards',
   },
 ];
 
@@ -162,18 +214,38 @@ export function LobbyScreen() {
   // Check if current bet is a preset
   const isCustomBetActive = betAmount > 0 && !BET_OPTIONS.some(o => o.lamports === betAmount);
 
+  const handleBannerClick = (banner: BannerData) => {
+    if (banner.action === 'bonus') {
+      if (!isAuthenticated) {
+        setScreen('auth');
+      } else if (bonusClaimed === false) {
+        handleClaimBonus();
+      }
+    } else if (banner.action === 'battle') {
+      setMode('battle');
+    } else if (banner.action === 'referrals' || banner.action === 'rewards') {
+      if (!isAuthenticated) {
+        setShowAuthPrompt(true);
+      } else {
+        setScreen('rewards');
+      }
+    }
+  };
+
   return (
     <div style={{
       ...styles.container,
       ...(isMobile ? { padding: '12px' } : {}),
     }}>
+      {/* Full-width Banner Carousel */}
+      <BannerCarousel isMobile={isMobile} onBannerClick={handleBannerClick} />
+
       <div style={{
         ...styles.columns,
         ...(isMobile ? { gridTemplateColumns: '1fr', gap: '10px' } : {}),
       }}>
         {/* Left column: Configuration */}
         <div style={styles.leftCol}>
-          {!isMobile && <ChartPreview />}
 
           {/* Mode */}
           <div style={styles.panel}>
@@ -566,90 +638,90 @@ function StatRow({ label, value, color, icon }: { label: string; value: string; 
   );
 }
 
-function ChartPreview() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBannerClick: (b: BannerData) => void }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startAutoSlide = () => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    intervalRef.current = setInterval(() => {
+      setActiveIndex((prev) => (prev + 1) % BANNERS.length);
+    }, 5000);
+  };
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
-
-    const w = rect.width;
-    const h = rect.height;
-
-    const rng = new SeededRandom(String(Date.now() % 10000));
-    const path = generateChartPath(rng);
-
-    // Background
-    ctx.fillStyle = theme.bg.primary;
-    ctx.fillRect(0, 0, w, h);
-
-    // Subtle grid
-    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
-    ctx.lineWidth = 1;
-    for (let y = 0; y < h; y += 20) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(w, y);
-      ctx.stroke();
-    }
-
-    // Chart fill
-    const gradient = ctx.createLinearGradient(0, 0, 0, h);
-    gradient.addColorStop(0, 'rgba(153, 69, 255, 0.06)');
-    gradient.addColorStop(1, 'rgba(153, 69, 255, 0.0)');
-
-    ctx.beginPath();
-    ctx.moveTo(0, h);
-    for (let i = 0; i < path.points.length; i++) {
-      const x = (i / path.points.length) * w;
-      const y = h - (path.points[i].price * h);
-      ctx.lineTo(x, y);
-    }
-    ctx.lineTo(w, h);
-    ctx.closePath();
-    ctx.fillStyle = gradient;
-    ctx.fill();
-
-    // Chart line with blue→purple gradient
-    const lineGrad = ctx.createLinearGradient(0, 0, w, 0);
-    lineGrad.addColorStop(0, '#9945FF');
-    lineGrad.addColorStop(0.5, '#8b7bff');
-    lineGrad.addColorStop(1, '#9945FF');
-
-    ctx.beginPath();
-    for (let i = 0; i < path.points.length; i++) {
-      const x = (i / path.points.length) * w;
-      const y = h - (path.points[i].price * h);
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-    ctx.strokeStyle = lineGrad;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-
-    // Overlay text
-    ctx.fillStyle = 'rgba(153, 69, 255, 0.18)';
-    ctx.font = 'bold 40px "JetBrains Mono", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('PREVIEW', w / 2, h / 2 + 14);
+    startAutoSlide();
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
 
+  const goToSlide = (i: number) => {
+    setActiveIndex(i);
+    startAutoSlide();
+  };
+
   return (
-    <div style={styles.chartPreview}>
-      <canvas
-        ref={canvasRef}
-        style={{ width: '100%', height: '100%', borderRadius: '8px' }}
-      />
-      <div style={styles.chartOverlay}>
-        <span style={styles.chartOverlayText}>Next round preview</span>
+    <div style={styles.carouselWrapper}>
+      <div style={{
+        ...styles.carouselTrack,
+        transform: `translateX(-${activeIndex * 100}%)`,
+      }}>
+        {BANNERS.map((banner) => (
+          <div
+            key={banner.id}
+            style={{
+              ...styles.carouselSlide,
+              background: banner.gradient,
+              borderColor: `${banner.accentColor}25`,
+            }}
+          >
+            <div style={{
+              ...styles.carouselContent,
+              ...(isMobile ? { flexDirection: 'column' as const, alignItems: 'flex-start', paddingTop: '16px', paddingLeft: '18px', paddingRight: '18px', paddingBottom: '30px', gap: '8px' } : {}),
+            }}>
+              {!isMobile && (
+                <span style={styles.carouselEmoji}>{banner.emoji}</span>
+              )}
+              <div style={{
+                ...styles.carouselTextWrap,
+                ...(isMobile ? { gap: '4px' } : {}),
+              }}>
+                <span style={{
+                  ...styles.carouselTitle,
+                  color: banner.accentColor,
+                  ...(isMobile ? { fontSize: '16px' } : {}),
+                }}>{isMobile ? `${banner.emoji} ${banner.title}` : banner.title}</span>
+                <span style={{
+                  ...styles.carouselSubtitle,
+                  ...(isMobile ? { fontSize: '13px' } : {}),
+                }}>{banner.subtitle}</span>
+              </div>
+              <button
+                onClick={() => onBannerClick(banner)}
+                style={{
+                  ...styles.carouselCta,
+                  background: `${banner.accentColor}18`,
+                  border: `1px solid ${banner.accentColor}35`,
+                  color: banner.accentColor,
+                  ...(isMobile ? { padding: '8px 18px', fontSize: '13px', alignSelf: 'flex-start' } : {}),
+                }}
+              >
+                {banner.cta}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={styles.carouselDots}>
+        {BANNERS.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => goToSlide(i)}
+            style={{
+              ...styles.carouselDot,
+              ...(i === activeIndex ? styles.carouselDotActive : {}),
+            }}
+          />
+        ))}
       </div>
     </div>
   );
@@ -683,23 +755,93 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '12px',
   },
 
-  // Chart Preview
-  chartPreview: {
+  // Banner Carousel
+  carouselWrapper: {
     position: 'relative',
-    height: '180px',
     borderRadius: '10px',
     overflow: 'hidden',
     border: `1px solid ${theme.border.subtle}`,
+    marginBottom: '12px',
+    background: theme.bg.secondary,
   },
-  chartOverlay: {
-    position: 'absolute',
-    bottom: '8px',
-    left: '10px',
+  carouselTrack: {
+    display: 'flex',
+    transition: 'transform 0.4s ease',
   },
-  chartOverlayText: {
-    fontSize: '12px',
+  carouselSlide: {
+    minWidth: '100%',
+    flexShrink: 0,
+    border: '1px solid transparent',
+  },
+  carouselContent: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '16px',
+    paddingTop: '18px',
+    paddingLeft: '24px',
+    paddingRight: '24px',
+    paddingBottom: '28px',
+  },
+  carouselEmoji: {
+    fontSize: '34px',
+    flexShrink: 0,
+  },
+  carouselTextWrap: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '3px',
+    minWidth: 0,
+  },
+  carouselTitle: {
+    fontSize: '17px',
+    fontWeight: 700,
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+  },
+  carouselSubtitle: {
+    fontSize: '14px',
     fontWeight: 500,
     color: theme.text.muted,
+    lineHeight: 1.3,
+  },
+  carouselCta: {
+    padding: '8px 18px',
+    fontSize: '14px',
+    fontWeight: 700,
+    fontFamily: 'Rajdhani, sans-serif',
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
+    borderRadius: '8px',
+    cursor: 'pointer',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    transition: 'all 0.15s ease',
+  },
+  carouselDots: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '6px',
+    position: 'absolute' as const,
+    bottom: '8px',
+    left: 0,
+    right: 0,
+  },
+  carouselDot: {
+    width: '8px',
+    height: '8px',
+    borderRadius: '4px',
+    background: 'rgba(255, 255, 255, 0.15)',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0,
+    transition: 'all 0.25s ease',
+  },
+  carouselDotActive: {
+    background: '#9945FF',
+    width: '24px',
+    boxShadow: '0 0 8px rgba(153, 69, 255, 0.4)',
   },
 
   // Panels

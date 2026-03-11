@@ -676,7 +676,7 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
           >
             <div style={{
               ...styles.carouselContent,
-              ...(isMobile ? { flexDirection: 'column' as const, alignItems: 'flex-start', paddingTop: '16px', paddingLeft: '18px', paddingRight: '18px', paddingBottom: '30px', gap: '8px' } : {}),
+              ...(isMobile ? { flexDirection: 'column' as const, alignItems: 'flex-start', paddingTop: '16px', paddingLeft: '18px', paddingRight: '18px', paddingBottom: '16px', gap: '8px' } : {}),
             }}>
               {!isMobile && (
                 <span style={styles.carouselEmoji}>{banner.emoji}</span>
@@ -709,18 +709,6 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
               </button>
             </div>
           </div>
-        ))}
-      </div>
-      <div style={styles.carouselDots}>
-        {BANNERS.map((_, i) => (
-          <button
-            key={i}
-            onClick={() => goToSlide(i)}
-            style={{
-              ...styles.carouselDot,
-              ...(i === activeIndex ? styles.carouselDotActive : {}),
-            }}
-          />
         ))}
       </div>
     </div>
@@ -780,7 +768,7 @@ const styles: Record<string, React.CSSProperties> = {
     paddingTop: '18px',
     paddingLeft: '24px',
     paddingRight: '24px',
-    paddingBottom: '28px',
+    paddingBottom: '18px',
   },
   carouselEmoji: {
     fontSize: '34px',
@@ -819,31 +807,6 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.5px',
     transition: 'all 0.15s ease',
   },
-  carouselDots: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '6px',
-    position: 'absolute' as const,
-    bottom: '8px',
-    left: 0,
-    right: 0,
-  },
-  carouselDot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '4px',
-    background: 'rgba(255, 255, 255, 0.15)',
-    border: 'none',
-    cursor: 'pointer',
-    padding: 0,
-    transition: 'all 0.25s ease',
-  },
-  carouselDotActive: {
-    background: '#9945FF',
-    width: '24px',
-    boxShadow: '0 0 8px rgba(153, 69, 255, 0.4)',
-  },
-
   // Panels
   panel: {
     background: theme.bg.secondary,

@@ -272,6 +272,15 @@ export function LobbyScreen() {
               >
                 Battle
               </button>
+              <button
+                onClick={() => setMode('prediction' as any)}
+                style={{
+                  ...styles.modeBtn,
+                  ...(mode === ('prediction' as any) ? styles.modeBtnActive : {}),
+                }}
+              >
+                Predict
+              </button>
             </div>
           </div>
 
@@ -438,6 +447,10 @@ export function LobbyScreen() {
               }
               if (mode === 'battle') {
                 enterBattle();
+                return;
+              }
+              if (mode === ('prediction' as any)) {
+                setScreen('prediction' as any);
                 return;
               }
               playBetPlaced();
@@ -845,7 +858,7 @@ const styles: Record<string, React.CSSProperties> = {
   // Mode Toggle
   modeRow: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    gridTemplateColumns: '1fr 1fr 1fr',
     gap: '1px',
     background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.25), rgba(20, 241, 149, 0.25))',
   },

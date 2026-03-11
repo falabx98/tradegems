@@ -2,7 +2,7 @@
 
 export type RiskTier = 'conservative' | 'balanced' | 'aggressive';
 
-export type GameMode = 'solo' | 'battle';
+export type GameMode = 'solo' | 'battle' | 'prediction';
 
 export type RoundPhase = 'pre' | 'opening' | 'buildup' | 'chaos' | 'final' | 'frozen' | 'result';
 

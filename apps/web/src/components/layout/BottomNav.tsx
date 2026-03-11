@@ -13,6 +13,7 @@ const TABS = [
 ] as const;
 
 const MORE_ITEMS = [
+  { id: 'prediction', label: 'Predict', icon: 'candles' },
   { id: 'rewards', label: 'Rewards', icon: 'gift' },
   { id: 'stats', label: 'Stats', icon: 'chart' },
   { id: 'history', label: 'History', icon: 'clock' },

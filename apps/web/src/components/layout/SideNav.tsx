@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { id: 'lobby', label: 'Lobby', icon: 'grid' },
   { id: 'solo', label: 'Solo', icon: 'play' },
   { id: 'battle', label: 'Battle', icon: 'swords' },
+  { id: 'prediction', label: 'Predict', icon: 'candles' },
   { id: 'leaderboard', label: 'Ranks', icon: 'trophy' },
   { id: 'rewards', label: 'Rewards', icon: 'gift' },
   { id: 'wallet', label: 'Wallet', icon: 'wallet' },
@@ -31,6 +32,8 @@ export function SideNav() {
       setScreen('lobby');
     } else if (id === 'battle') {
       setScreen('battle' as any);
+    } else if (id === 'prediction') {
+      setScreen('prediction' as any);
     } else if (id === 'leaderboard' || id === 'rewards' || id === 'wallet' || id === 'history' || id === 'settings' || id === 'stats') {
       setScreen(id as any);
     }

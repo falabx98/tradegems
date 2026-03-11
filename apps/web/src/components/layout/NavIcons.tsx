@@ -92,6 +92,15 @@ export function NavIcon({ name, size = 18, color = 'currentColor' }: NavIconProp
           <path d="M7 16l4-8 4 4 5-6" />
         </svg>
       );
+    case 'candles':
+      return (
+        <svg {...props}>
+          <line x1="8" y1="3" x2="8" y2="21" />
+          <rect x="5.5" y="7" width="5" height="8" rx="0.5" fill={color} />
+          <line x1="17" y1="5" x2="17" y2="19" />
+          <rect x="14.5" y="9" width="5" height="5" rx="0.5" />
+        </svg>
+      );
     case 'more':
       return (
         <svg {...props}>

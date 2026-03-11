@@ -13,6 +13,7 @@ import { RewardsScreen } from './components/screens/RewardsScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { BattleScreen } from './components/screens/BattleScreen';
 import { StatsScreen } from './components/screens/StatsScreen';
+import { PredictionScreen } from './components/screens/PredictionScreen';
 import { OnboardingModal, useOnboarding } from './components/OnboardingModal';
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggle } from './components/layout/ChatToggle';
@@ -76,6 +77,7 @@ export default function App() {
       {screen === 'settings' && <SettingsScreen />}
       {screen === 'stats' && <StatsScreen />}
       {screen === 'battle' && <BattleScreen />}
+      {screen === 'prediction' && <PredictionScreen />}
       {screen === 'auth' && (
         <AuthScreen onSuccess={() => {
           syncProfile();

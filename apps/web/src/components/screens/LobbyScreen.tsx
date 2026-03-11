@@ -670,7 +670,9 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
             alt={banner.id}
             draggable={false}
             style={{
-              width: '100%',
+              width: '104%',
+              marginLeft: '-2%',
+              marginTop: '-2%',
               display: 'block',
             }}
           />

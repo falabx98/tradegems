@@ -3,6 +3,7 @@ import { api } from '../../utils/api';
 import { useGameStore } from '../../stores/gameStore';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface LeaderboardEntry {
   rank: number;
@@ -13,9 +14,9 @@ interface LeaderboardEntry {
 }
 
 const TABS = [
-  { id: 'profit', label: 'Top profit' },
-  { id: 'multiplier', label: 'Best mult' },
-  { id: 'volume', label: 'Volume' },
+  { id: 'profit', label: 'Top Profit', icon: '💰' },
+  { id: 'multiplier', label: 'Best Mult', icon: '💎' },
+  { id: 'volume', label: 'Volume', icon: '📊' },
 ] as const;
 
 const PERIODS = [
@@ -24,8 +25,22 @@ const PERIODS = [
   { id: 'all', label: 'All' },
 ] as const;
 
+const RANK_META: Record<number, { medal: string; color: string; glow: string; bg: string; height: number }> = {
+  1: { medal: '🥇', color: '#ffd700', glow: 'rgba(255, 215, 0, 0.35)', bg: 'rgba(255, 215, 0, 0.08)', height: 100 },
+  2: { medal: '🥈', color: '#c0c0c0', glow: 'rgba(192, 192, 192, 0.25)', bg: 'rgba(192, 192, 192, 0.06)', height: 74 },
+  3: { medal: '🥉', color: '#cd7f32', glow: 'rgba(205, 127, 50, 0.25)', bg: 'rgba(205, 127, 50, 0.06)', height: 56 },
+};
+
+function getInitials(name: string): string {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+  return name.substring(0, 2).toUpperCase();
+}
+
 export function LeaderboardScreen() {
   const profile = useGameStore((s) => s.profile);
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<string>('profit');
   const [activePeriod, setActivePeriod] = useState<string>('all');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -53,19 +68,18 @@ export function LeaderboardScreen() {
     return `${formatSol(val)} SOL`;
   }
 
-  function rankInfo(rank: number) {
-    if (rank === 1) return { trophy: '🏆', color: '#ffd700', border: 'rgba(255, 215, 0, 0.2)', shadow: 'rgba(255, 215, 0, 0.1)', label: '1st' };
-    if (rank === 2) return { trophy: '🥈', color: '#c0c0c0', border: 'rgba(192, 192, 192, 0.2)', shadow: 'rgba(192, 192, 192, 0.1)', label: '2nd' };
-    if (rank === 3) return { trophy: '🥉', color: '#cd7f32', border: 'rgba(205, 127, 50, 0.2)', shadow: 'rgba(205, 127, 50, 0.1)', label: '3rd' };
-    return null;
-  }
-
   const top3 = entries.slice(0, 3);
+  const rest = entries.slice(3);
   const hasTop3 = top3.length >= 3 && !loading;
 
   return (
     <div style={styles.container}>
-      {/* Tabs */}
+      {/* Header */}
+      <div style={styles.header} className="card-enter">
+        <h1 style={styles.title}>Rankings</h1>
+      </div>
+
+      {/* Tab bar */}
       <div style={styles.tabBar} className="card-enter card-enter-1">
         {TABS.map((tab) => (
           <button
@@ -76,95 +90,256 @@ export function LeaderboardScreen() {
               ...(activeTab === tab.id ? styles.tabActive : {}),
             }}
           >
-            {tab.label}
+            <span>{tab.icon}</span>
+            {(!isMobile || activeTab === tab.id) && <span>{tab.label}</span>}
           </button>
         ))}
-        <div style={styles.tabSpacer} />
-        {PERIODS.map((p) => (
-          <button
-            key={p.id}
-            onClick={() => setActivePeriod(p.id)}
-            style={{
-              ...styles.periodBtn,
-              ...(activePeriod === p.id ? styles.periodActive : {}),
-            }}
-          >
-            {p.label}
-          </button>
-        ))}
+        <div style={{ flex: 1 }} />
+        <div style={styles.periodWrap}>
+          {PERIODS.map((p) => (
+            <button
+              key={p.id}
+              onClick={() => setActivePeriod(p.id)}
+              style={{
+                ...styles.periodBtn,
+                ...(activePeriod === p.id ? styles.periodActive : {}),
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Top 3 Podium */}
       {hasTop3 && (
         <div style={styles.podium} className="card-enter card-enter-2">
-          {/* 2nd place */}
-          <div style={{ ...styles.podiumCard, border: `1px solid ${rankInfo(2)!.border}` }}>
-            <span style={styles.podiumTrophy}>🥈</span>
-            <span className="badge-metallic" style={{ ...styles.podiumRank, background: `${rankInfo(2)!.color}20`, color: rankInfo(2)!.color }}>2nd</span>
-            <span style={styles.podiumName}>{top3[1].username || 'Anonymous'}</span>
-            <span style={styles.podiumScore} className="mono">{formatScore(top3[1].score, activeTab)}</span>
-          </div>
-          {/* 1st place */}
-          <div style={{ ...styles.podiumCard, ...styles.podiumFirst, border: `1px solid ${rankInfo(1)!.border}`, boxShadow: `0 0 20px ${rankInfo(1)!.shadow}` }}>
-            <span style={{ ...styles.podiumTrophy, fontSize: '38px' }}>🏆</span>
-            <span className="badge-metallic" style={{ ...styles.podiumRank, background: `${rankInfo(1)!.color}20`, color: rankInfo(1)!.color }}>1st</span>
-            <span style={styles.podiumName}>{top3[0].username || 'Anonymous'}</span>
-            <span style={styles.podiumScore} className="mono">{formatScore(top3[0].score, activeTab)}</span>
-          </div>
-          {/* 3rd place */}
-          <div style={{ ...styles.podiumCard, border: `1px solid ${rankInfo(3)!.border}` }}>
-            <span style={styles.podiumTrophy}>🥉</span>
-            <span className="badge-metallic" style={{ ...styles.podiumRank, background: `${rankInfo(3)!.color}20`, color: rankInfo(3)!.color }}>3rd</span>
-            <span style={styles.podiumName}>{top3[2].username || 'Anonymous'}</span>
-            <span style={styles.podiumScore} className="mono">{formatScore(top3[2].score, activeTab)}</span>
-          </div>
+          {/* Order: 2nd, 1st, 3rd for visual podium layout */}
+          {[top3[1], top3[0], top3[2]].map((entry, idx) => {
+            const actualRank = idx === 0 ? 2 : idx === 1 ? 1 : 3;
+            const meta = RANK_META[actualRank];
+            const isMe = entry.userId === profile.id;
+            const avatarSize = actualRank === 1 ? 56 : 44;
+
+            return (
+              <div key={entry.userId} style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                gap: '6px',
+              }}>
+                {/* Avatar + medal */}
+                <div style={{ position: 'relative' }}>
+                  <div style={{
+                    width: avatarSize,
+                    height: avatarSize,
+                    borderRadius: '50%',
+                    background: `linear-gradient(135deg, ${meta.color}30, ${meta.color}10)`,
+                    border: `2px solid ${meta.color}`,
+                    boxShadow: `0 0 16px ${meta.glow}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: actualRank === 1 ? '20px' : '16px',
+                    fontWeight: 800,
+                    color: meta.color,
+                    fontFamily: "'Orbitron', sans-serif",
+                  }}>
+                    {getInitials(entry.username)}
+                  </div>
+                  <span style={{
+                    position: 'absolute',
+                    bottom: -6,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    fontSize: actualRank === 1 ? '22px' : '18px',
+                    lineHeight: 1,
+                    filter: `drop-shadow(0 0 4px ${meta.glow})`,
+                  }}>{meta.medal}</span>
+                </div>
+
+                {/* Name */}
+                <span style={{
+                  fontSize: actualRank === 1 ? '14px' : '13px',
+                  fontWeight: 700,
+                  color: isMe ? '#c084fc' : theme.text.primary,
+                  maxWidth: isMobile ? '80px' : '110px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  textAlign: 'center',
+                  marginTop: '4px',
+                }}>
+                  {entry.username || 'Anonymous'}
+                  {isMe && <span style={{ color: '#c084fc', fontSize: '10px' }}> (you)</span>}
+                </span>
+
+                {/* Score */}
+                <span style={{
+                  fontSize: actualRank === 1 ? '15px' : '13px',
+                  fontWeight: 700,
+                  fontFamily: "'JetBrains Mono', monospace",
+                  color: meta.color,
+                  textShadow: `0 0 10px ${meta.glow}`,
+                }}>
+                  {formatScore(entry.score, activeTab)}
+                </span>
+
+                {/* Podium bar */}
+                <div style={{
+                  width: '100%',
+                  height: meta.height,
+                  borderRadius: '8px 8px 0 0',
+                  background: `linear-gradient(180deg, ${meta.color}18, ${meta.color}08)`,
+                  border: `1px solid ${meta.color}25`,
+                  borderBottom: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  paddingTop: '10px',
+                }}>
+                  <span style={{
+                    fontSize: actualRank === 1 ? '28px' : '22px',
+                    fontWeight: 800,
+                    fontFamily: "'Orbitron', sans-serif",
+                    color: `${meta.color}60`,
+                  }}>
+                    {actualRank}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* Leaderboard Table */}
+      {/* Table */}
       <div style={styles.panel} className="card-enter card-enter-3">
         <div style={styles.tableHeader}>
-          <span style={{ ...styles.th, width: '50px' }}>Rank</span>
+          <span style={{ ...styles.th, width: '44px' }}>#</span>
           <span style={{ ...styles.th, flex: 1 }}>Player</span>
-          <span style={{ ...styles.th, width: '120px', textAlign: 'right' }}>Score</span>
+          <span style={{ ...styles.th, width: '110px', textAlign: 'right' as const }}>Score</span>
         </div>
         <div style={styles.tableBody}>
           {loading ? (
-            <div style={styles.empty}>Loading rankings...</div>
+            <>
+              {[1,2,3,4,5].map(i => (
+                <div key={i} style={styles.row}>
+                  <span style={{ ...styles.rankNum, width: '44px' }}>
+                    <div style={{ width: 20, height: 14, borderRadius: 4, background: 'rgba(255,255,255,0.04)' }} />
+                  </span>
+                  <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
+                    <div style={{ width: 80 + i * 10, height: 14, borderRadius: 4, background: 'rgba(255,255,255,0.04)' }} />
+                  </span>
+                  <span style={{ width: '110px' }}>
+                    <div style={{ width: 60, height: 14, borderRadius: 4, background: 'rgba(255,255,255,0.04)', marginLeft: 'auto' }} />
+                  </span>
+                </div>
+              ))}
+            </>
           ) : entries.length === 0 ? (
-            <div style={styles.empty}>No rankings available yet. Play some rounds!</div>
+            <div style={styles.empty}>
+              <span style={{ fontSize: '32px', marginBottom: '8px' }}>🏆</span>
+              <span>No rankings yet. Play some rounds!</span>
+            </div>
           ) : (
-            entries.map((entry) => {
-              const info = rankInfo(entry.rank);
+            (hasTop3 ? rest : entries).map((entry) => {
+              const meta = RANK_META[entry.rank];
               const isMe = entry.userId === profile.id;
+              const barWidth = entries.length > 0
+                ? Math.max(8, (parseFloat(entry.score) / parseFloat(entries[0].score)) * 100)
+                : 0;
+
               return (
                 <div
                   key={entry.userId}
-                  className="table-row-hover"
                   style={{
                     ...styles.row,
                     ...(isMe ? styles.rowMe : {}),
                   }}
                 >
-                  <span style={{ ...styles.rank, width: '50px' }}>
-                    {info ? (
-                      <span className="badge-metallic" style={{
-                        ...styles.badge,
-                        background: `${info.color}20`,
-                        color: info.color,
-                        boxShadow: `0 0 6px ${info.shadow}`,
-                      }}>
-                        {info.trophy} {info.label}
-                      </span>
+                  {/* Rank */}
+                  <span style={{ ...styles.rankNum, width: '44px' }}>
+                    {meta ? (
+                      <span style={{ fontSize: '18px', filter: `drop-shadow(0 0 3px ${meta.glow})` }}>{meta.medal}</span>
                     ) : (
-                      <span className="mono" style={{ color: theme.text.muted }}>#{entry.rank}</span>
+                      <span className="mono" style={{ color: theme.text.muted, fontSize: '13px' }}>
+                        {entry.rank}
+                      </span>
                     )}
                   </span>
-                  <span style={{ ...styles.username, flex: 1 }}>
-                    {entry.username || 'Anonymous'}
-                    {isMe && <span style={styles.meTag}>You</span>}
+
+                  {/* Player */}
+                  <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                    {/* Mini avatar */}
+                    <div style={{
+                      width: 30,
+                      height: 30,
+                      borderRadius: '50%',
+                      background: isMe
+                        ? 'rgba(153, 69, 255, 0.15)'
+                        : meta ? `${meta.color}12` : 'rgba(255, 255, 255, 0.04)',
+                      border: isMe
+                        ? '1.5px solid rgba(153, 69, 255, 0.4)'
+                        : meta ? `1.5px solid ${meta.color}30` : '1.5px solid rgba(255, 255, 255, 0.08)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      fontFamily: "'Orbitron', sans-serif",
+                      color: isMe ? '#c084fc' : meta ? meta.color : theme.text.muted,
+                      flexShrink: 0,
+                    }}>
+                      {getInitials(entry.username)}
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
+                      <span style={{
+                        fontSize: '14px',
+                        fontWeight: 600,
+                        color: isMe ? '#c084fc' : theme.text.primary,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {entry.username || 'Anonymous'}
+                        {isMe && <span style={styles.meTag}>You</span>}
+                      </span>
+                      {/* Score bar */}
+                      <div style={{
+                        width: '100%',
+                        height: '3px',
+                        borderRadius: '2px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          width: `${Math.min(100, barWidth)}%`,
+                          height: '100%',
+                          borderRadius: '2px',
+                          background: isMe
+                            ? 'rgba(153, 69, 255, 0.5)'
+                            : meta ? `${meta.color}50` : 'rgba(153, 69, 255, 0.2)',
+                          transition: 'width 0.6s ease',
+                        }} />
+                      </div>
+                    </div>
                   </span>
-                  <span style={{ ...styles.score, width: '120px', textAlign: 'right' }} className="mono">
+
+                  {/* Score */}
+                  <span style={{
+                    width: '110px',
+                    textAlign: 'right' as const,
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    fontFamily: "'JetBrains Mono', monospace",
+                    color: isMe ? '#c084fc' : meta ? meta.color : theme.text.primary,
+                    textShadow: meta ? `0 0 8px ${meta.glow}` : 'none',
+                  }}>
                     {formatScore(entry.score, activeTab)}
                   </span>
                 </div>
@@ -186,27 +361,45 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     overflow: 'auto',
   },
+  header: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  title: {
+    fontSize: '22px',
+    fontWeight: 800,
+    fontFamily: "'Orbitron', sans-serif",
+    color: theme.text.primary,
+    margin: 0,
+    letterSpacing: '1px',
+    textTransform: 'uppercase' as const,
+    textShadow: '0 0 20px rgba(153, 69, 255, 0.3)',
+  },
+
+  // Tabs
   tabBar: {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    background: 'rgba(28, 20, 42, 0.85)',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
-    border: '1px solid rgba(255, 255, 255, 0.06)',
+    background: theme.bg.secondary,
+    border: `1px solid ${theme.border.subtle}`,
     borderRadius: '12px',
     padding: '4px',
   },
   tab: {
-    padding: '6px 14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    padding: '7px 14px',
     background: 'transparent',
     border: 'none',
     borderRadius: '8px',
     color: theme.text.muted,
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: "'Rajdhani', sans-serif",
     transition: 'all 0.15s',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
@@ -214,100 +407,63 @@ const styles: Record<string, React.CSSProperties> = {
   tabActive: {
     background: 'rgba(153, 69, 255, 0.15)',
     color: '#c084fc',
-    boxShadow: '0 0 12px rgba(153, 69, 255, 0.3)',
+    boxShadow: '0 0 12px rgba(153, 69, 255, 0.25)',
   },
-  tabSpacer: { flex: 1 },
+  periodWrap: {
+    display: 'flex',
+    gap: '2px',
+    background: 'rgba(0, 0, 0, 0.2)',
+    borderRadius: '6px',
+    padding: '2px',
+  },
   periodBtn: {
     padding: '4px 10px',
     background: 'transparent',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: '5px',
     color: theme.text.muted,
     fontSize: '12px',
     fontWeight: 600,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: "'Rajdhani', sans-serif",
     transition: 'all 0.15s',
   },
   periodActive: {
-    background: 'rgba(153, 69, 255, 0.18)',
-    color: theme.accent.purple,
-    boxShadow: '0 0 8px rgba(153, 69, 255, 0.2)',
+    background: 'rgba(153, 69, 255, 0.2)',
+    color: '#c084fc',
   },
 
   // Podium
   podium: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '8px',
-  },
-  podiumCard: {
-    background: 'rgba(28, 20, 42, 0.85)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    borderRadius: '14px',
-    padding: '16px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
+    gridTemplateColumns: '1fr 1.15fr 1fr',
     gap: '6px',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
-  },
-  podiumFirst: {
-    padding: '24px 16px',
-  },
-  podiumTrophy: {
-    fontSize: '30px',
-    lineHeight: 1,
-  },
-  podiumRank: {
-    fontSize: '12px',
-    fontWeight: 700,
-    padding: '3px 8px',
-    borderRadius: '6px',
-    position: 'relative' as const,
-    overflow: 'hidden',
-  },
-  podiumName: {
-    fontSize: '14px',
-    fontWeight: 700,
-    color: theme.text.primary,
-    textAlign: 'center',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-    maxWidth: '100%',
-  },
-  podiumScore: {
-    fontSize: '14px',
-    fontWeight: 700,
-    color: '#c084fc',
-    textShadow: '0 0 8px rgba(192, 132, 252, 0.4)',
+    alignItems: 'flex-end',
+    padding: '20px 8px 0',
   },
 
   // Table
   panel: {
-    background: 'rgba(28, 20, 42, 0.85)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(153, 69, 255, 0.18)',
+    background: theme.bg.secondary,
+    border: `1px solid ${theme.border.subtle}`,
     borderRadius: '14px',
     overflow: 'hidden',
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   },
   tableHeader: {
     display: 'flex',
-    padding: '8px 12px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
-    background: 'rgba(32, 24, 48, 0.95)',
+    padding: '10px 14px',
+    borderBottom: `1px solid ${theme.border.subtle}`,
+    background: 'rgba(32, 24, 48, 0.6)',
   },
   th: {
-    fontSize: '13px',
+    fontSize: '12px',
     fontWeight: 600,
     color: theme.text.muted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   },
   tableBody: {
     flex: 1,
@@ -315,56 +471,39 @@ const styles: Record<string, React.CSSProperties> = {
   },
   row: {
     display: 'flex',
-    padding: '10px 12px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.06)',
+    padding: '10px 14px',
+    borderBottom: `1px solid ${theme.border.subtle}`,
     alignItems: 'center',
-    transition: 'background-color 0.15s ease, transform 0.1s ease',
+    transition: 'background 0.15s',
   },
   rowMe: {
-    background: 'rgba(153, 69, 255, 0.08)',
-    boxShadow: 'inset 0 0 20px rgba(153, 69, 255, 0.08)',
+    background: 'rgba(153, 69, 255, 0.06)',
     borderLeft: '3px solid #9945FF',
   },
-  rank: {
+  rankNum: {
     fontSize: '14px',
     fontWeight: 600,
-  },
-  badge: {
-    fontSize: '12px',
-    fontWeight: 700,
-    padding: '3px 8px',
-    borderRadius: '6px',
-    position: 'relative' as const,
-    overflow: 'hidden',
-  },
-  username: {
-    fontSize: '15px',
-    fontWeight: 600,
-    color: theme.text.primary,
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
   },
   meTag: {
-    fontSize: '11px',
+    fontSize: '10px',
     fontWeight: 700,
     color: '#c084fc',
-    padding: '2px 6px',
-    background: 'rgba(153, 69, 255, 0.18)',
-    borderRadius: '6px',
-    border: '1px solid rgba(153, 69, 255, 0.2)',
-    boxShadow: '0 0 8px rgba(153, 69, 255, 0.2)',
-  },
-  score: {
-    fontSize: '15px',
-    fontWeight: 700,
-    color: '#c084fc',
-    textShadow: '0 0 8px rgba(192, 132, 252, 0.4)',
+    padding: '1px 5px',
+    background: 'rgba(153, 69, 255, 0.15)',
+    borderRadius: '4px',
+    marginLeft: '6px',
+    verticalAlign: 'middle',
   },
   empty: {
-    padding: '40px',
+    padding: '48px 24px',
     textAlign: 'center',
     fontSize: '14px',
     color: theme.text.muted,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px',
   },
 };

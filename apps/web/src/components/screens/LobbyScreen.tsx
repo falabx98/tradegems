@@ -60,11 +60,8 @@ const GAME_MODE_OPTIONS: {
 
 interface BannerData {
   id: string;
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
+  image: string;
   cta: string;
-  gradient: string;
   accentColor: string;
   action: 'bonus' | 'referrals' | 'battle' | 'rewards';
 }
@@ -72,41 +69,29 @@ interface BannerData {
 const BANNERS: BannerData[] = [
   {
     id: 'welcome-bonus',
-    icon: <GiftIcon size={28} color="#14F195" />,
-    title: 'Claim 1 SOL Free',
-    subtitle: 'New player welcome bonus — start trading risk-free today.',
+    image: '/Welcome-Bonus.png',
     cta: 'Claim Now',
-    gradient: 'linear-gradient(135deg, rgba(20, 241, 149, 0.12) 0%, rgba(52, 211, 153, 0.06) 100%)',
     accentColor: '#14F195',
     action: 'bonus',
   },
   {
     id: 'referral',
-    icon: <HandshakeIcon size={28} color="#9945FF" />,
-    title: 'Invite & Earn 10%',
-    subtitle: 'Share your code. Earn commission on every friend\'s trade.',
+    image: '/Referral-Program.png',
     cta: 'View Referrals',
-    gradient: 'linear-gradient(135deg, rgba(153, 69, 255, 0.12) 0%, rgba(192, 132, 252, 0.06) 100%)',
     accentColor: '#9945FF',
     action: 'referrals',
   },
   {
     id: 'battle-arena',
-    icon: <SwordsIcon size={28} color="#f87171" />,
-    title: 'PvP Trading Battles',
-    subtitle: 'Challenge other traders in real-time head-to-head rounds.',
+    image: '/PvP-Battle-Arena.png',
     cta: 'Enter Arena',
-    gradient: 'linear-gradient(135deg, rgba(248, 113, 113, 0.12) 0%, rgba(251, 191, 36, 0.06) 100%)',
     accentColor: '#f87171',
     action: 'battle',
   },
   {
     id: 'daily-rewards',
-    icon: <PackageIcon size={28} color="#fbbf24" />,
-    title: 'Daily Rewards',
-    subtitle: 'Claim daily rakeback and VIP rewards. Higher tiers earn more.',
+    image: '/Daily-Rewards.png',
     cta: 'Claim',
-    gradient: 'linear-gradient(135deg, rgba(251, 191, 36, 0.12) 0%, rgba(153, 69, 255, 0.06) 100%)',
     accentColor: '#fbbf24',
     action: 'rewards',
   },
@@ -272,15 +257,6 @@ export function LobbyScreen() {
                 }}
               >
                 Battle
-              </button>
-              <button
-                onClick={() => setMode('prediction' as any)}
-                style={{
-                  ...styles.modeBtn,
-                  ...(mode === ('prediction' as any) ? styles.modeBtnActive : {}),
-                }}
-              >
-                Predict
               </button>
             </div>
           </div>
@@ -450,10 +426,6 @@ export function LobbyScreen() {
                 enterBattle();
                 return;
               }
-              if (mode === ('prediction' as any)) {
-                setScreen('prediction' as any);
-                return;
-              }
               playBetPlaced();
               hapticMedium();
               startRound();
@@ -591,29 +563,33 @@ export function LobbyScreen() {
           <div style={{ ...styles.panel, flex: 1 }}>
             <div style={styles.panelHeader}>
               <span style={styles.panelTitle}>Recent plays</span>
-              <span style={styles.liveBadge}>LIVE</span>
+              {activityFeed.length > 0 && <span style={styles.liveBadge}>LIVE</span>}
             </div>
             <div style={styles.feedList}>
-              {(activityFeed.length > 0 ? activityFeed : [
-                { user: 'waiting...', mult: '—', amount: '—', win: true, time: '' },
-              ]).map((item, i) => (
-                <div key={i} style={styles.feedRow}>
-                  <span style={styles.feedUser}>{item.user}</span>
-                  <span style={{
-                    ...styles.feedMult,
-                    color: item.win ? theme.game.multiplier : theme.game.divider,
-                  }} className="mono">
-                    {item.mult}
-                  </span>
-                  <span style={{
-                    ...styles.feedAmount,
-                    color: item.win ? theme.game.multiplier : theme.game.divider,
-                  }} className="mono">
-                    {item.amount}
-                  </span>
-                  <span style={styles.feedTime}>{item.time}</span>
+              {activityFeed.length === 0 ? (
+                <div style={{ padding: '24px 16px', textAlign: 'center' as const, color: theme.text.muted, fontSize: '13px' }}>
+                  No recent activity
                 </div>
-              ))}
+              ) : (
+                activityFeed.map((item, i) => (
+                  <div key={i} style={styles.feedRow}>
+                    <span style={styles.feedUser}>{item.user}</span>
+                    <span style={{
+                      ...styles.feedMult,
+                      color: item.win ? theme.game.multiplier : theme.game.divider,
+                    }} className="mono">
+                      {item.mult}
+                    </span>
+                    <span style={{
+                      ...styles.feedAmount,
+                      color: item.win ? theme.game.multiplier : theme.game.divider,
+                    }} className="mono">
+                      {item.amount}
+                    </span>
+                    <span style={styles.feedTime}>{item.time}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
@@ -656,6 +632,8 @@ function StatRow({ label, value, color, icon }: { label: string; value: string; 
 }
 
 function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBannerClick: (b: BannerData) => void }) {
+  const visible = isMobile ? 1 : 3;
+  const gap = 10;
   const [activeIndex, setActiveIndex] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -663,7 +641,7 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
     if (intervalRef.current) clearInterval(intervalRef.current);
     intervalRef.current = setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % BANNERS.length);
-    }, 5000);
+    }, 4000);
   };
 
   useEffect(() => {
@@ -671,63 +649,38 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, []);
 
-  const goToSlide = (i: number) => {
-    setActiveIndex(i);
-    startAutoSlide();
-  };
+  // Build visible window: show `visible` items starting from activeIndex, wrapping around
+  const visibleBanners: { banner: BannerData; idx: number }[] = [];
+  for (let i = 0; i < visible; i++) {
+    const idx = (activeIndex + i) % BANNERS.length;
+    visibleBanners.push({ banner: BANNERS[idx], idx });
+  }
 
   return (
-    <div style={styles.carouselWrapper}>
-      <div style={{
-        ...styles.carouselTrack,
-        transform: `translateX(-${activeIndex * 100}%)`,
-      }}>
-        {BANNERS.map((banner) => (
-          <div
-            key={banner.id}
+    <div style={styles.bannerRow}>
+      {visibleBanners.map(({ banner, idx }) => (
+        <div
+          key={`${banner.id}-${activeIndex}`}
+          onClick={() => onBannerClick(banner)}
+          className="banner-card"
+          style={{
+            ...styles.bannerCard,
+            height: isMobile ? '120px' : '140px',
+          }}
+        >
+          <img
+            src={banner.image}
+            alt={banner.id}
+            draggable={false}
             style={{
-              ...styles.carouselSlide,
-              background: banner.gradient,
-              borderColor: `${banner.accentColor}25`,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
             }}
-          >
-            <div style={{
-              ...styles.carouselContent,
-              ...(isMobile ? { flexDirection: 'column' as const, alignItems: 'flex-start', paddingTop: '16px', paddingLeft: '18px', paddingRight: '18px', paddingBottom: '16px', gap: '8px' } : {}),
-            }}>
-              {!isMobile && (
-                <span style={styles.carouselEmoji}>{banner.icon}</span>
-              )}
-              <div style={{
-                ...styles.carouselTextWrap,
-                ...(isMobile ? { gap: '4px' } : {}),
-              }}>
-                <span style={{
-                  ...styles.carouselTitle,
-                  color: banner.accentColor,
-                  ...(isMobile ? { fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' } : {}),
-                }}>{isMobile && banner.icon}{banner.title}</span>
-                <span style={{
-                  ...styles.carouselSubtitle,
-                  ...(isMobile ? { fontSize: '13px' } : {}),
-                }}>{banner.subtitle}</span>
-              </div>
-              <button
-                onClick={() => onBannerClick(banner)}
-                style={{
-                  ...styles.carouselCta,
-                  background: `${banner.accentColor}18`,
-                  border: `1px solid ${banner.accentColor}35`,
-                  color: banner.accentColor,
-                  ...(isMobile ? { padding: '8px 18px', fontSize: '13px', alignSelf: 'flex-start' } : {}),
-                }}
-              >
-                {banner.cta}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+          />
+        </div>
+      ))}
     </div>
   );
 }
@@ -760,69 +713,23 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '12px',
   },
 
-  // Banner Carousel
-  carouselWrapper: {
-    position: 'relative',
-    borderRadius: '10px',
-    overflow: 'hidden',
-    border: `1px solid ${theme.border.subtle}`,
+  // Banner Row (Shuffle-style)
+  bannerRow: {
+    display: 'flex',
+    gap: '10px',
     marginBottom: '12px',
-    background: theme.bg.secondary,
+    overflowX: 'auto',
+    scrollbarWidth: 'none',
+    paddingBottom: '2px',
   },
-  carouselTrack: {
-    display: 'flex',
-    transition: 'transform 0.4s ease',
-  },
-  carouselSlide: {
-    minWidth: '100%',
-    flexShrink: 0,
-    border: '1px solid transparent',
-  },
-  carouselContent: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    paddingTop: '18px',
-    paddingLeft: '24px',
-    paddingRight: '24px',
-    paddingBottom: '18px',
-  },
-  carouselEmoji: {
-    fontSize: '34px',
-    flexShrink: 0,
-  },
-  carouselTextWrap: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '3px',
-    minWidth: 0,
-  },
-  carouselTitle: {
-    fontSize: '17px',
-    fontWeight: 700,
-    fontFamily: "'Orbitron', sans-serif",
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-  },
-  carouselSubtitle: {
-    fontSize: '14px',
-    fontWeight: 500,
-    color: theme.text.muted,
-    lineHeight: 1.3,
-  },
-  carouselCta: {
-    padding: '8px 18px',
-    fontSize: '14px',
-    fontWeight: 700,
-    fontFamily: 'Rajdhani, sans-serif',
-    whiteSpace: 'nowrap' as const,
-    flexShrink: 0,
-    borderRadius: '8px',
+  bannerCard: {
+    flex: '1 1 0',
+    minWidth: '0',
+    borderRadius: '12px',
+    overflow: 'hidden',
     cursor: 'pointer',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-    transition: 'all 0.15s ease',
+    flexShrink: 0,
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
   },
   // Panels
   panel: {
@@ -859,7 +766,7 @@ const styles: Record<string, React.CSSProperties> = {
   // Mode Toggle
   modeRow: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr 1fr',
+    gridTemplateColumns: '1fr 1fr',
     gap: '1px',
     background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.25), rgba(20, 241, 149, 0.25))',
   },

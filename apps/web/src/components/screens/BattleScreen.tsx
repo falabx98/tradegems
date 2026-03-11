@@ -14,7 +14,7 @@ import {
   playBattleJoin,
   playRoundEnd,
 } from '../../utils/sounds';
-import { SwordsIcon, MedalIcon, CheckIcon, TrophyIcon } from '../ui/GameIcons';
+import { SwordsIcon, MedalIcon, CheckIcon, TrophyIcon, UserIcon } from '../ui/GameIcons';
 
 const ROUND_DURATION = 15;
 
@@ -283,7 +283,7 @@ export function BattleScreen() {
           {/* Empty slots */}
           {Array.from({ length: Math.max(0, 6 - players.length) }).map((_, i) => (
             <div key={`empty-${i}`} style={styles.emptySlot}>
-              <div style={styles.emptyIcon}>👤</div>
+              <div style={styles.emptyIcon}><UserIcon size={26} color="#555570" /></div>
               <div style={styles.emptyText}>Waiting...</div>
             </div>
           ))}
@@ -301,7 +301,7 @@ export function BattleScreen() {
               </span>
             </button>
           )}
-          <button onClick={resetBattle} style={styles.cancelButton}>
+          <button onClick={resetBattle} className="nav-btn" style={styles.cancelButton}>
             Back to Lobby
           </button>
         </div>
@@ -518,7 +518,7 @@ export function BattleScreen() {
         <div style={styles.idleDesc}>
           {error ? error : 'Connecting to battle...'}
         </div>
-        <button onClick={resetBattle} style={styles.cancelButton}>
+        <button onClick={resetBattle} className="nav-btn" style={styles.cancelButton}>
           Back to Lobby
         </button>
       </div>

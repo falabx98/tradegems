@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../utils/api';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
+import { ChartBarIcon } from '../ui/GameIcons';
 
 interface HistoryEntry {
   id: number;
@@ -70,7 +71,11 @@ export function HistoryScreen() {
               ))}
             </div>
           ) : entries.length === 0 ? (
-            <div style={styles.empty}>No rounds played yet. Enter the arena!</div>
+            <div style={styles.empty}>
+              <ChartBarIcon size={36} color="#555570" />
+              <span>No rounds played yet</span>
+              <span style={{ fontSize: '13px', color: '#444460' }}>Your game history will appear here</span>
+            </div>
           ) : (
             entries.map((r) => {
               const mult = parseFloat(r.finalMultiplier || '1');
@@ -217,9 +222,13 @@ const styles: Record<string, React.CSSProperties> = {
     color: theme.text.secondary,
   },
   empty: {
-    padding: '40px',
+    padding: '48px 24px',
     textAlign: 'center',
     fontSize: '14px',
     color: theme.text.muted,
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '8px',
   },
 };

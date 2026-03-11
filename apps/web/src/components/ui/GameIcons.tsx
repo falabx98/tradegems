@@ -246,6 +246,17 @@ export function MoneyIcon({ size = 20, color = '#34d399', className, style }: Ic
   );
 }
 
+export function UserIcon({ size = 20, color = '#8888a0', className, style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className} style={defaults(size, style)}>
+      <circle cx="12" cy="8" r="4" fill={color} opacity="0.15" />
+      <path d="M20 21c0-3.87-3.58-7-8-7s-8 3.13-8 7" fill={color} opacity="0.1" />
+      <circle cx="12" cy="8" r="4" />
+      <path d="M20 21c0-3.87-3.58-7-8-7s-8 3.13-8 7" />
+    </svg>
+  );
+}
+
 export function ChartBarIcon({ size = 20, color = '#5b8def', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className} style={defaults(size, style)}>

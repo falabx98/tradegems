@@ -3,7 +3,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
-import { formatSol } from '../../utils/sol';
+import { formatSol, solToLamports } from '../../utils/sol';
 import { api } from '../../utils/api';
 import {
   generatePredictionRound,
@@ -17,6 +17,17 @@ import {
 import { CandlestickChart } from '../arena/CandlestickChart';
 import { playBetPlaced, playCountdownBeep, playLevelUp, playRoundEnd, hapticMedium, hapticHeavy } from '../../utils/sounds';
 import { ArrowUpIcon, ArrowDownIcon, ArrowSidewaysIcon, TrophyIcon, ExplosionIcon } from '../ui/GameIcons';
+
+const BET_OPTIONS = [
+  { label: '0.01', lamports: 10_000_000 },
+  { label: '0.05', lamports: 50_000_000 },
+  { label: '0.1',  lamports: 100_000_000 },
+  { label: '0.25', lamports: 250_000_000 },
+  { label: '0.5',  lamports: 500_000_000 },
+  { label: '1',    lamports: 1_000_000_000 },
+  { label: '2',    lamports: 2_000_000_000 },
+  { label: '5',    lamports: 5_000_000_000 },
+];
 
 // ─── Confetti (lightweight version) ──────────────────────────────────────────
 
@@ -88,7 +99,7 @@ function ConfettiCanvas({ active }: { active: boolean }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function PredictionScreen() {
-  const { betAmount, profile, setScreen, syncProfile } = useGameStore();
+  const { betAmount, setBetAmount, profile, setScreen, syncProfile } = useGameStore();
   const { isAuthenticated } = useAuthStore();
   const isMobile = useIsMobile();
 
@@ -99,6 +110,18 @@ export function PredictionScreen() {
   const [revealProgress, setRevealProgress] = useState(0);
   const [countdown, setCountdown] = useState(3);
   const [serverRoundId, setServerRoundId] = useState<string | null>(null);
+  const [customBet, setCustomBet] = useState('');
+
+  const handleCustomBet = () => {
+    const val = parseFloat(customBet);
+    if (isNaN(val) || val <= 0) return;
+    const lamports = solToLamports(val);
+    if (isAuthenticated && lamports > profile.balance) return;
+    setBetAmount(lamports);
+    setCustomBet('');
+  };
+
+  const isCustomBetActive = betAmount > 0 && !BET_OPTIONS.some(o => o.lamports === betAmount);
 
   // Generate round on mount
   useEffect(() => {
@@ -270,6 +293,70 @@ export function PredictionScreen() {
       {/* Controls / Result */}
       {phase === 'setup' && (
         <div style={s.setupPanel}>
+          {/* Position Size Selector */}
+          <div style={s.betSection}>
+            <div style={s.betSectionHeader}>
+              <span style={s.betSectionLabel}>POSITION SIZE</span>
+              <div style={s.betBadge}>
+                <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px' }} />
+                <span className="mono" style={{ fontWeight: 700, color: theme.accent.cyan, fontSize: '13px' }}>
+                  {formatSol(betAmount)}
+                </span>
+              </div>
+            </div>
+            <div style={s.betPills}>
+              {BET_OPTIONS.map((opt) => {
+                const active = betAmount === opt.lamports;
+                const disabled = isAuthenticated && opt.lamports > profile.balance;
+                return (
+                  <button
+                    key={opt.lamports}
+                    onClick={() => { setBetAmount(opt.lamports); setCustomBet(''); }}
+                    disabled={disabled}
+                    className="bet-pill"
+                    style={{
+                      ...s.betPill,
+                      ...(active ? s.betPillActive : {}),
+                      ...(disabled ? { opacity: 0.3, cursor: 'not-allowed' } : {}),
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div style={s.customBetRow}>
+              <span style={s.customBetLabel}>Custom</span>
+              <div style={s.customBetInputWrap}>
+                <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', flexShrink: 0 }} />
+                <input
+                  type="number"
+                  placeholder="0.00"
+                  value={customBet}
+                  onChange={(e) => setCustomBet(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleCustomBet(); }}
+                  style={{
+                    ...s.customBetInput,
+                    ...(isCustomBetActive ? { color: '#c084fc' } : {}),
+                  }}
+                  className="mono"
+                  step="0.01"
+                  min="0"
+                />
+                <button
+                  onClick={handleCustomBet}
+                  disabled={!customBet || parseFloat(customBet) <= 0}
+                  style={{
+                    ...s.customBetBtn,
+                    opacity: !customBet || parseFloat(customBet) <= 0 ? 0.35 : 1,
+                  }}
+                >
+                  Set
+                </button>
+              </div>
+            </div>
+          </div>
+
           <p style={s.instruction}>CALL IT</p>
           <div style={{ ...s.dirRow, ...(isMobile ? { gap: '8px' } : {}) }}>
             <button onClick={() => handlePrediction('long')} className="dir-btn dir-long" style={s.dirBtn}>
@@ -415,7 +502,8 @@ const s: Record<string, CSSProperties> = {
     color: theme.text.primary,
     fontFamily: "'Orbitron', sans-serif",
     margin: 0,
-    letterSpacing: '0.5px',
+    letterSpacing: '1px',
+    textTransform: 'uppercase' as const,
   },
   betBadge: {
     display: 'flex',
@@ -428,6 +516,96 @@ const s: Record<string, CSSProperties> = {
   },
   chartWrap: {
     flexShrink: 0,
+  },
+
+  // Bet selector
+  betSection: {
+    width: '100%',
+    maxWidth: '500px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  betSectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  betSectionLabel: {
+    fontSize: '12px',
+    fontWeight: 700,
+    color: theme.text.muted,
+    fontFamily: "'Rajdhani', sans-serif",
+    letterSpacing: '1px',
+  },
+  betPills: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '6px',
+  },
+  betPill: {
+    padding: '6px 12px',
+    fontSize: '13px',
+    fontWeight: 700,
+    fontFamily: "'JetBrains Mono', monospace",
+    color: theme.text.secondary,
+    background: 'rgba(153, 69, 255, 0.06)',
+    border: '1px solid rgba(153, 69, 255, 0.12)',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+  },
+  betPillActive: {
+    background: 'rgba(153, 69, 255, 0.2)',
+    borderColor: 'rgba(153, 69, 255, 0.5)',
+    color: '#c084fc',
+    boxShadow: '0 0 10px rgba(153, 69, 255, 0.2)',
+  },
+  customBetRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  customBetLabel: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: theme.text.muted,
+    flexShrink: 0,
+  },
+  customBetInputWrap: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    background: theme.bg.tertiary,
+    borderRadius: '6px',
+    padding: '0 8px',
+    border: `1px solid ${theme.border.subtle}`,
+  },
+  customBetInput: {
+    flex: 1,
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    fontFamily: '"JetBrains Mono", monospace',
+    fontSize: '14px',
+    fontWeight: 600,
+    color: theme.text.secondary,
+    padding: '7px 0',
+    width: '60px',
+    minWidth: 0,
+  },
+  customBetBtn: {
+    padding: '5px 10px',
+    background: 'rgba(153, 69, 255, 0.12)',
+    border: '1px solid rgba(153, 69, 255, 0.2)',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontFamily: 'Rajdhani, sans-serif',
+    fontSize: '13px',
+    fontWeight: 700,
+    color: '#c084fc',
+    transition: 'all 0.12s ease',
   },
 
   // Setup

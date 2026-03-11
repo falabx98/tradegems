@@ -5,6 +5,7 @@ import { formatMultiplier } from '../../engine/roundEngine';
 import { theme } from '../../styles/theme';
 import { GameNode } from '../../types/game';
 import { formatSol } from '../../utils/sol';
+import { playLevelUp, hapticHeavy } from '../../utils/sounds';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -177,6 +178,13 @@ export function ResultScreen() {
     const timer = setTimeout(() => setRevealed(true), 300);
     return () => clearTimeout(timer);
   }, []);
+
+  // Play victory sound on win
+  useEffect(() => {
+    if (result && result.finalMultiplier >= 1) {
+      setTimeout(() => { playLevelUp(); hapticHeavy(); }, 400);
+    }
+  }, [result]);
 
   if (!result) return null;
 

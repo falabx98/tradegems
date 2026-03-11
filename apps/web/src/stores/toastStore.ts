@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { playToastSound } from '../utils/sounds';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -25,6 +26,7 @@ export const useToastStore = create<ToastState>((set) => ({
     set((state) => ({
       toasts: [...state.toasts.slice(-4), { ...toast, id }], // max 5
     }));
+    try { playToastSound(toast.type); } catch { /* silent */ }
     // Auto-remove
     setTimeout(() => {
       set((state) => ({

@@ -6,6 +6,7 @@ import { theme } from '../../styles/theme';
 import { RiskTier } from '../../types/game';
 import { api } from '../../utils/api';
 import { formatSol, lamportsToSol, solToLamports } from '../../utils/sol';
+import { playBetPlaced, hapticMedium } from '../../utils/sounds';
 
 const BET_OPTIONS = [
   { label: '0.01', lamports: 10_000_000 },
@@ -439,6 +440,8 @@ export function LobbyScreen() {
                 enterBattle();
                 return;
               }
+              playBetPlaced();
+              hapticMedium();
               startRound();
             }}
             disabled={isAuthenticated && betAmount > profile.balance}

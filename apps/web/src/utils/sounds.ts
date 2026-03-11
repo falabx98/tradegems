@@ -410,6 +410,99 @@ export function playMultiplierMilestone(milestone: number) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//  UI SOUNDS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// ─── BUTTON CLICK ──────────────────────────────────────────────────────────
+// Soft click/pop
+
+export function playButtonClick() {
+  playTone({ freq: 600, type: 'sine', duration: 0.04, gain: 0.08, attack: 0.002 });
+  playNoise(0.02, 0.03, 3000, 'highpass');
+}
+
+// ─── BET PLACED ────────────────────────────────────────────────────────────
+// Coin drop
+
+export function playBetPlaced() {
+  playTone({ freq: 1200, type: 'triangle', duration: 0.08, gain: 0.12, attack: 0.002 });
+  setTimeout(() => {
+    playTone({ freq: 900, type: 'triangle', duration: 0.06, gain: 0.08, attack: 0.002 });
+  }, 40);
+  playNoise(0.05, 0.04, 5000, 'highpass');
+}
+
+// ─── TOAST NOTIFICATION ────────────────────────────────────────────────────
+// Quick soft ping
+
+export function playToastSound(type: 'success' | 'error' | 'info' | 'warning') {
+  switch (type) {
+    case 'success':
+      playTone({ freq: 880, type: 'sine', duration: 0.1, gain: 0.1, attack: 0.005 });
+      setTimeout(() => playTone({ freq: 1100, type: 'sine', duration: 0.08, gain: 0.07, attack: 0.005 }), 60);
+      break;
+    case 'error':
+      playTone({ freq: 300, type: 'square', duration: 0.08, gain: 0.1, attack: 0.002 });
+      setTimeout(() => playTone({ freq: 200, type: 'square', duration: 0.1, gain: 0.08, attack: 0.002 }), 70);
+      break;
+    case 'warning':
+      playTone({ freq: 600, type: 'triangle', duration: 0.1, gain: 0.08, attack: 0.003 });
+      break;
+    case 'info':
+      playTone({ freq: 700, type: 'sine', duration: 0.08, gain: 0.06, attack: 0.005 });
+      break;
+  }
+}
+
+// ─── LEVEL UP ──────────────────────────────────────────────────────────────
+// Celebratory fanfare
+
+export function playLevelUp() {
+  const notes = [523, 659, 784, 1047, 1319]; // C5 E5 G5 C6 E6
+  notes.forEach((freq, i) => {
+    setTimeout(() => {
+      playTone({ freq, type: 'sine', duration: 0.2 + i * 0.05, gain: 0.22 - i * 0.03, attack: 0.005 });
+    }, i * 80);
+  });
+  setTimeout(() => playNoise(0.15, 0.06, 8000, 'highpass'), 200);
+}
+
+// ─── MYSTERY BOX OPEN ──────────────────────────────────────────────────────
+
+export function playBoxOpen() {
+  // Build-up rumble
+  playNoise(0.3, 0.08, 400, 'lowpass');
+
+  // Pop
+  setTimeout(() => {
+    playTone({ freq: 800, type: 'sine', duration: 0.15, gain: 0.25, attack: 0.002 });
+    playTone({ freq: 1200, type: 'sine', duration: 0.12, gain: 0.15, attack: 0.003 });
+    playNoise(0.1, 0.08, 6000, 'highpass');
+  }, 250);
+}
+
+// ─── HAPTIC FEEDBACK ───────────────────────────────────────────────────────
+// Vibration API for mobile
+
+export function hapticLight() {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    navigator.vibrate(10);
+  }
+}
+
+export function hapticMedium() {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    navigator.vibrate(30);
+  }
+}
+
+export function hapticHeavy() {
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+    navigator.vibrate([20, 30, 40]);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //  MAIN DISPATCHER — call from node callbacks
 // ═══════════════════════════════════════════════════════════════════════════════
 

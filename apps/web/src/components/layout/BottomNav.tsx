@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { theme } from '../../styles/theme';
 import { NavIcon } from './NavIcons';
+import { playButtonClick, hapticLight } from '../../utils/sounds';
 
 const TABS = [
   { id: 'lobby', label: 'Lobby', icon: 'grid' },
@@ -28,6 +29,8 @@ export function BottomNav() {
   const isMoreActive = MORE_ITEMS.some((m) => m.id === activeId);
 
   const handleTab = (id: string) => {
+    playButtonClick();
+    hapticLight();
     if (id === 'more') {
       setShowMore((v) => !v);
       return;
@@ -41,6 +44,8 @@ export function BottomNav() {
   };
 
   const handleMoreItem = (id: string) => {
+    playButtonClick();
+    hapticLight();
     setShowMore(false);
     if (id === 'battle') {
       setScreen('battle' as any);

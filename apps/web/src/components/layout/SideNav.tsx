@@ -1,6 +1,7 @@
 import { useGameStore } from '../../stores/gameStore';
 import { theme } from '../../styles/theme';
 import { NavIcon } from './NavIcons';
+import { playButtonClick, hapticLight } from '../../utils/sounds';
 
 const NAV_ITEMS = [
   { id: 'lobby', label: 'Lobby', icon: 'grid' },
@@ -24,6 +25,8 @@ export function SideNav() {
   const activeId = screen === 'lobby' || screen === 'setup' ? 'lobby' : screen;
 
   const handleNav = (id: string) => {
+    playButtonClick();
+    hapticLight();
     if (id === 'lobby' || id === 'solo') {
       setScreen('lobby');
     } else if (id === 'battle') {

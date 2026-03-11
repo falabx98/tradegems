@@ -243,8 +243,9 @@ export function LeaderboardScreen() {
             </>
           ) : entries.length === 0 ? (
             <div style={styles.empty}>
-              <TrophyIcon size={32} color="#fbbf24" style={{ marginBottom: '8px' }} />
-              <span>No rankings yet. Play some rounds!</span>
+              <TrophyIcon size={44} color="#fbbf24" />
+              <span style={styles.emptyTitle}>No Rankings Yet</span>
+              <span style={styles.emptyDesc}>Play rounds to climb the leaderboard and earn your spot!</span>
             </div>
           ) : (
             (hasTop3 ? rest : entries).map((entry) => {
@@ -498,13 +499,26 @@ const styles: Record<string, React.CSSProperties> = {
     verticalAlign: 'middle',
   },
   empty: {
-    padding: '48px 24px',
+    padding: '60px 24px',
     textAlign: 'center',
-    fontSize: '14px',
-    color: theme.text.muted,
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '8px',
+    gap: '10px',
+  },
+  emptyTitle: {
+    fontSize: '18px',
+    fontWeight: 700,
+    color: theme.text.secondary,
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    marginTop: '4px',
+  },
+  emptyDesc: {
+    fontSize: '14px',
+    color: theme.text.muted,
+    maxWidth: '260px',
+    lineHeight: 1.4,
   },
 };

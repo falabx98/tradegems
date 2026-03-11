@@ -5,7 +5,7 @@ import { api } from '../../utils/api';
 import { formatSol, solToLamports } from '../../utils/sol';
 import { isPhantomInstalled, connectPhantom, sendSolToTreasury, getConnectedAddress } from '../../utils/phantom';
 import { theme } from '../../styles/theme';
-import { CheckIcon, LockIcon, PartyIcon } from '../ui/GameIcons';
+import { CheckIcon, LockIcon, PartyIcon, WalletIcon } from '../ui/GameIcons';
 
 interface Transaction {
   id: string;
@@ -520,7 +520,11 @@ export function WalletScreen() {
               ))}
             </div>
           ) : transactions.length === 0 ? (
-            <div style={s.emptyState}>No transactions yet</div>
+            <div style={s.emptyState}>
+              <WalletIcon size={36} color="#555570" />
+              <span style={s.emptyTitle}>No Transactions Yet</span>
+              <span style={s.emptyDesc}>Deposit SOL to get started playing</span>
+            </div>
           ) : (
             transactions.map((tx) => (
               <div key={tx.id} style={s.txRow} className="table-row-hover">
@@ -1033,10 +1037,26 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 700,
   },
   emptyState: {
-    padding: '32px',
+    padding: '48px 24px',
     textAlign: 'center' as const,
-    fontSize: '15px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '8px',
+  },
+  emptyTitle: {
+    fontSize: '16px',
+    fontWeight: 700,
+    color: '#8888a0',
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+    marginTop: '4px',
+  },
+  emptyDesc: {
+    fontSize: '14px',
     color: '#555570',
+    lineHeight: 1.4,
   },
 
   // ── Bonus Banner ──

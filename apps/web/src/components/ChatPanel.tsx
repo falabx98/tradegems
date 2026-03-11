@@ -34,20 +34,20 @@ function SendIcon({ size = 18, color = '#fff' }: { size?: number; color?: string
   );
 }
 
-// Quick emoji list
-const QUICK_EMOJIS = ['🔥', '💎', '🚀', '💰', '😂', '👀', '💪', '🎯', '⚡', '🏆', '😎', '🤑'];
+// Quick text reactions (casino/gaming style — no emojis)
+const QUICK_REACTIONS = ['GG', 'LFG', 'REKT', 'PUMP', 'DUMP', 'GL', 'WEN', 'GM', 'HODL', 'NGMI', 'WAGMI', 'F'];
 
-function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void; onClose: () => void }) {
+function ReactionPicker({ onSelect, onClose }: { onSelect: (text: string) => void; onClose: () => void }) {
   return (
     <div style={emojiStyles.backdrop} onClick={onClose}>
       <div style={emojiStyles.picker} onClick={(e) => e.stopPropagation()}>
-        {QUICK_EMOJIS.map((emoji) => (
+        {QUICK_REACTIONS.map((text) => (
           <button
-            key={emoji}
+            key={text}
             style={emojiStyles.emojiBtn}
-            onClick={() => { onSelect(emoji); onClose(); }}
+            onClick={() => { onSelect(text); onClose(); }}
           >
-            {emoji}
+            {text}
           </button>
         ))}
       </div>
@@ -80,13 +80,17 @@ const emojiStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '22px',
-    padding: '8px',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: '8px',
+    fontSize: '12px',
+    fontWeight: 700,
+    fontFamily: "'Orbitron', sans-serif",
+    letterSpacing: '0.5px',
+    padding: '7px 4px',
+    background: 'rgba(153, 69, 255, 0.08)',
+    border: '1px solid rgba(153, 69, 255, 0.15)',
+    borderRadius: '6px',
+    color: '#c084fc',
     cursor: 'pointer',
-    transition: 'background 0.1s',
+    transition: 'background 0.1s, transform 0.1s',
   },
 };
 
@@ -348,10 +352,10 @@ export function ChatPanel() {
           <div style={styles.errorToast}>{error}</div>
         )}
 
-        {/* Emoji Picker */}
+        {/* Reaction Picker */}
         {showEmojis && (
-          <EmojiPicker
-            onSelect={(emoji) => setNewMessage((prev) => prev + emoji)}
+          <ReactionPicker
+            onSelect={(text) => setNewMessage((prev) => prev ? prev + ' ' + text : text)}
             onClose={() => setShowEmojis(false)}
           />
         )}
@@ -362,8 +366,11 @@ export function ChatPanel() {
             <button
               style={styles.emojiToggle}
               onClick={() => setShowEmojis((v) => !v)}
+              title="Quick reactions"
             >
-              😊
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={showEmojis ? '#c084fc' : '#8888a0'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
+              </svg>
             </button>
             <input
               ref={inputRef}

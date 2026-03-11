@@ -34,6 +34,72 @@ function SendIcon({ size = 18, color = '#fff' }: { size?: number; color?: string
   );
 }
 
+// Quick emoji list
+const QUICK_EMOJIS = ['🔥', '💎', '🚀', '💰', '😂', '👀', '💪', '🎯', '⚡', '🏆', '😎', '🤑'];
+
+function EmojiPicker({ onSelect, onClose }: { onSelect: (emoji: string) => void; onClose: () => void }) {
+  return (
+    <div style={emojiStyles.backdrop} onClick={onClose}>
+      <div style={emojiStyles.picker} onClick={(e) => e.stopPropagation()}>
+        {QUICK_EMOJIS.map((emoji) => (
+          <button
+            key={emoji}
+            style={emojiStyles.emojiBtn}
+            onClick={() => { onSelect(emoji); onClose(); }}
+          >
+            {emoji}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const emojiStyles: Record<string, React.CSSProperties> = {
+  backdrop: {
+    position: 'absolute',
+    inset: 0,
+    zIndex: 5,
+  },
+  picker: {
+    position: 'absolute',
+    bottom: '60px',
+    left: '14px',
+    right: '14px',
+    display: 'grid',
+    gridTemplateColumns: 'repeat(6, 1fr)',
+    gap: '4px',
+    padding: '10px',
+    background: theme.bg.elevated,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: '12px',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.6)',
+    zIndex: 6,
+  },
+  emojiBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '22px',
+    padding: '8px',
+    background: 'transparent',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'background 0.1s',
+  },
+};
+
+function formatTimestamp(dateStr: string): string {
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  if (diff < 60_000) return 'now';
+  if (diff < 3600_000) return `${Math.floor(diff / 60_000)}m`;
+  if (diff < 86400_000) return `${Math.floor(diff / 3600_000)}h`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export function ChatPanel() {
   const chatOpen = useGameStore((s) => s.chatOpen);
   const toggleChat = useGameStore((s) => s.toggleChat);
@@ -47,6 +113,7 @@ export function ChatPanel() {
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showEmojis, setShowEmojis] = useState(false);
   const lastTimestampRef = useRef<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -266,6 +333,7 @@ export function ChatPanel() {
                       {msg.username}
                     </span>
                     <span style={styles.levelBadge}>{level}</span>
+                    <span style={styles.timestamp}>{formatTimestamp(msg.createdAt)}</span>
                   </div>
                   <div style={styles.messageText}>{msg.message}</div>
                 </div>
@@ -280,9 +348,23 @@ export function ChatPanel() {
           <div style={styles.errorToast}>{error}</div>
         )}
 
+        {/* Emoji Picker */}
+        {showEmojis && (
+          <EmojiPicker
+            onSelect={(emoji) => setNewMessage((prev) => prev + emoji)}
+            onClose={() => setShowEmojis(false)}
+          />
+        )}
+
         {/* Input */}
         {isAuthenticated ? (
           <div style={styles.inputBar}>
+            <button
+              style={styles.emojiToggle}
+              onClick={() => setShowEmojis((v) => !v)}
+            >
+              😊
+            </button>
             <input
               ref={inputRef}
               type="text"
@@ -473,6 +555,12 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '1px 5px',
     lineHeight: '14px',
   },
+  timestamp: {
+    fontSize: '11px',
+    fontWeight: 500,
+    color: theme.text.muted,
+    marginLeft: 'auto',
+  },
   messageText: {
     fontFamily: 'Rajdhani, sans-serif',
     fontSize: '15px',
@@ -511,6 +599,20 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: 500,
     outline: 'none',
+  },
+  emojiToggle: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '50%',
+    background: 'transparent',
+    border: `1px solid ${theme.border.subtle}`,
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '20px',
+    flexShrink: 0,
+    transition: 'background 0.15s',
   },
   sendBtn: {
     width: '40px',

@@ -56,7 +56,19 @@ export function HistoryScreen() {
 
         <div style={styles.tableBody}>
           {loading ? (
-            <div style={styles.empty}>Loading history...</div>
+            <div style={{ padding: '8px 12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              {[...Array(6)].map((_, i) => (
+                <div key={i} style={{
+                  display: 'flex', gap: '12px', padding: '10px 0',
+                  borderBottom: '1px solid rgba(153, 69, 255, 0.06)',
+                }}>
+                  <div style={{ width: '60px', height: '14px', borderRadius: '4px', background: 'rgba(153, 69, 255, 0.08)', animation: 'pulse 1.5s infinite' }} />
+                  <div style={{ width: '50px', height: '14px', borderRadius: '4px', background: 'rgba(153, 69, 255, 0.06)', animation: 'pulse 1.5s infinite', animationDelay: '0.2s' }} />
+                  <div style={{ flex: 1 }} />
+                  <div style={{ width: '70px', height: '14px', borderRadius: '4px', background: 'rgba(153, 69, 255, 0.06)', animation: 'pulse 1.5s infinite', animationDelay: '0.4s' }} />
+                </div>
+              ))}
+            </div>
           ) : entries.length === 0 ? (
             <div style={styles.empty}>No rounds played yet. Enter the arena!</div>
           ) : (

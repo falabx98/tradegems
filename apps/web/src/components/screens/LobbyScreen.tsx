@@ -663,10 +663,7 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
           key={`${banner.id}-${activeIndex}`}
           onClick={() => onBannerClick(banner)}
           className="banner-card"
-          style={{
-            ...styles.bannerCard,
-            height: isMobile ? '120px' : '140px',
-          }}
+          style={styles.bannerCard}
         >
           <img
             src={banner.image}
@@ -674,9 +671,8 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
             draggable={false}
             style={{
               width: '100%',
-              height: '100%',
-              objectFit: 'cover',
               display: 'block',
+              borderRadius: '12px',
             }}
           />
         </div>

@@ -7,6 +7,7 @@ import { formatSol } from '../../utils/sol';
 import { api } from '../../utils/api';
 import {
   generatePredictionRound,
+  regenerateWithOutcome,
   calculatePredictionResult,
   type PredictionDirection,
   type PredictionPhase,
@@ -143,11 +144,27 @@ export function PredictionScreen() {
     return () => cancelAnimationFrame(raf);
   }, [phase, roundConfig]);
 
+  const WIN_PROBABILITY = 0.45;
+
   function handlePrediction(dir: PredictionDirection) {
     if (!roundConfig) return;
     setPrediction(dir);
     playBetPlaced();
     hapticMedium();
+
+    // Apply 45% win rate: decide if player should win, then adjust reveal candles
+    const shouldWin = Math.random() < WIN_PROBABILITY;
+    if (shouldWin && roundConfig.outcome !== dir) {
+      // Player should win but current outcome doesn't match — regenerate to match
+      setRoundConfig(regenerateWithOutcome(roundConfig, dir));
+    } else if (!shouldWin && roundConfig.outcome === dir) {
+      // Player should lose but current outcome matches — regenerate to a different outcome
+      const alternatives: PredictionDirection[] = (['long', 'short', 'range'] as const).filter(d => d !== dir);
+      const altTarget = alternatives[Math.floor(Math.random() * alternatives.length)];
+      setRoundConfig(regenerateWithOutcome(roundConfig, altTarget));
+    }
+    // Otherwise the current outcome already aligns with the desired result
+
     setPhase('countdown');
 
     // Place bet on server in background

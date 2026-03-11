@@ -85,6 +85,13 @@ export function NavIcon({ name, size = 18, color = 'currentColor' }: NavIconProp
           <circle cx="12" cy="12" r="3" />
         </svg>
       );
+    case 'chart':
+      return (
+        <svg {...props}>
+          <path d="M3 3v18h18" />
+          <path d="M7 16l4-8 4 4 5-6" />
+        </svg>
+      );
     case 'more':
       return (
         <svg {...props}>

@@ -12,6 +12,7 @@ import { LeaderboardScreen } from './components/screens/LeaderboardScreen';
 import { RewardsScreen } from './components/screens/RewardsScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { BattleScreen } from './components/screens/BattleScreen';
+import { StatsScreen } from './components/screens/StatsScreen';
 import { OnboardingModal, useOnboarding } from './components/OnboardingModal';
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggle } from './components/layout/ChatToggle';
@@ -73,6 +74,7 @@ export default function App() {
       {screen === 'leaderboard' && <LeaderboardScreen />}
       {screen === 'rewards' && <RewardsScreen />}
       {screen === 'settings' && <SettingsScreen />}
+      {screen === 'stats' && <StatsScreen />}
       {screen === 'battle' && <BattleScreen />}
       {screen === 'auth' && (
         <AuthScreen onSuccess={() => {

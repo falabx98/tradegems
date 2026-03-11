@@ -12,6 +12,7 @@ const NAV_ITEMS = [
 ] as const;
 
 const BOTTOM_ITEMS = [
+  { id: 'stats', label: 'Stats', icon: 'chart' },
   { id: 'history', label: 'History', icon: 'clock' },
   { id: 'settings', label: 'Settings', icon: 'gear' },
 ] as const;
@@ -27,7 +28,7 @@ export function SideNav() {
       setScreen('lobby');
     } else if (id === 'battle') {
       setScreen('battle' as any);
-    } else if (id === 'leaderboard' || id === 'rewards' || id === 'wallet' || id === 'history' || id === 'settings') {
+    } else if (id === 'leaderboard' || id === 'rewards' || id === 'wallet' || id === 'history' || id === 'settings' || id === 'stats') {
       setScreen(id as any);
     }
   };

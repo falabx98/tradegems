@@ -25,6 +25,21 @@ interface TokenPayload {
   sid: string;
 }
 
+// 20 default avatar images in /public/avatars/
+const AVATAR_POOL = Array.from({ length: 20 }, (_, i) => {
+  const names = [
+    'emerald', 'ruby', 'sapphire', 'diamond', 'amethyst',
+    'topaz', 'opal', 'turquoise', 'citrine', 'garnet',
+    'jade', 'obsidian', 'lapis', 'rose_quartz', 'peridot',
+    'tanzanite', 'amber', 'malachite', 'tiger_eye', 'alexandrite',
+  ];
+  return `/avatars/pepe_${String(i + 1).padStart(2, '0')}_${names[i]}.png`;
+});
+
+function randomAvatar(): string {
+  return AVATAR_POOL[Math.floor(Math.random() * AVATAR_POOL.length)];
+}
+
 export class AuthService {
   private db = getDb();
 
@@ -52,8 +67,8 @@ export class AuthService {
       passwordHash,
     }).returning();
 
-    // Create profile
-    await this.db.insert(userProfiles).values({ userId: user.id });
+    // Create profile with random avatar
+    await this.db.insert(userProfiles).values({ userId: user.id, avatarUrl: randomAvatar() });
 
     // Create initial SOL balance
     await this.db.insert(balances).values({
@@ -204,7 +219,7 @@ export class AuthService {
       username,
     }).returning();
 
-    await this.db.insert(userProfiles).values({ userId: user.id });
+    await this.db.insert(userProfiles).values({ userId: user.id, avatarUrl: randomAvatar() });
     await this.db.insert(balances).values({
       userId: user.id,
       asset: 'SOL',

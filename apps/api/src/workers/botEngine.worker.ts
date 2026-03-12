@@ -9,6 +9,7 @@ interface BotUser {
   username: string;
   level: number;
   vipTier: string;
+  avatarUrl: string | null;
 }
 
 // ─── State ──────────────────────────────────────────────────
@@ -329,7 +330,7 @@ async function simulateChatMessage(bot: BotUser): Promise<void> {
       username: bot.username,
       message,
       channel: 'global',
-      avatar: null,
+      avatar: bot.avatarUrl,
       level: bot.level,
     });
   } catch (err) {
@@ -439,11 +440,19 @@ async function loadBotUsers(): Promise<void> {
         username: users.username,
         level: users.level,
         vipTier: users.vipTier,
+        avatarUrl: userProfiles.avatarUrl,
       })
       .from(users)
+      .leftJoin(userProfiles, eq(users.id, userProfiles.userId))
       .where(eq(users.role, 'bot'));
 
-    botUsers = rows;
+    botUsers = rows.map(r => ({
+      id: r.id,
+      username: r.username,
+      level: r.level,
+      vipTier: r.vipTier,
+      avatarUrl: r.avatarUrl,
+    }));
     console.log(`[BotEngine] Loaded ${botUsers.length} bot users from database`);
   } catch (err) {
     console.error('[BotEngine] Failed to load bot users:', err);

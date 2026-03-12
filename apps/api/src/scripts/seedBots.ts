@@ -57,6 +57,17 @@ function getVipTier(level: number): string {
   return 'bronze';
 }
 
+// 20 default avatar images
+const AVATAR_POOL = Array.from({ length: 20 }, (_, i) => {
+  const names = [
+    'emerald', 'ruby', 'sapphire', 'diamond', 'amethyst',
+    'topaz', 'opal', 'turquoise', 'citrine', 'garnet',
+    'jade', 'obsidian', 'lapis', 'rose_quartz', 'peridot',
+    'tanzanite', 'amber', 'malachite', 'tiger_eye', 'alexandrite',
+  ];
+  return `/avatars/pepe_${String(i + 1).padStart(2, '0')}_${names[i]}.png`;
+});
+
 function randomBetween(min: number, max: number): number {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -130,6 +141,7 @@ async function main() {
     await db.insert(userProfiles).values({
       userId: newUser.id,
       displayName: username,
+      avatarUrl: AVATAR_POOL[Math.floor(Math.random() * AVATAR_POOL.length)],
       roundsPlayed,
       totalWagered,
       totalWon,

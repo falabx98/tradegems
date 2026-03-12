@@ -581,3 +581,37 @@ export const predictionRounds = pgTable('prediction_rounds', {
 }, (table) => [
   index('idx_prediction_user').on(table.userId, table.createdAt),
 ]);
+
+// ============================================================
+// BONUS CODES
+// ============================================================
+
+export const bonusCodes = pgTable('bonus_codes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  code: text('code').unique().notNull(),
+  description: text('description'),
+  type: text('type').notNull().default('fixed'),
+  amountLamports: bigint('amount_lamports', { mode: 'number' }).notNull(),
+  maxUses: integer('max_uses').notNull().default(1),
+  usedCount: integer('used_count').notNull().default(0),
+  maxPerUser: integer('max_per_user').notNull().default(1),
+  minLevel: integer('min_level').notNull().default(1),
+  active: boolean('active').notNull().default(true),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  createdBy: uuid('created_by').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_bonus_codes_code').on(table.code),
+  index('idx_bonus_codes_active').on(table.active),
+]);
+
+export const bonusCodeRedemptions = pgTable('bonus_code_redemptions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  bonusCodeId: uuid('bonus_code_id').notNull().references(() => bonusCodes.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  amountLamports: bigint('amount_lamports', { mode: 'number' }).notNull(),
+  redeemedAt: timestamp('redeemed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_redemptions_user').on(table.userId),
+  index('idx_redemptions_code').on(table.bonusCodeId),
+]);

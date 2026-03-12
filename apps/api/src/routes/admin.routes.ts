@@ -1,11 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { and, desc, eq, gte, sql, ilike, or, count, sum, avg } from 'drizzle-orm';
+import { and, desc, eq, gte, lte, sql, ilike, or, count, sum, avg } from 'drizzle-orm';
 import {
   rounds, bets, betResults, users, userProfiles, featureFlags,
   engineConfigs, adminAuditLogs, balances, balanceLedgerEntries,
   deposits, withdrawals, roundPools, roundNodes, riskFlags,
   userDepositWallets, referralCodes, referrals, referralEarnings,
-  chatMessages,
+  chatMessages, bonusCodes, bonusCodeRedemptions,
 } from '@tradingarena/db';
 import { getDb } from '../config/database.js';
 import { requireAdmin, getAuthUser } from '../middleware/auth.js';
@@ -767,5 +767,129 @@ export async function adminRoutes(server: FastifyInstance) {
     });
 
     return { success: true };
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  BONUS CODES
+  // ═══════════════════════════════════════════════════════════
+
+  server.get('/bonus-codes', async (request) => {
+    const { active } = request.query as { active?: string };
+
+    const conditions = active !== undefined ? eq(bonusCodes.active, active === 'true') : undefined;
+
+    const data = await db
+      .select()
+      .from(bonusCodes)
+      .where(conditions)
+      .orderBy(desc(bonusCodes.createdAt))
+      .limit(100);
+
+    return { data };
+  });
+
+  server.post('/bonus-codes', async (request) => {
+    const { code, description, type, amountLamports, maxUses, maxPerUser, minLevel, expiresAt } = request.body as {
+      code: string;
+      description?: string;
+      type?: string;
+      amountLamports: number;
+      maxUses?: number;
+      maxPerUser?: number;
+      minLevel?: number;
+      expiresAt?: string;
+    };
+    const actor = getAuthUser(request);
+
+    const [created] = await db.insert(bonusCodes).values({
+      code: code.toUpperCase().trim(),
+      description,
+      type: type ?? 'fixed',
+      amountLamports,
+      maxUses: maxUses ?? 1,
+      maxPerUser: maxPerUser ?? 1,
+      minLevel: minLevel ?? 1,
+      expiresAt: expiresAt ? new Date(expiresAt) : undefined,
+      createdBy: actor.userId,
+    }).returning();
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'bonus_code_create',
+      targetType: 'bonus_code',
+      targetId: created.id,
+      payload: { code: code.toUpperCase().trim(), amountLamports },
+      ipAddress: request.ip,
+    });
+
+    return created;
+  });
+
+  server.patch('/bonus-codes/:id', async (request) => {
+    const { id } = request.params as { id: string };
+    const { active, maxUses, expiresAt, description } = request.body as {
+      active?: boolean;
+      maxUses?: number;
+      expiresAt?: string;
+      description?: string;
+    };
+    const actor = getAuthUser(request);
+
+    const update: Record<string, unknown> = {};
+    if (active !== undefined) update.active = active;
+    if (maxUses !== undefined) update.maxUses = maxUses;
+    if (expiresAt !== undefined) update.expiresAt = new Date(expiresAt);
+    if (description !== undefined) update.description = description;
+
+    await db.update(bonusCodes).set(update).where(eq(bonusCodes.id, id));
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'bonus_code_update',
+      targetType: 'bonus_code',
+      targetId: id,
+      payload: { active, maxUses, expiresAt, description },
+      ipAddress: request.ip,
+    });
+
+    return { success: true };
+  });
+
+  server.delete('/bonus-codes/:id', async (request) => {
+    const { id } = request.params as { id: string };
+    const actor = getAuthUser(request);
+
+    await db.update(bonusCodes).set({ active: false }).where(eq(bonusCodes.id, id));
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'bonus_code_deactivate',
+      targetType: 'bonus_code',
+      targetId: id,
+      payload: {},
+      ipAddress: request.ip,
+    });
+
+    return { success: true };
+  });
+
+  server.get('/bonus-codes/:id/redemptions', async (request) => {
+    const { id } = request.params as { id: string };
+
+    const data = await db
+      .select({
+        id: bonusCodeRedemptions.id,
+        userId: bonusCodeRedemptions.userId,
+        amountLamports: bonusCodeRedemptions.amountLamports,
+        redeemedAt: bonusCodeRedemptions.redeemedAt,
+        username: users.username,
+      })
+      .from(bonusCodeRedemptions)
+      .leftJoin(users, eq(bonusCodeRedemptions.userId, users.id))
+      .where(eq(bonusCodeRedemptions.bonusCodeId, id))
+      .orderBy(desc(bonusCodeRedemptions.redeemedAt))
+      .limit(100);
+
+    return { data };
   });
 }

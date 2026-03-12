@@ -255,6 +255,12 @@ export const api = {
       withdrawalUnlocked: boolean;
     }>('/v1/wallet/bonus-status'),
 
+  redeemBonusCode: (code: string) =>
+    apiFetch<{ success: boolean; message: string; amount: number }>('/v1/wallet/redeem-code', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    }),
+
   // Rewards
   getMissions: () =>
     apiFetch<{ data: Array<{ id: string; title: string; description: string; progress: number; target: number; reward: number; completed: boolean }> }>('/v1/rewards/missions'),

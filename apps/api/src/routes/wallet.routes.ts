@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
-import { linkedWallets } from '@tradingarena/db';
+import { eq, and, desc, count } from 'drizzle-orm';
+import { linkedWallets, bonusCodes, bonusCodeRedemptions, balances, balanceLedgerEntries, users } from '@tradingarena/db';
 import { WalletService } from '../modules/wallet/wallet.service.js';
 import { DepositService } from '../modules/solana/deposit.service.js';
 import { DepositWalletService } from '../modules/solana/depositWallet.service.js';
@@ -149,6 +149,109 @@ export async function walletRoutes(server: FastifyInstance) {
     });
 
     return { message: 'Wallet linked successfully', address };
+  });
+
+  // ─── Bonus: Redeem bonus code ──────────────────────────
+
+  server.post('/redeem-code', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const { code } = request.body as { code: string };
+    const userId = getAuthUser(request).userId;
+    const db = getDb();
+
+    // 1. Find the bonus code
+    const bonusCode = await db.query.bonusCodes.findFirst({
+      where: eq(bonusCodes.code, code.toUpperCase().trim()),
+    });
+
+    if (!bonusCode || !bonusCode.active) {
+      return reply.status(400).send({
+        error: { code: 'INVALID_CODE', message: 'Invalid or inactive bonus code' },
+      });
+    }
+
+    // 2. Check expiration
+    if (bonusCode.expiresAt && bonusCode.expiresAt < new Date()) {
+      return reply.status(400).send({
+        error: { code: 'CODE_EXPIRED', message: 'This bonus code has expired' },
+      });
+    }
+
+    // 3. Check max uses
+    if (bonusCode.usedCount >= bonusCode.maxUses) {
+      return reply.status(400).send({
+        error: { code: 'CODE_EXHAUSTED', message: 'This bonus code has reached its maximum number of uses' },
+      });
+    }
+
+    // 4. Check per-user limit
+    const [userRedemptions] = await db
+      .select({ total: count() })
+      .from(bonusCodeRedemptions)
+      .where(and(eq(bonusCodeRedemptions.bonusCodeId, bonusCode.id), eq(bonusCodeRedemptions.userId, userId)));
+
+    if ((userRedemptions?.total ?? 0) >= bonusCode.maxPerUser) {
+      return reply.status(400).send({
+        error: { code: 'ALREADY_REDEEMED', message: 'You have already redeemed this bonus code' },
+      });
+    }
+
+    // 5. Check user level
+    const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+    const userLevel = (user as unknown as { level?: number })?.level ?? 1;
+    if (userLevel < bonusCode.minLevel) {
+      return reply.status(400).send({
+        error: { code: 'LEVEL_TOO_LOW', message: `You must be at least level ${bonusCode.minLevel} to redeem this code` },
+      });
+    }
+
+    // 6. Credit balance
+    const [existing] = await db.select().from(balances).where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL')));
+
+    if (existing) {
+      await db.update(balances).set({
+        availableAmount: existing.availableAmount + bonusCode.amountLamports,
+        updatedAt: new Date(),
+      }).where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL')));
+    } else {
+      await db.insert(balances).values({
+        userId,
+        asset: 'SOL',
+        availableAmount: bonusCode.amountLamports,
+        updatedAt: new Date(),
+      });
+    }
+
+    // 7. Create ledger entry
+    const newBalance = (existing?.availableAmount ?? 0) + bonusCode.amountLamports;
+    await db.insert(balanceLedgerEntries).values({
+      userId,
+      asset: 'SOL',
+      entryType: 'bonus_code_redemption',
+      amount: bonusCode.amountLamports,
+      balanceAfter: newBalance,
+      referenceType: 'bonus_code',
+      referenceId: bonusCode.id,
+      metadata: { code: bonusCode.code },
+    });
+
+    // 8. Insert redemption record
+    await db.insert(bonusCodeRedemptions).values({
+      bonusCodeId: bonusCode.id,
+      userId,
+      amountLamports: bonusCode.amountLamports,
+    });
+
+    // 9. Increment used count
+    await db.update(bonusCodes).set({
+      usedCount: bonusCode.usedCount + 1,
+    }).where(eq(bonusCodes.id, bonusCode.id));
+
+    // 10. Return success
+    return {
+      success: true,
+      message: `Redeemed ${bonusCode.code} for bonus SOL`,
+      amount: bonusCode.amountLamports,
+    };
   });
 
 }

@@ -60,7 +60,7 @@ export function AdminScreen() {
   const [userTotal, setUserTotal] = useState(0);
   const [treasury, setTreasury] = useState<TreasuryOverview | null>(null);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
-  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'deposits' | 'withdrawals' | 'games' | 'bonuses' | 'logs'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'treasury' | 'deposits' | 'withdrawals' | 'games' | 'bonuses' | 'logs'>('overview');
   const [statusLoading, setStatusLoading] = useState<string | null>(null);
   // Deposits
   const [depositsList, setDepositsList] = useState<any[]>([]);
@@ -266,6 +266,7 @@ export function AdminScreen() {
   const TABS: Array<{ key: typeof activeTab; label: string }> = [
     { key: 'overview', label: 'Overview' },
     { key: 'users', label: 'Users' },
+    { key: 'treasury', label: 'Treasury' },
     { key: 'deposits', label: 'Deposits' },
     { key: 'withdrawals', label: 'Withdrawals' },
     { key: 'games', label: 'Games' },

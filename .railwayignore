@@ -1,0 +1,24 @@
+# Railway only needs the API — exclude everything else
+node_modules/
+dist/
+.git/
+.turbo/
+.env
+.env.local
+.env.production
+
+# Web app (deployed on Vercel, not Railway)
+apps/web/
+
+# Large files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+
+# OS/Editor
+.DS_Store
+.vscode/
+.idea/

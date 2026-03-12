@@ -7,7 +7,7 @@
  */
 export function isPhotoAvatar(avatarUrl: string | null | undefined): boolean {
   if (!avatarUrl) return false;
-  return avatarUrl.startsWith('data:image/') || avatarUrl.startsWith('http');
+  return avatarUrl.startsWith('data:image/') || avatarUrl.startsWith('http') || avatarUrl.startsWith('/');
 }
 
 /**

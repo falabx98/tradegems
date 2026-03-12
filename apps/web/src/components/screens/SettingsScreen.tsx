@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
+import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { isMuted, setMuted, getVolume, setVolume } from '../../utils/sounds';
@@ -12,6 +13,7 @@ import { UploadIcon } from '../ui/GameIcons';
 export function SettingsScreen() {
   const profile = useGameStore((s) => s.profile);
   const go = useAppNavigate();
+  const isMobile = useIsMobile();
   const { logout } = useAuthStore();
   const syncProfile = useGameStore((s) => s.syncProfile);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -89,7 +91,10 @@ export function SettingsScreen() {
         <div style={styles.cardHeader}>
           <span style={styles.cardTitle}>Profile</span>
         </div>
-        <div style={styles.cardBody}>
+        <div style={{
+          ...styles.cardBody,
+          ...(isMobile ? { flexDirection: 'column' as const, alignItems: 'center', textAlign: 'center' as const } : {}),
+        }}>
           {hasPhoto ? (
             <img
               src={profile.avatarUrl!}
@@ -136,7 +141,10 @@ export function SettingsScreen() {
         <div style={styles.cardHeader}>
           <span style={styles.cardTitle}>Avatar</span>
         </div>
-        <div style={styles.avatarSection}>
+        <div style={{
+          ...styles.avatarSection,
+          ...(isMobile ? { flexDirection: 'column' as const, alignItems: 'center', textAlign: 'center' as const } : {}),
+        }}>
           {/* Current avatar preview */}
           <div style={styles.avatarPreviewWrap}>
             {hasPhoto ? (
@@ -198,7 +206,10 @@ export function SettingsScreen() {
         <div style={styles.cardHeader}>
           <span style={styles.cardTitle}>Statistics</span>
         </div>
-        <div style={styles.statsGrid}>
+        <div style={{
+          ...styles.statsGrid,
+          ...(isMobile ? { gridTemplateColumns: 'repeat(2, 1fr)' } : {}),
+        }}>
           <StatBox label="Rounds played" value={`${profile.roundsPlayed}`} />
           <StatBox label="Total wagered" value={`${formatSol(profile.totalWagered)} SOL`} icon />
           <StatBox label="Total won" value={`${formatSol(profile.totalWon)} SOL`} color={theme.success} icon />
@@ -213,7 +224,10 @@ export function SettingsScreen() {
         <div style={styles.cardHeader}>
           <span style={styles.cardTitle}>Preferences</span>
         </div>
-        <div style={styles.cardBody}>
+        <div style={{
+          ...styles.cardBody,
+          ...(isMobile ? { flexDirection: 'column' as const } : {}),
+        }}>
           <div style={styles.prefRow} className="table-row-hover">
             <span style={styles.prefLabel}>Sound effects</span>
             <button

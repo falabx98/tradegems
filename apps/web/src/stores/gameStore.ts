@@ -183,6 +183,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         set({ serverRoundId: roundId, betPlaced: true });
       } catch (err) {
         console.warn('Server bet placement failed (playing locally):', err);
+        // Sync profile to correct local balance after failed bet placement
+        get().syncProfile();
       }
     })();
   },
@@ -296,10 +298,11 @@ export const useGameStore = create<GameState>((set, get) => ({
             // Non-critical — local result still displayed
           }
 
-          // Sync real profile from server (balance, stats, etc.)
-          await get().syncProfile();
         } catch (err) {
           console.warn('Server round resolution failed:', err);
+        } finally {
+          // Always sync real profile from server (balance, stats, etc.)
+          await get().syncProfile();
         }
       }
     })();

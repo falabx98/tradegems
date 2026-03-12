@@ -29,6 +29,8 @@ export function WalletScreen() {
   const syncProfile = useGameStore((s) => s.syncProfile);
   const walletAddress = useAuthStore((s) => s.walletAddress);
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
   const [tab, setTab] = useState<Tab>('deposit');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -200,6 +202,9 @@ export function WalletScreen() {
 
   return (
     <div style={s.root}>
+      <div style={isMobile ? s.twoColMobile : s.twoCol}>
+        {/* ── Left Column: Balance + Deposit/Withdraw ── */}
+        <div style={isMobile ? s.leftColMobile : s.leftCol}>
       {/* ── Balance Hero ── */}
       <div style={s.balanceCard} className="gradient-border card-enter card-enter-1">
         <div style={s.balanceRow}>
@@ -495,8 +500,9 @@ export function WalletScreen() {
           </div>
         </div>
       )}
-
-      {/* ── Transaction History ── */}
+        </div>
+        {/* ── Right Column: Transaction History ── */}
+        <div style={s.rightCol}>
       <div style={s.historyCard} className="card-enter card-enter-4">
         <div style={s.historyHeader}>
           <span style={s.historyTitle}>Transactions</span>
@@ -550,6 +556,8 @@ export function WalletScreen() {
           )}
         </div>
       </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -564,8 +572,38 @@ const s: Record<string, React.CSSProperties> = {
     padding: '16px',
     height: '100%',
     overflow: 'auto',
+  },
+  twoCol: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '16px',
+    flex: 1,
+    minHeight: 0,
+  },
+  leftCol: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '12px',
+    maxWidth: '480px',
+  },
+  rightCol: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    minHeight: 0,
+  },
+  twoColMobile: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '12px',
+    flex: 1,
+  },
+  leftColMobile: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '12px',
     maxWidth: '480px',
     margin: '0 auto',
+    width: '100%',
   },
 
   // ── Balance Card ──
@@ -978,6 +1016,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column' as const,
     boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+    minHeight: 0,
   },
   historyHeader: {
     display: 'flex',

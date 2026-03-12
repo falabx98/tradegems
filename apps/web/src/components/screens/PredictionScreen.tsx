@@ -17,6 +17,7 @@ import {
 import { CandlestickChart } from '../arena/CandlestickChart';
 import { playBetPlaced, playCountdownBeep, playLevelUp, playRoundEnd, hapticMedium, hapticHeavy } from '../../utils/sounds';
 import { ArrowUpIcon, ArrowDownIcon, ArrowSidewaysIcon, TrophyIcon, ExplosionIcon } from '../ui/GameIcons';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
 
 const BET_OPTIONS = [
   { label: '0.01', lamports: 10_000_000 },
@@ -99,9 +100,10 @@ function ConfettiCanvas({ active }: { active: boolean }) {
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function PredictionScreen() {
-  const { betAmount, setBetAmount, profile, setScreen, syncProfile } = useGameStore();
+  const { betAmount, setBetAmount, profile, syncProfile } = useGameStore();
   const { isAuthenticated } = useAuthStore();
   const isMobile = useIsMobile();
+  const go = useAppNavigate();
 
   const [phase, setPhase] = useState<PredictionPhase>('setup');
   const [roundConfig, setRoundConfig] = useState<PredictionRoundConfig | null>(null);
@@ -470,7 +472,7 @@ export function PredictionScreen() {
             <button onClick={handlePlayAgain} className="btn-3d btn-3d-primary" style={s.playAgainBtn}>
               Predict Again
             </button>
-            <button onClick={() => setScreen('lobby')} style={s.backBtn}>
+            <button onClick={() => go('lobby')} style={s.backBtn}>
               Back to Lobby
             </button>
           </div>

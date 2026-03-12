@@ -7,6 +7,8 @@ import { GameNode } from '../../types/game';
 import { formatSol } from '../../utils/sol';
 import { playLevelUp, hapticHeavy } from '../../utils/sounds';
 import { GemIcon, BombIcon, ShieldIcon, LightningIcon, WaveIcon, TrophyIcon, ExplosionIcon } from '../ui/GameIcons';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
+import { getServerConfig } from '../../utils/api';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -144,54 +146,45 @@ function ConfettiCanvas({ active }: { active: boolean }) {
   );
 }
 
-// ─── Animated Counter ────────────────────────────────────────────────────────
-
-function AnimatedValue({ value, prefix, suffix, duration = 800 }: {
-  value: number; prefix?: string; suffix?: string; duration?: number;
-}) {
-  const [display, setDisplay] = useState(0);
-
-  useEffect(() => {
-    let start = 0;
-    const startTime = performance.now();
-    function tick(now: number) {
-      const t = Math.min((now - startTime) / duration, 1);
-      const eased = 1 - Math.pow(1 - t, 3);
-      setDisplay(eased * value);
-      if (t < 1) start = requestAnimationFrame(tick);
-    }
-    start = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(start);
-  }, [value, duration]);
-
-  const formatted = Math.abs(display) < 10 ? display.toFixed(2) : display.toFixed(0);
-  return <>{prefix}{formatted}{suffix}</>;
-}
-
 // ─── Main Component ──────────────────────────────────────────────────────────
 
 export function ResultScreen() {
   const isMobile = useIsMobile();
   const { result, profile, playAgain, resetRound, betAmount, riskTier } = useGameStore();
+  const go = useAppNavigate();
   const [revealed, setRevealed] = useState(false);
+  const [feeRate, setFeeRate] = useState<number>((globalThis as any).__serverFeeRate ?? 0.05);
 
   useEffect(() => {
     const timer = setTimeout(() => setRevealed(true), 300);
     return () => clearTimeout(timer);
   }, []);
 
-  // Play victory sound on win
+  // Fetch server fee rate
   useEffect(() => {
-    if (result && result.finalMultiplier >= 1) {
+    getServerConfig().then(cfg => setFeeRate(cfg.feeRate));
+  }, []);
+
+  // L1 fix: Play victory sound based on actual win condition (payout >= totalCost)
+  // instead of just finalMultiplier >= 1 (which ignores the fee)
+  useEffect(() => {
+    if (!result) return;
+    const fee = Math.floor(result.playerState.betAmount * feeRate);
+    const totalCost = result.playerState.betAmount + fee;
+    if (result.payout >= totalCost) {
       setTimeout(() => { playLevelUp(); hapticHeavy(); }, 400);
     }
-  }, [result]);
+  }, [result, feeRate]);
 
   if (!result) return null;
 
-  const isWin = result.finalMultiplier >= 1;
-  const profit = result.payout - result.playerState.betAmount;
-  const profitPercent = ((result.finalMultiplier - 1) * 100).toFixed(0);
+  // M1+M2: Account for fee in victory determination and display
+  const fee = Math.floor(result.playerState.betAmount * feeRate);
+  const totalCost = result.playerState.betAmount + fee;
+  // Victory = payout exceeds total cost (bet + fee), not just bet
+  const isWin = result.payout >= totalCost;
+  const profit = result.payout - totalCost;
+  const profitPercent = totalCost > 0 ? ((result.payout / totalCost - 1) * 100).toFixed(0) : '0';
   const resultColor = isWin ? theme.game.multiplier : theme.game.divider;
   const totalNodes = result.nodesHit.length + result.nodesMissed.length;
   const hitRate = totalNodes > 0 ? Math.round((result.nodesHit.length / totalNodes) * 100) : 0;
@@ -267,6 +260,8 @@ export function ResultScreen() {
             </div>
             <div style={s.panelBody}>
               <SummaryRow label="Bet" value={`${formatSol(result.playerState.betAmount)} SOL`} icon />
+              <SummaryRow label={`Fee (${(feeRate * 100).toFixed(0)}%)`} value={`${formatSol(fee)} SOL`} color={theme.text.muted} icon />
+              <SummaryRow label="Total Cost" value={`${formatSol(totalCost)} SOL`} icon />
               <SummaryRow label="Payout" value={`${formatSol(result.payout)} SOL`} color={resultColor} icon />
               <SummaryRow label="P&L" value={`${profit >= 0 ? '+' : ''}${formatSol(profit)} SOL`} color={resultColor} icon />
               <SummaryRow label="Risk" value={result.playerState.riskTier} color={
@@ -279,7 +274,7 @@ export function ResultScreen() {
           {/* Actions */}
           <div style={s.actions}>
             <button
-              onClick={playAgain}
+              onClick={() => { playAgain(); go('setup'); }}
               className="btn-3d btn-3d-primary"
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -292,7 +287,7 @@ export function ResultScreen() {
                 {formatSol(betAmount)} · {riskTier}
               </span>
             </button>
-            <button onClick={resetRound} style={s.ghostBtn}>
+            <button onClick={() => { resetRound(); go('lobby'); }} style={s.ghostBtn}>
               Back to lobby
             </button>
           </div>

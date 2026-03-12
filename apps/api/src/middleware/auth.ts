@@ -18,12 +18,51 @@ export async function requireAuth(request: FastifyRequest, _reply: FastifyReply)
   try {
     await request.jwtVerify();
     const payload = request.user as unknown as { sub: string; role: string; sid: string };
-    (request as any).authUser = {
+    const authUser: AuthUser = {
       userId: payload.sub,
       role: payload.role,
       sessionId: payload.sid,
-    } as AuthUser;
+    };
+    (request as any).authUser = authUser;
+
+    // M7+H2: Check session revocation via Redis cache (falls back to DB)
+    // Redis key `revoked:session:{id}` is set when session is revoked (see auth.service.ts)
+    // Cache miss → check DB → cache result for 60s
+    try {
+      const { getRedis } = await import('../config/redis.js');
+      const redis = getRedis();
+      const cacheKey = `revoked:session:${authUser.sessionId}`;
+      const cached = await redis.get(cacheKey);
+
+      if (cached === '1') {
+        throw new AppError(401, 'SESSION_REVOKED', 'Session has been revoked');
+      }
+
+      if (cached === null) {
+        // Cache miss — check DB and cache the result
+        const { getDb } = await import('../config/database.js');
+        const { userSessions } = await import('@tradingarena/db');
+        const { eq } = await import('drizzle-orm');
+        const db = getDb();
+        const session = await db.query.userSessions.findFirst({
+          where: eq(userSessions.id, authUser.sessionId),
+          columns: { revokedAt: true },
+        });
+        if (session?.revokedAt) {
+          await redis.set(cacheKey, '1', 'EX', 300); // Cache revoked for 5 min
+          throw new AppError(401, 'SESSION_REVOKED', 'Session has been revoked');
+        }
+        // Cache "not revoked" for 60s to reduce DB hits
+        await redis.set(cacheKey, '0', 'EX', 60);
+      }
+      // cached === '0' means valid session (cached), do nothing
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      // If Redis/DB check fails, allow request (don't block auth on transient issues)
+      request.log.warn({ err }, 'Session revocation check failed (non-blocking)');
+    }
   } catch (err) {
+    if (err instanceof AppError) throw err;
     request.log.warn({ err }, 'JWT verification failed');
     throw new AppError(401, 'UNAUTHORIZED', 'Invalid or expired token');
   }

@@ -152,11 +152,10 @@ export class WalletService {
         AND locked_amount >= ${totalLocked}
     `);
 
-    // If no row was updated, the settlement was already processed (or insufficient locked funds)
+    // If no row was updated, the settlement failed (already processed or insufficient locked funds)
     const rowsAffected = (result as any)?.rowCount ?? (result as any)?.length ?? 1;
     if (rowsAffected === 0) {
-      console.warn(`[Wallet] settlePayout skipped — insufficient locked funds for user ${userId}, ref ${ref.type}:${ref.id}`);
-      return;
+      throw new AppError(409, 'SETTLEMENT_FAILED', `Settlement skipped — insufficient locked funds for user ${userId}, ref ${ref.type}:${ref.id}`);
     }
 
     const bal = await this.db.query.balances.findFirst({
@@ -191,24 +190,24 @@ export class WalletService {
   // ─── Credit Deposit ──────────────────────────────────────
 
   async creditDeposit(userId: string, amount: number, asset: string, depositId: string) {
-    await this.db.execute(sql`
-      UPDATE balances
-      SET available_amount = available_amount + ${amount},
-          updated_at = now()
-      WHERE user_id = ${userId}
-        AND asset = ${asset}
-    `);
+    // L3 fix: Upsert balance row to handle missing balance rows
+    const result = await this.db.execute(sql`
+      INSERT INTO balances (user_id, asset, available_amount, locked_amount, pending_amount)
+      VALUES (${userId}, ${asset}, ${amount}, 0, 0)
+      ON CONFLICT (user_id, asset)
+      DO UPDATE SET available_amount = balances.available_amount + ${amount},
+                    updated_at = now()
+      RETURNING available_amount
+    `) as unknown as { available_amount: number }[];
 
-    const bal = await this.db.query.balances.findFirst({
-      where: and(eq(balances.userId, userId), eq(balances.asset, asset)),
-    });
+    const balanceAfter = result?.[0]?.available_amount ?? amount;
 
     await this.db.insert(balanceLedgerEntries).values({
       userId,
       asset,
       entryType: 'deposit_confirmed',
       amount,
-      balanceAfter: bal?.availableAmount ?? 0,
+      balanceAfter,
       referenceType: 'deposit',
       referenceId: depositId,
     });

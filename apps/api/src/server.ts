@@ -17,6 +17,8 @@ import { adminRoutes } from './routes/admin.routes.js';
 import { battleRoutes } from './routes/battle.routes.js';
 import { referralRoutes } from './routes/referral.routes.js';
 import { chatRoutes } from './routes/chat.routes.js';
+import { tipRoutes } from './routes/tip.routes.js';
+import { startDepositWorker } from './workers/depositConfirmation.worker.js';
 
 export async function buildServer() {
   const server = Fastify({
@@ -68,6 +70,16 @@ export async function buildServer() {
     version: '0.0.1',
   }));
 
+  // ─── Public Config ──────────────────────────────────────
+  server.get('/v1/config', async () => ({
+    feeRate: env.PLATFORM_FEE_RATE,
+    minBetLamports: 1_000_000,
+    maxBetLamports: 10_000_000_000,
+    buyInTiers: [100_000_000, 250_000_000, 500_000_000, 1_000_000_000, 2_000_000_000],
+    tournamentRounds: 3,
+    roundDurationMs: 15000,
+  }));
+
   // ─── SOL Price Proxy (avoids CoinGecko CORS) ────────────
   let cachedSolPrice = { usd: 0, ts: 0 };
   server.get('/v1/sol-price', async () => {
@@ -98,6 +110,10 @@ export async function buildServer() {
   await server.register(battleRoutes, { prefix: '/v1/battles' });
   await server.register(referralRoutes, { prefix: '/v1/referrals' });
   await server.register(chatRoutes, { prefix: '/v1/chat' });
+  await server.register(tipRoutes, { prefix: '/v1/tips' });
+
+  // Start background workers
+  startDepositWorker();
 
   return server;
 }

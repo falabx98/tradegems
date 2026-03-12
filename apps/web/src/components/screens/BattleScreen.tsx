@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useGameStore } from '../../stores/gameStore';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { ChartArena } from '../arena/ChartArena';
-import { api } from '../../utils/api';
+import { api, getServerConfig } from '../../utils/api';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { getPhase } from '../../engine/roundEngine';
@@ -10,41 +11,46 @@ import type { RoundConfig, GameNode, RoundPhase } from '../../types/game';
 import {
   playNodeActivatedSound,
   playNodeMiss,
-  playNearMiss,
   playBattleJoin,
   playRoundEnd,
 } from '../../utils/sounds';
-import { SwordsIcon, MedalIcon, CheckIcon, TrophyIcon, UserIcon } from '../ui/GameIcons';
+import { MedalIcon, TrophyIcon, UserIcon, CheckIcon } from '../ui/GameIcons';
 
 const ROUND_DURATION = 15;
+const BUYIN_LABELS: Record<number, string> = {
+  100_000_000: '0.1',
+  250_000_000: '0.25',
+  500_000_000: '0.5',
+  1_000_000_000: '1',
+  2_000_000_000: '2',
+};
 
 function rankBadge(rank: number): React.ReactNode {
   if (rank >= 1 && rank <= 3) return <MedalIcon rank={rank as 1 | 2 | 3} size={20} />;
-  return `#${rank}`;
+  return <span style={{ fontSize: '13px', fontWeight: 700, color: theme.text.muted }}>#{rank}</span>;
 }
 
 export function BattleScreen() {
   const {
-    battleJoined,
-    betAmount,
-    riskTier,
-    joinBattle,
-    resetBattle,
+    tournamentRoomId,
+    joinTournament,
+    leaveTournament,
+    resetTournament,
     syncProfile,
   } = useGameStore();
+  const go = useAppNavigate();
 
-  // Local state
-  const [phase, setPhase] = useState<'betting' | 'active' | 'results'>('betting');
-  const [roundNumber, setRoundNumber] = useState(0);
-  const [players, setPlayers] = useState<any[]>([]);
-  const [grossPool, setGrossPool] = useState(0);
-  const [phaseEndsAt, setPhaseEndsAt] = useState(0);
-  const [phaseStartedAt, setPhaseStartedAt] = useState(0);
-  const [countdown, setCountdown] = useState(20);
-  const [results, setResults] = useState<any>(null);
-  const [myPlayerId, setMyPlayerId] = useState<string | null>(null);
-  const [joined, setJoined] = useState(false);
+  // Tournament state from polling
+  const [roomState, setRoomState] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [feeRate, setFeeRate] = useState<number>((globalThis as any).__serverFeeRate ?? 0.05);
+
+  // Fetch server fee rate for dynamic display
+  useEffect(() => {
+    getServerConfig().then(cfg => setFeeRate(cfg.feeRate));
+  }, []);
 
   // Chart/active phase state
   const [roundConfig, setRoundConfig] = useState<RoundConfig | null>(null);
@@ -59,34 +65,25 @@ export function BattleScreen() {
   const rafRef = useRef<number>(0);
   const reportedRef = useRef(false);
   const cachedRoundRef = useRef<number>(0);
-  const prevRoundRef = useRef<number>(0);
   const multiplierRef = useRef(1.0);
-  const joinedRef = useRef(false);
+  const roomIdRef = useRef<string | null>(null);
 
-  // Keep refs in sync
   multiplierRef.current = currentMultiplier;
-  joinedRef.current = joined;
+  roomIdRef.current = tournamentRoomId;
 
-  // ─── Polling ────────────────────────────────────────────────────────────────
+  // ─── Room Polling ──────────────────────────────────────────────────────────
 
-  const poll = useCallback(async () => {
+  const pollRoom = useCallback(async () => {
+    const rid = roomIdRef.current;
+    if (!rid) return;
     try {
-      const data = await api.getCurrentBattle();
-
-      setPhase(data.phase);
-      setRoundNumber(data.roundNumber);
-      setPlayers(data.players);
-      setGrossPool(data.grossPool);
-      setPhaseEndsAt(data.phaseEndsAt);
-      setPhaseStartedAt(data.phaseStartedAt);
-      setMyPlayerId(data.myPlayerId);
-
-      if (data.results) setResults(data.results);
+      const data = await api.getTournamentRoom(rid);
+      setRoomState(data);
 
       // Cache roundConfig once per round
-      if (data.phase === 'active' && data.roundConfig && cachedRoundRef.current !== data.roundNumber) {
+      if (data.state === 'round_active' && data.roundConfig && cachedRoundRef.current !== data.currentRound) {
         setRoundConfig(data.roundConfig);
-        cachedRoundRef.current = data.roundNumber;
+        cachedRoundRef.current = data.currentRound;
         reportedRef.current = false;
         setActivatedNodeIds(new Set());
         setMissedNodeIds(new Set());
@@ -95,64 +92,64 @@ export function BattleScreen() {
         setLocalElapsed(0);
       }
 
-      // Reset joined state on new round & sync profile on transition to new betting phase
-      if (data.phase === 'betting' && prevRoundRef.current !== data.roundNumber) {
-        // If we were joined in the previous round, sync profile for updated balance
-        if (prevRoundRef.current > 0 && joinedRef.current) {
-          useGameStore.getState().syncProfile();
-        }
-        prevRoundRef.current = data.roundNumber;
-        setJoined(!!data.myPlayerId);
-        reportedRef.current = false;
-      }
-
-      // Keep joined state in sync
-      if (data.myPlayerId) {
-        setJoined(true);
+      // Sync profile on final results
+      if (data.state === 'final_results' || data.state === 'closed') {
+        syncProfile();
       }
 
       setError(null);
     } catch (err: any) {
-      setError(err.message || 'Connection failed');
+      if (err.status === 404) {
+        // Room closed/gone
+        resetTournament();
+      } else {
+        setError(err.message || 'Connection failed');
+      }
     }
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [syncProfile, resetTournament]);
 
   useEffect(() => {
-    poll();
-    const interval = phase === 'active' ? 500 : 1000;
-    pollRef.current = setInterval(poll, interval);
+    if (!tournamentRoomId) return;
+    pollRoom();
+    const interval = roomState?.state === 'round_active' ? 500 : 1000;
+    pollRef.current = setInterval(pollRoom, interval);
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [poll, phase]);
+  }, [pollRoom, tournamentRoomId, roomState?.state]);
 
   // ─── Countdown Timer ────────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (phase !== 'betting') return;
+    if (!roomState) return;
     const timer = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((phaseEndsAt - Date.now()) / 1000));
+      const remaining = Math.max(0, Math.ceil((roomState.phaseEndsAt - Date.now()) / 1000));
       setCountdown(remaining);
     }, 200);
     return () => clearInterval(timer);
-  }, [phase, phaseEndsAt]);
+  }, [roomState?.phaseEndsAt]);
 
-  // ─── RAF Loop for Active Phase ──────────────────────────────────────────────
+  // ─── RAF Loop for Active Phase ────────────────────────────────────────────
 
   useEffect(() => {
-    if (phase !== 'active' || !roundConfig) return;
+    if (roomState?.state !== 'round_active' || !roundConfig) return;
 
     const tick = () => {
-      const serverElapsed = (Date.now() - phaseStartedAt) / 1000;
+      const serverElapsed = (Date.now() - roomState.phaseStartedAt) / 1000;
       const elapsed = Math.min(serverElapsed, ROUND_DURATION);
 
       setLocalElapsed(elapsed);
       setLocalPhase(getPhase(elapsed));
 
       if (elapsed >= ROUND_DURATION) {
-        if (!reportedRef.current && joinedRef.current) {
+        if (!reportedRef.current && roomIdRef.current) {
           reportedRef.current = true;
-          api.reportBattleMultiplier(multiplierRef.current).catch(console.warn);
+          api.reportTournamentMultiplier(
+            roomIdRef.current,
+            roomState.currentRound,
+            multiplierRef.current,
+          ).catch(console.warn);
           playRoundEnd(multiplierRef.current >= 1.0);
         }
         return;
@@ -163,20 +160,18 @@ export function BattleScreen() {
 
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [phase, roundConfig, phaseStartedAt]);
+  }, [roomState?.state, roundConfig, roomState?.phaseStartedAt, roomState?.currentRound]);
 
-  // ─── Node Activation ────────────────────────────────────────────────────────
+  // ─── Node Activation ──────────────────────────────────────────────────────
 
   const handleNodeActivated = useCallback((node: GameNode) => {
     if (!roundConfig) return;
     const store = useGameStore.getState();
-    const modifier = roundConfig.riskModifiers?.[store.riskTier];
+    const modifier = roundConfig.riskModifiers?.['balanced']; // Tournament uses balanced
     if (!modifier) return;
 
     const engineCfg = roundConfig.engineConfig ?? DEFAULT_ENGINE_CONFIG;
     const betTier = getBetTier(store.betAmount, engineCfg);
-    const prevShields = shields;
-    const prevMult = currentMultiplier;
 
     setCurrentMultiplier(prev => {
       const { newMultiplier, newShields } = computeNodeEffect(
@@ -186,39 +181,47 @@ export function BattleScreen() {
       const clamped = Math.max(0, Math.min(maxMult, newMultiplier));
       setShields(newShields);
 
-      // Play sound with context
-      const shieldBlocked = node.type === 'divider' && newShields < prevShields;
       playNodeActivatedSound(
         node.type, node.value, node.rarity || 'common',
-        prev, clamped, shieldBlocked,
+        prev, clamped, false,
       );
 
       return clamped;
     });
 
     setActivatedNodeIds(prev => new Set([...prev, node.id]));
-  }, [roundConfig, shields, currentMultiplier]);
+  }, [roundConfig, shields]);
 
   const handleNodeMissed = useCallback((node: GameNode) => {
     setMissedNodeIds(prev => new Set([...prev, node.id]));
     playNodeMiss();
   }, []);
 
-  // ─── Join Handler ───────────────────────────────────────────────────────────
+  // ─── Join Handler ─────────────────────────────────────────────────────────
 
-  const handleJoin = async () => {
+  const handleJoin = async (buyIn: number) => {
+    setJoining(true);
+    setError(null);
     try {
-      await joinBattle();
-      setJoined(true);
+      await joinTournament(buyIn);
       playBattleJoin();
     } catch (err: any) {
-      setError(err.message || 'Failed to join');
+      setError(err.message || 'Failed to join tournament');
+    } finally {
+      setJoining(false);
     }
   };
 
-  // ─── Render Helpers ─────────────────────────────────────────────────────────
+  // ─── Leave Handler ────────────────────────────────────────────────────────
 
-  const renderPlayerAvatar = (player: any) => {
+  const handleLeave = async () => {
+    await leaveTournament();
+    setRoomState(null);
+  };
+
+  // ─── Render Helpers ───────────────────────────────────────────────────────
+
+  const renderAvatar = (player: any) => {
     const initial = player.username.charAt(0).toUpperCase();
     const colors = ['#9945FF', '#14F195', '#FF6B35', '#00D4FF', '#FFD93D', '#FF4B8C'];
     const color = colors[player.username.length % colors.length];
@@ -229,101 +232,162 @@ export function BattleScreen() {
     );
   };
 
-  const getVipColor = (tier: string) => {
-    const map: Record<string, string> = {
-      bronze: '#cd7f32', silver: '#c0c0c0', gold: '#ffd700', platinum: '#e5e4e2', titan: '#ff6b35',
-    };
-    return map[tier] || '#888';
-  };
+  // ─── ROOM BROWSER (no room joined) ────────────────────────────────────────
 
-  // ─── BETTING PHASE ──────────────────────────────────────────────────────────
-
-  if (phase === 'betting') {
+  if (!tournamentRoomId) {
     return (
       <div style={styles.container}>
         <div style={styles.header}>
-          <span style={styles.headerIcon}><SwordsIcon size={24} color="#f87171" /></span>
-          <span style={styles.headerTitle}>Battle Arena</span>
-          <div style={styles.roundBadge}>Round #{roundNumber}</div>
+          <TrophyIcon size={24} color="#FFD700" />
+          <span style={styles.headerTitle}>Tournaments</span>
         </div>
 
-        {/* Countdown */}
-        <div style={styles.countdownBar}>
-          <div style={styles.countdownLabel}>Next round in</div>
-          <div style={styles.countdownValue} className="mono">{countdown}s</div>
-          <div style={{
-            ...styles.countdownProgress,
-            width: `${Math.max(0, (countdown / 20) * 100)}%`,
-          }} />
+        <div style={styles.description}>
+          3 rounds · Best cumulative score wins the pot
         </div>
 
-        {/* Info bar */}
-        <div style={styles.infoBar}>
-          <span className="mono">◈ {formatSol(betAmount)}</span>
-          <span>Risk <strong>{riskTier}</strong></span>
-          <span>Pool <strong className="mono">◈ {formatSol(grossPool)}</strong></span>
+        {error && (
+          <div style={styles.errorBox}>{error}</div>
+        )}
+
+        <div style={styles.tierGrid}>
+          {Object.entries(BUYIN_LABELS).map(([lamStr, label]) => {
+            const lam = parseInt(lamStr);
+            return (
+              <button
+                key={lam}
+                onClick={() => handleJoin(lam)}
+                disabled={joining}
+                className="btn-3d btn-3d-primary"
+                style={styles.tierButton}
+              >
+                <span style={styles.tierAmount} className="mono">{label} SOL</span>
+                <span style={styles.tierLabel}>Join</span>
+              </button>
+            );
+          })}
         </div>
+
+        <div style={styles.rulesBox}>
+          <div style={styles.ruleRow}>
+            <span style={styles.ruleIcon}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c084fc" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </span>
+            <span>4-8 players per tournament</span>
+          </div>
+          <div style={styles.ruleRow}>
+            <span style={styles.ruleIcon}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c084fc" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </span>
+            <span>3 rounds × 15 seconds each</span>
+          </div>
+          <div style={styles.ruleRow}>
+            <span style={styles.ruleIcon}>
+              <TrophyIcon size={14} color="#FFD700" />
+            </span>
+            <span>Winner takes all ({(feeRate * 100).toFixed(0)}% rake)</span>
+          </div>
+        </div>
+
+        <button onClick={() => { resetTournament(); go('lobby'); }} className="nav-btn" style={styles.backButton}>
+          Back to Lobby
+        </button>
+      </div>
+    );
+  }
+
+  // ─── WAITING ROOM ─────────────────────────────────────────────────────────
+
+  if (!roomState || roomState.state === 'waiting') {
+    const players = roomState?.players || [];
+    const maxPlayers = roomState?.maxPlayers || 8;
+    const buyIn = roomState?.buyIn || 0;
+    const hasCountdown = roomState?.countdownStartedAt !== null;
+
+    return (
+      <div style={styles.container}>
+        <div style={styles.header}>
+          <TrophyIcon size={24} color="#FFD700" />
+          <span style={styles.headerTitle}>Waiting Room</span>
+          <div style={styles.roomBadge}>{tournamentRoomId}</div>
+        </div>
+
+        <div style={styles.waitingInfo}>
+          <div style={styles.buyInDisplay} className="mono">
+            {formatSol(buyIn)} SOL Buy-in
+          </div>
+          <div style={styles.potDisplay} className="mono">
+            Pot: {formatSol(roomState?.grossPool || 0)} SOL
+          </div>
+        </div>
+
+        {hasCountdown && (
+          <div style={styles.countdownBar}>
+            <div style={styles.countdownLabel}>Starting in</div>
+            <div style={styles.countdownValue} className="mono">{countdown}s</div>
+            <div style={{
+              ...styles.countdownProgress,
+              width: `${Math.max(0, (countdown / 15) * 100)}%`,
+            }} />
+          </div>
+        )}
+
+        {!hasCountdown && (
+          <div style={styles.waitingNotice}>
+            Waiting for {4 - players.length} more player{4 - players.length !== 1 ? 's' : ''}...
+          </div>
+        )}
 
         {/* Player Grid */}
         <div style={styles.playerGrid}>
-          {players.map((p) => (
+          {players.map((p: any) => (
             <div key={p.id} style={{
               ...styles.playerCard,
-              ...(p.id === myPlayerId ? styles.playerCardYou : {}),
+              ...(p.id === roomState?.myPlayerId ? styles.playerCardYou : {}),
             }}>
-              {p.id === myPlayerId && <div style={styles.youBadge}>YOU</div>}
-              {renderPlayerAvatar(p)}
+              {p.id === roomState?.myPlayerId && <div style={styles.youBadge}>YOU</div>}
+              {renderAvatar(p)}
               <div style={styles.playerName}>{p.username}</div>
               <div style={styles.playerMeta}>
-                Lv{p.level} <span style={{ color: getVipColor(p.vipTier) }}>{p.vipTier}</span>
+                Lv{p.level}
               </div>
-              <div style={styles.playerBet} className="mono">◈ {formatSol(p.betAmount)}</div>
             </div>
           ))}
-          {/* Empty slots */}
-          {Array.from({ length: Math.max(0, 6 - players.length) }).map((_, i) => (
+          {Array.from({ length: Math.max(0, maxPlayers - players.length) }).map((_, i) => (
             <div key={`empty-${i}`} style={styles.emptySlot}>
-              <div style={styles.emptyIcon}><UserIcon size={26} color="#555570" /></div>
+              <UserIcon size={26} color="#555570" />
               <div style={styles.emptyText}>Waiting...</div>
             </div>
           ))}
         </div>
 
-        {/* Join button */}
         <div style={styles.actions}>
-          {joined ? (
-            <div style={styles.joinedBadge}><CheckIcon size={14} color="#34d399" /> Joined — waiting for round</div>
-          ) : (
-            <button onClick={handleJoin} className="btn-3d btn-3d-primary" style={styles.joinButton}>
-              ENTER BATTLE
-              <span className="mono" style={{ opacity: 0.8 }}>
-                {' '}◈ {formatSol(betAmount)} · {riskTier}
-              </span>
-            </button>
-          )}
-          <button onClick={resetBattle} className="nav-btn" style={styles.cancelButton}>
-            Back to Lobby
+          <button onClick={handleLeave} className="nav-btn" style={styles.backButton}>
+            Leave Room
           </button>
         </div>
 
-        {/* Player count */}
         <div style={styles.playerCount}>
-          {players.length}/6 Players
+          {players.length}/{maxPlayers} Players
         </div>
       </div>
     );
   }
 
-  // ─── ACTIVE PHASE ───────────────────────────────────────────────────────────
+  // ─── ROUND ACTIVE ─────────────────────────────────────────────────────────
 
-  if (phase === 'active') {
+  if (roomState.state === 'round_active') {
     const timeLeft = Math.max(0, Math.ceil(ROUND_DURATION - localElapsed));
+    const players = roomState.players || [];
 
     return (
       <div style={styles.container}>
         {/* Header */}
         <div style={styles.activeHeader}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><SwordsIcon size={16} color="#f87171" /> <strong>BATTLE IN PROGRESS</strong></span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <TrophyIcon size={16} color="#FFD700" />
+            <strong>ROUND {roomState.currentRound}/{roomState.totalRounds}</strong>
+          </span>
           <span className="mono" style={styles.timer}>{timeLeft}s</span>
         </div>
 
@@ -359,27 +423,29 @@ export function BattleScreen() {
             }} className="mono">
               {currentMultiplier.toFixed(2)}x
             </div>
-            {joined && <div style={styles.hudJoinedBadge}>PLAYING</div>}
+            <div style={styles.hudRound}>R{roomState.currentRound}/{roomState.totalRounds}</div>
           </div>
         </div>
 
         {/* Compact Leaderboard */}
         <div style={styles.leaderboard}>
           <div style={styles.leaderboardHeader}>
-            <span>Live Rankings</span>
+            <span>Standings</span>
             <span style={{ color: theme.text.muted }}>{players.length} players</span>
           </div>
-          {players.slice(0, 6).map((p, idx) => {
-            const rankIcon = rankBadge(idx + 1);
-            const isMe = p.id === myPlayerId;
-            const mult = isMe ? currentMultiplier : p.currentMultiplier;
-            const pnl = (mult - 1) * p.betAmount;
+          {players.slice(0, 8).map((p: any, idx: number) => {
+            const isMe = p.id === roomState.myPlayerId;
+            // L1 fix: use currentRoundMultiplier from server (reported value), fallback to 1.0
+            const mult = isMe ? currentMultiplier : (p.currentRoundMultiplier ?? 1.0);
+            const cumScore = isMe
+              ? (p.cumulativeScore || 0) + currentMultiplier
+              : (p.cumulativeScore || 0) + (mult ?? 0);
             return (
               <div key={p.id} style={{
                 ...styles.rankRow,
                 ...(isMe ? styles.rankRowMe : {}),
               }}>
-                <span style={styles.rankEmoji}>{rankIcon}</span>
+                <span style={styles.rankEmoji}>{rankBadge(idx + 1)}</span>
                 <span style={{
                   ...styles.rankName,
                   color: isMe ? '#c084fc' : theme.text.primary,
@@ -388,15 +454,18 @@ export function BattleScreen() {
                 </span>
                 <span style={{
                   ...styles.rankMult,
-                  color: mult >= 1.0 ? '#14F195' : '#FF4B4B',
+                  color: (mult ?? 1.0) >= 1.0 ? '#14F195' : '#FF4B4B',
                 }} className="mono">
-                  {mult.toFixed(2)}x
+                  {(mult ?? 1.0).toFixed(2)}x
                 </span>
                 <span style={{
-                  ...styles.rankPnl,
-                  color: pnl >= 0 ? '#14F195' : '#FF4B4B',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  color: theme.text.muted,
+                  width: '50px',
+                  textAlign: 'right' as const,
                 }} className="mono">
-                  {pnl >= 0 ? '+' : ''}{formatSol(Math.abs(pnl))}
+                  {(cumScore ?? 0).toFixed(1)}
                 </span>
               </div>
             );
@@ -404,121 +473,193 @@ export function BattleScreen() {
         </div>
 
         <div style={styles.poolFooter} className="mono">
-          ◈ Pool: {formatSol(grossPool)}
+          Pot: {formatSol(roomState.netPool)} SOL · Round {roomState.currentRound}/{roomState.totalRounds}
         </div>
       </div>
     );
   }
 
-  // ─── RESULTS PHASE ──────────────────────────────────────────────────────────
+  // ─── ROUND RESULTS (between rounds) ───────────────────────────────────────
 
-  if (phase === 'results' && results) {
-    const rankings = results.rankings || [];
-    const myResult = rankings.find((r: any) => r.playerId === myPlayerId);
-    const myRank = myResult?.rank || '-';
-    const myMult = myResult?.finalMultiplier || currentMultiplier;
-    const myPnl = myResult ? myResult.profitLoss : 0;
-    const myRankIcon = rankBadge(myRank);
-
-    const autoCountdown = Math.max(0, Math.ceil((phaseEndsAt - Date.now()) / 1000));
+  if (roomState.state === 'round_results') {
+    const players = roomState.players || [];
 
     return (
       <div style={styles.container}>
-        {/* Hero result */}
-        {myResult && (
-          <div style={styles.resultsHero}>
-            <div style={styles.resultRankBig}>{myRankIcon}</div>
-            <div style={styles.resultPlace}>
-              {myRank === 1 ? '1st' : myRank === 2 ? '2nd' : myRank === 3 ? '3rd' : `${myRank}th`} Place!
-            </div>
-            <div style={{
-              ...styles.resultMult,
-              color: myMult >= 1.0 ? '#14F195' : '#FF4B4B',
-            }} className="mono">
-              {myMult.toFixed(2)}x
-            </div>
-            <div style={{
-              ...styles.resultPnl,
-              color: myPnl >= 0 ? '#14F195' : '#FF4B4B',
-            }} className="mono">
-              {myPnl >= 0 ? '+' : ''}{formatSol(Math.abs(myPnl))} SOL
-            </div>
-          </div>
-        )}
+        <div style={styles.header}>
+          <TrophyIcon size={24} color="#FFD700" />
+          <span style={styles.headerTitle}>Round {roomState.currentRound} Results</span>
+        </div>
 
-        {/* Rankings */}
-        <div style={styles.rankingsTable}>
-          <div style={styles.rankingsTitle}>Battle Rankings</div>
-          {rankings.map((r: any) => {
-            const isMe = r.playerId === myPlayerId;
-            const bandColor = r.band === 'top' ? '#FFD700' : r.band === 'medium' ? '#14F195'
-              : r.band === 'breakeven' ? '#60A5FA' : '#FF4B4B';
-            const rIcon = rankBadge(r.rank);
+        {/* Round progression dots */}
+        <div style={styles.roundDots}>
+          {Array.from({ length: roomState.totalRounds }).map((_, i) => (
+            <div key={i} style={{
+              ...styles.roundDot,
+              background: i < roomState.currentRound ? '#14F195' : theme.border.medium,
+            }} />
+          ))}
+        </div>
+
+        {/* Standings */}
+        <div style={styles.standingsTable}>
+          <div style={styles.standingsHeader}>
+            <span style={{ width: '28px' }}>#</span>
+            <span style={{ flex: 1 }}>Player</span>
+            <span style={{ width: '55px', textAlign: 'right' as const }}>Round</span>
+            <span style={{ width: '55px', textAlign: 'right' as const }}>Total</span>
+          </div>
+          {players.map((p: any, idx: number) => {
+            const isMe = p.id === roomState.myPlayerId;
+            const roundMults = p.roundMultipliers || [];
+            const lastRoundMult = roundMults[roundMults.length - 1] ?? 0;
             return (
-              <div key={r.playerId} style={{
-                ...styles.resultRow,
-                ...(isMe ? styles.resultRowMe : {}),
+              <div key={p.id} style={{
+                ...styles.standingRow,
+                ...(isMe ? styles.rankRowMe : {}),
               }}>
-                <span style={styles.resultRank}>{rIcon}</span>
-                <div style={styles.resultInfo}>
-                  <span style={{ color: isMe ? '#c084fc' : theme.text.primary }}>
-                    {r.username} {isMe && <span style={styles.youTag}>you</span>}
-                  </span>
-                  <span style={{ fontSize: '12px', color: bandColor }}>● {r.band}</span>
-                </div>
+                <span style={styles.rankEmoji}>{rankBadge(idx + 1)}</span>
                 <span style={{
-                  ...styles.resultMultSmall,
-                  color: r.finalMultiplier >= 1.0 ? '#14F195' : '#FF4B4B',
-                }} className="mono">
-                  {r.finalMultiplier.toFixed(2)}x
+                  flex: 1,
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: isMe ? '#c084fc' : theme.text.primary,
+                }}>
+                  {p.username} {isMe && <span style={styles.youTag}>you</span>}
                 </span>
                 <span style={{
-                  ...styles.resultPnlSmall,
-                  color: r.profitLoss >= 0 ? '#14F195' : '#FF4B4B',
+                  width: '55px',
+                  textAlign: 'right' as const,
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  color: lastRoundMult >= 1.0 ? '#14F195' : '#FF4B4B',
                 }} className="mono">
-                  {r.profitLoss >= 0 ? '+' : ''}{formatSol(Math.abs(r.profitLoss))}
+                  {lastRoundMult.toFixed(2)}x
+                </span>
+                <span style={{
+                  width: '55px',
+                  textAlign: 'right' as const,
+                  fontSize: '14px',
+                  fontWeight: 700,
+                  color: '#c084fc',
+                }} className="mono">
+                  {p.cumulativeScore.toFixed(1)}
                 </span>
               </div>
             );
           })}
         </div>
 
-        {/* Pool summary */}
-        {results.pool && (
-          <div style={styles.poolSummary}>
-            <div style={styles.poolRow}>
-              <span>Gross Pool</span>
-              <span className="mono">{formatSol(results.pool.grossPool)} SOL</span>
-            </div>
-            <div style={styles.poolRow}>
-              <span>Platform Fee ({(results.pool.feeRate * 100).toFixed(0)}%)</span>
-              <span className="mono" style={{ color: '#FF4B4B' }}>-{formatSol(results.pool.platformFee)} SOL</span>
-            </div>
-            <div style={{ ...styles.poolRow, fontWeight: 700 }}>
-              <span>Net Pool</span>
-              <span className="mono" style={{ color: '#14F195' }}>{formatSol(results.pool.netPool)} SOL</span>
-            </div>
-          </div>
-        )}
-
         <div style={styles.nextRoundNotice}>
-          Next round in {autoCountdown}s...
+          Next round in {countdown}s...
         </div>
       </div>
     );
   }
 
-  // ─── IDLE / LOADING ─────────────────────────────────────────────────────────
+  // ─── FINAL RESULTS ────────────────────────────────────────────────────────
+
+  if (roomState.state === 'final_results') {
+    const players = roomState.players || [];
+    const winner = roomState.winner;
+    const myPlayerId = roomState.myPlayerId;
+    const isWinner = winner?.id === myPlayerId;
+
+    return (
+      <div style={styles.container}>
+        {/* Winner celebration */}
+        <div style={styles.finalHero}>
+          <TrophyIcon size={52} color="#FFD700" />
+          <div style={styles.winnerTitle}>
+            {isWinner ? 'You Won!' : `${winner?.username || 'Winner'} Wins!`}
+          </div>
+          <div style={styles.winnerScore} className="mono">
+            Score: {winner?.cumulativeScore?.toFixed(2) || '0'}
+          </div>
+          <div style={styles.winnerPayout} className="mono">
+            {formatSol(winner?.payout || 0)} SOL
+          </div>
+        </div>
+
+        {/* Final standings */}
+        <div style={styles.standingsTable}>
+          <div style={styles.rankingsTitle}>Final Standings</div>
+          {players.map((p: any, idx: number) => {
+            const isMe = p.id === myPlayerId;
+            const roundMults = p.roundMultipliers || [];
+            return (
+              <div key={p.id} style={{
+                ...styles.standingRow,
+                ...(isMe ? styles.rankRowMe : {}),
+                ...(idx === 0 ? { border: '1px solid rgba(255, 215, 0, 0.3)', background: 'rgba(255, 215, 0, 0.05)' } : {}),
+              }}>
+                <span style={styles.rankEmoji}>{rankBadge(idx + 1)}</span>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, gap: '2px' }}>
+                  <span style={{
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: isMe ? '#c084fc' : theme.text.primary,
+                  }}>
+                    {p.username} {isMe && <span style={styles.youTag}>you</span>}
+                  </span>
+                  <span style={{ fontSize: '11px', color: theme.text.muted }} className="mono">
+                    {roundMults.map((m: number) => m.toFixed(1) + 'x').join(' + ')}
+                  </span>
+                </div>
+                <span style={{
+                  fontSize: '16px',
+                  fontWeight: 700,
+                  color: idx === 0 ? '#FFD700' : '#c084fc',
+                }} className="mono">
+                  {p.cumulativeScore.toFixed(2)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Pot breakdown */}
+        <div style={styles.poolSummary}>
+          <div style={styles.poolRow}>
+            <span>Total Pool</span>
+            <span className="mono">{formatSol(roomState.grossPool)} SOL</span>
+          </div>
+          <div style={styles.poolRow}>
+            <span>Rake ({(feeRate * 100).toFixed(0)}%)</span>
+            <span className="mono" style={{ color: '#FF4B4B' }}>
+              -{formatSol(roomState.grossPool - roomState.netPool)} SOL
+            </span>
+          </div>
+          <div style={{ ...styles.poolRow, fontWeight: 700 }}>
+            <span>Winner Payout</span>
+            <span className="mono" style={{ color: '#14F195' }}>{formatSol(roomState.netPool)} SOL</span>
+          </div>
+        </div>
+
+        <div style={styles.actions}>
+          <button onClick={() => { resetTournament(); go('lobby'); }} className="btn-3d btn-3d-primary" style={styles.tierButton}>
+            <span style={{ fontSize: '16px', fontWeight: 700 }}>Back to Lobby</span>
+          </button>
+        </div>
+
+        <div style={styles.nextRoundNotice}>
+          Auto-return in {countdown}s...
+        </div>
+      </div>
+    );
+  }
+
+  // ─── FALLBACK / LOADING ───────────────────────────────────────────────────
 
   return (
     <div style={styles.container}>
       <div style={styles.idle}>
-        <SwordsIcon size={52} color="#f87171" />
-        <div style={styles.idleTitle}>Battle Arena</div>
+        <TrophyIcon size={52} color="#FFD700" />
+        <div style={styles.idleTitle}>Tournament</div>
         <div style={styles.idleDesc}>
-          {error ? error : 'Connecting to battle...'}
+          {error ? error : 'Connecting...'}
         </div>
-        <button onClick={resetBattle} className="nav-btn" style={styles.cancelButton}>
+        <button onClick={() => { resetTournament(); go('lobby'); }} className="nav-btn" style={styles.backButton}>
           Back to Lobby
         </button>
       </div>
@@ -544,14 +685,140 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     padding: '16px 20px 8px',
   },
-  headerIcon: { fontSize: '26px' },
-  headerTitle: { fontSize: '22px', fontWeight: 700, color: theme.text.primary, flex: 1, fontFamily: "'Orbitron', sans-serif", textTransform: 'uppercase' as const, letterSpacing: '1px' },
-  roundBadge: {
-    padding: '4px 12px',
+  headerTitle: {
+    fontSize: '20px',
+    fontWeight: 700,
+    color: theme.text.primary,
+    flex: 1,
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
+  },
+  roomBadge: {
+    padding: '4px 10px',
     borderRadius: '20px',
     background: 'rgba(153, 69, 255, 0.15)',
     color: '#c084fc',
+    fontSize: '12px',
+    fontWeight: 600,
+    fontFamily: 'monospace',
+  },
+
+  // Description
+  description: {
+    padding: '4px 20px 12px',
     fontSize: '14px',
+    color: theme.text.muted,
+  },
+
+  // Error
+  errorBox: {
+    margin: '0 20px 12px',
+    padding: '10px 14px',
+    borderRadius: '8px',
+    background: 'rgba(248, 113, 113, 0.1)',
+    border: '1px solid rgba(248, 113, 113, 0.3)',
+    color: '#f87171',
+    fontSize: '13px',
+    fontWeight: 500,
+  },
+
+  // Buy-in Tier Grid
+  tierGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '10px',
+    padding: '8px 20px',
+    flex: 0,
+  },
+  tierButton: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '18px 12px',
+    borderRadius: '12px',
+    border: 'none',
+    cursor: 'pointer',
+    width: '100%',
+  },
+  tierAmount: {
+    fontSize: '20px',
+    fontWeight: 900,
+    color: '#fff',
+    fontFamily: "'Orbitron', sans-serif",
+  },
+  tierLabel: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: 'rgba(255,255,255,0.7)',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
+  },
+
+  // Rules box
+  rulesBox: {
+    margin: '12px 20px',
+    padding: '12px 16px',
+    borderRadius: '10px',
+    background: 'rgba(28, 20, 42, 0.85)',
+    border: `1px solid ${theme.border.subtle}`,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  ruleRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    fontSize: '13px',
+    color: theme.text.secondary,
+  },
+  ruleIcon: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '20px',
+  },
+
+  // Back button
+  backButton: {
+    margin: '8px 20px',
+    padding: '12px',
+    borderRadius: '10px',
+    border: `1px solid ${theme.border.medium}`,
+    background: 'transparent',
+    color: theme.text.muted,
+    fontSize: '15px',
+    fontWeight: 500,
+    cursor: 'pointer',
+    fontFamily: 'Rajdhani, sans-serif',
+    textAlign: 'center' as const,
+  },
+
+  // Waiting
+  waitingInfo: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    padding: '8px 20px',
+    fontSize: '15px',
+    color: theme.text.secondary,
+  },
+  buyInDisplay: {
+    fontSize: '16px',
+    fontWeight: 700,
+    color: '#c084fc',
+  },
+  potDisplay: {
+    fontSize: '16px',
+    fontWeight: 700,
+    color: '#14F195',
+  },
+  waitingNotice: {
+    textAlign: 'center' as const,
+    padding: '12px 20px',
+    fontSize: '15px',
+    color: '#c084fc',
     fontWeight: 600,
   },
 
@@ -576,19 +843,10 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'width 0.2s linear',
   },
 
-  // Info bar
-  infoBar: {
-    display: 'flex',
-    gap: '16px',
-    padding: '8px 20px',
-    fontSize: '14px',
-    color: theme.text.secondary,
-  },
-
   // Player grid
   playerGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
+    gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '8px',
     padding: '8px 20px',
     flex: 1,
@@ -599,7 +857,7 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '4px',
-    padding: '12px 8px',
+    padding: '12px 6px',
     borderRadius: '12px',
     background: 'rgba(28, 20, 42, 0.85)',
     border: `1px solid ${theme.border.subtle}`,
@@ -620,75 +878,35 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '4px',
   },
   avatar: {
-    width: '36px',
-    height: '36px',
+    width: '32px',
+    height: '32px',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarText: { color: '#fff', fontSize: '16px', fontWeight: 700 },
-  playerName: { fontSize: '13px', fontWeight: 600, color: theme.text.primary, textAlign: 'center' as const },
+  avatarText: { color: '#fff', fontSize: '14px', fontWeight: 700 },
+  playerName: { fontSize: '12px', fontWeight: 600, color: theme.text.primary, textAlign: 'center' as const, lineHeight: '1.2' },
   playerMeta: { fontSize: '11px', color: theme.text.muted },
-  playerBet: { fontSize: '12px', color: theme.text.secondary },
   emptySlot: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '4px',
-    padding: '12px 8px',
+    padding: '12px 6px',
     borderRadius: '12px',
     border: `1px dashed ${theme.border.subtle}`,
     opacity: 0.4,
   },
-  emptyIcon: { fontSize: '26px', opacity: 0.5 },
-  emptyText: { fontSize: '12px', color: theme.text.muted },
+  emptyText: { fontSize: '11px', color: theme.text.muted },
 
   // Actions
   actions: {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
-    padding: '12px 20px',
-  },
-  joinButton: {
-    width: '100%',
-    padding: '14px',
-    borderRadius: '12px',
-    border: 'none',
-    background: '#9945FF',
-    color: '#fff',
-    fontSize: '17px',
-    fontWeight: 700,
-    cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-    boxShadow: '0 4px 0 #7325d4, 0 6px 12px rgba(153, 69, 255, 0.3)',
-    transition: 'all 0.1s ease',
-  },
-  joinedBadge: {
-    textAlign: 'center' as const,
-    padding: '14px',
-    borderRadius: '12px',
-    background: 'rgba(20, 241, 149, 0.1)',
-    color: '#14F195',
-    fontSize: '16px',
-    fontWeight: 600,
-    border: '1px solid rgba(20, 241, 149, 0.2)',
-  },
-  cancelButton: {
-    width: '100%',
-    padding: '10px',
-    borderRadius: '10px',
-    border: `1px solid ${theme.border.medium}`,
-    background: 'transparent',
-    color: theme.text.muted,
-    fontSize: '15px',
-    fontWeight: 500,
-    cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    padding: '8px 20px',
   },
   playerCount: {
     textAlign: 'center' as const,
@@ -756,11 +974,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 900,
     textShadow: '0 2px 8px rgba(0,0,0,0.5)',
   },
-  hudJoinedBadge: {
+  hudRound: {
     padding: '2px 8px',
     borderRadius: '6px',
-    background: 'rgba(20, 241, 149, 0.2)',
-    color: '#14F195',
+    background: 'rgba(153, 69, 255, 0.2)',
+    color: '#c084fc',
     fontSize: '12px',
     fontWeight: 700,
   },
@@ -791,10 +1009,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(153, 69, 255, 0.08)',
     border: '1px solid rgba(153, 69, 255, 0.15)',
   },
-  rankEmoji: { fontSize: '16px', width: '24px', textAlign: 'center' as const },
+  rankEmoji: { width: '24px', textAlign: 'center' as const, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   rankName: { flex: 1, fontSize: '14px', fontWeight: 600 },
   rankMult: { fontSize: '15px', fontWeight: 700, width: '55px', textAlign: 'right' as const },
-  rankPnl: { fontSize: '13px', fontWeight: 600, width: '65px', textAlign: 'right' as const },
   youTag: {
     fontSize: '10px',
     fontWeight: 700,
@@ -812,22 +1029,73 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: `1px solid ${theme.border.subtle}`,
   },
 
-  // Results
-  resultsHero: {
+  // Round results
+  roundDots: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '8px 20px',
+  },
+  roundDot: {
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    transition: 'background 0.3s',
+  },
+
+  standingsTable: {
+    padding: '8px 20px',
+    flex: 1,
+  },
+  standingsHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '4px 8px',
+    fontSize: '12px',
+    fontWeight: 600,
+    color: theme.text.muted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
+    marginBottom: '4px',
+  },
+  standingRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '8px 10px',
+    borderRadius: '8px',
+    marginBottom: '2px',
+    background: 'rgba(28, 20, 42, 0.5)',
+  },
+
+  // Final results
+  finalHero: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     padding: '24px 20px 16px',
-    gap: '4px',
+    gap: '8px',
   },
-  resultRankBig: { fontSize: '52px' },
-  resultPlace: { fontSize: '24px', fontWeight: 700, color: theme.text.primary },
-  resultMult: { fontSize: '38px', fontWeight: 900 },
-  resultPnl: { fontSize: '16px', fontWeight: 600 },
+  winnerTitle: {
+    fontSize: '28px',
+    fontWeight: 900,
+    color: '#FFD700',
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '2px',
+  },
+  winnerScore: {
+    fontSize: '18px',
+    fontWeight: 700,
+    color: theme.text.secondary,
+  },
+  winnerPayout: {
+    fontSize: '32px',
+    fontWeight: 900,
+    color: '#14F195',
+  },
 
-  rankingsTable: {
-    padding: '0 20px',
-  },
   rankingsTitle: {
     fontSize: '15px',
     fontWeight: 700,
@@ -837,30 +1105,6 @@ const styles: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
-  resultRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 10px',
-    borderRadius: '8px',
-    marginBottom: '2px',
-    background: 'rgba(28, 20, 42, 0.5)',
-  },
-  resultRowMe: {
-    background: 'rgba(153, 69, 255, 0.08)',
-    border: '1px solid rgba(153, 69, 255, 0.15)',
-  },
-  resultRank: { fontSize: '18px', width: '28px', textAlign: 'center' as const },
-  resultInfo: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '1px',
-    fontSize: '14px',
-    fontWeight: 600,
-  },
-  resultMultSmall: { fontSize: '15px', fontWeight: 700, width: '55px', textAlign: 'right' as const },
-  resultPnlSmall: { fontSize: '13px', fontWeight: 600, width: '65px', textAlign: 'right' as const },
 
   poolSummary: {
     margin: '12px 20px',
@@ -879,7 +1123,7 @@ const styles: Record<string, React.CSSProperties> = {
 
   nextRoundNotice: {
     textAlign: 'center' as const,
-    padding: '16px',
+    padding: '12px',
     fontSize: '15px',
     color: '#c084fc',
     fontWeight: 600,
@@ -895,6 +1139,17 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '12px',
     padding: '40px',
   },
-  idleTitle: { fontSize: '24px', fontWeight: 700, color: theme.text.primary, fontFamily: "'Orbitron', sans-serif", textTransform: 'uppercase' as const, letterSpacing: '1px' },
-  idleDesc: { fontSize: '16px', color: theme.text.muted, textAlign: 'center' as const },
+  idleTitle: {
+    fontSize: '24px',
+    fontWeight: 700,
+    color: theme.text.primary,
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
+  },
+  idleDesc: {
+    fontSize: '16px',
+    color: theme.text.muted,
+    textAlign: 'center' as const,
+  },
 };

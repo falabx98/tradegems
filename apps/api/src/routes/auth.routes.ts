@@ -27,7 +27,7 @@ export async function authRoutes(server: FastifyInstance) {
   const authService = new AuthService();
 
   // ─── Register ────────────────────────────────────────────
-  server.post('/register', async (request, reply) => {
+  server.post('/register', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
     const body = registerSchema.parse(request.body);
     const { userId } = await authService.register(body);
 
@@ -66,7 +66,7 @@ export async function authRoutes(server: FastifyInstance) {
   });
 
   // ─── Login ───────────────────────────────────────────────
-  server.post('/login', async (request, reply) => {
+  server.post('/login', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const body = loginSchema.parse(request.body);
     const { userId, role } = await authService.login(body);
     const { sessionId, refreshToken } = await authService.createSession(userId, {
@@ -90,7 +90,7 @@ export async function authRoutes(server: FastifyInstance) {
   });
 
   // ─── Refresh ─────────────────────────────────────────────
-  server.post('/refresh', async (request, reply) => {
+  server.post('/refresh', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
     const refreshToken = request.cookies.refreshToken;
     if (!refreshToken) {
       throw new AppError(401, 'NO_REFRESH_TOKEN', 'No refresh token provided');
@@ -104,6 +104,15 @@ export async function authRoutes(server: FastifyInstance) {
     const accessToken = server.jwt.sign(
       { sub: result.userId, role: result.role, sid: result.sessionId },
     );
+
+    // Set rotated refresh token cookie (M5 fix)
+    reply.setCookie('refreshToken', result.newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      path: '/v1/auth',
+      maxAge: 7 * 24 * 60 * 60,
+    });
 
     return { accessToken, expiresIn: 900 };
   });
@@ -123,7 +132,7 @@ export async function authRoutes(server: FastifyInstance) {
     return authService.createWalletChallenge(address);
   });
 
-  server.post('/wallet/verify', async (request, reply) => {
+  server.post('/wallet/verify', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const body = walletVerifySchema.parse(request.body);
     const { userId, role, isNew } = await authService.verifyWalletSignature(
       body.address, body.signature, body.nonce,

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { NavIcon } from './NavIcons';
 import { playButtonClick, hapticLight } from '../../utils/sounds';
@@ -16,13 +17,13 @@ const MORE_ITEMS = [
   { id: 'prediction', label: 'Predict', icon: 'candles' },
   { id: 'rewards', label: 'Rewards', icon: 'gift' },
   { id: 'history', label: 'History', icon: 'clock' },
-  { id: 'battle', label: 'Battle', icon: 'swords' },
+  { id: 'battle', label: 'Tournament', icon: 'swords' },
   { id: 'settings', label: 'Settings', icon: 'gear' },
 ] as const;
 
 export function BottomNav() {
   const screen = useGameStore((s) => s.screen);
-  const setScreen = useGameStore((s) => s.setScreen);
+  const go = useAppNavigate();
   const [showMore, setShowMore] = useState(false);
 
   const activeId = screen === 'lobby' || screen === 'setup' ? 'lobby' : screen;
@@ -36,10 +37,10 @@ export function BottomNav() {
       return;
     }
     setShowMore(false);
-    if (id === 'lobby' || id === 'solo') {
-      setScreen('lobby');
+    if (id === 'solo') {
+      go('lobby');
     } else {
-      setScreen(id as any);
+      go(id);
     }
   };
 
@@ -47,11 +48,7 @@ export function BottomNav() {
     playButtonClick();
     hapticLight();
     setShowMore(false);
-    if (id === 'battle') {
-      setScreen('battle' as any);
-    } else {
-      setScreen(id as any);
-    }
+    go(id);
   };
 
   return (

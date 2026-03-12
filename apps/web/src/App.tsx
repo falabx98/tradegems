@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useGameStore } from './stores/gameStore';
 import { useAuthStore } from './stores/authStore';
 import { AppLayout } from './components/layout/AppLayout';
@@ -12,11 +13,18 @@ import { LeaderboardScreen } from './components/screens/LeaderboardScreen';
 import { RewardsScreen } from './components/screens/RewardsScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
 import { BattleScreen } from './components/screens/BattleScreen';
+import { SoloSetupScreen } from './components/screens/SoloSetupScreen';
 import { PredictionScreen } from './components/screens/PredictionScreen';
+import { FairnessScreen } from './components/screens/FairnessScreen';
+import { SeasonScreen } from './components/screens/SeasonScreen';
 import { OnboardingModal, useOnboarding } from './components/OnboardingModal';
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggle } from './components/layout/ChatToggle';
 import { ToastOverlay } from './components/ToastOverlay';
+import { PATH_TO_SCREEN, SCREEN_TO_PATH } from './hooks/useAppNavigate';
+import { getServerConfig, getAccessToken } from './utils/api';
+import { connectWebSocket, disconnectWebSocket } from './utils/ws';
+import { requestNotificationPermission } from './utils/notifications';
 import './styles/global.css';
 
 export default function App() {
@@ -27,17 +35,47 @@ export default function App() {
   const [authChecked, setAuthChecked] = useState(false);
   const { showOnboarding, closeOnboarding } = useOnboarding();
 
+  const location = useLocation();
+  const navigate = useNavigate();
+
   // Check auth on mount
   useEffect(() => {
     checkAuth().finally(() => setAuthChecked(true));
+    // M1 fix: prefetch server config (fee rate, etc.) and cache globally
+    getServerConfig().then(cfg => {
+      (globalThis as any).__serverFeeRate = cfg.feeRate;
+    });
   }, [checkAuth]);
 
-  // Sync profile from server when authenticated
+  // Sync profile from server when authenticated + connect WebSocket
   useEffect(() => {
     if (isAuthenticated) {
       syncProfile();
+      // Connect WebSocket for real-time updates
+      const token = getAccessToken();
+      if (token) connectWebSocket(token);
+      // Request notification permission (non-blocking)
+      requestNotificationPermission();
+    } else {
+      disconnectWebSocket();
     }
   }, [isAuthenticated, syncProfile]);
+
+  // Sync URL → store on first load and browser back/forward
+  useEffect(() => {
+    const screenFromPath = PATH_TO_SCREEN[location.pathname];
+    if (screenFromPath && screenFromPath !== screen) {
+      setScreen(screenFromPath as any);
+    }
+  }, [location.pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync store → URL when screen changes programmatically
+  useEffect(() => {
+    const expectedPath = SCREEN_TO_PATH[screen] || '/';
+    if (location.pathname !== expectedPath) {
+      navigate(expectedPath, { replace: true });
+    }
+  }, [screen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Show nothing until auth check completes
   if (!authChecked) {
@@ -57,17 +95,19 @@ export default function App() {
   }
 
   // All other screens get the full layout shell
-  // Auth screen overlays on top of the lobby
   return (
     <AppLayout>
       {showOnboarding && !isAuthenticated && (
         <OnboardingModal onClose={() => {
           closeOnboarding();
-          if (!isAuthenticated) setScreen('auth');
+          if (!isAuthenticated) {
+            setScreen('auth');
+            navigate('/auth');
+          }
         }} />
       )}
       {(screen === 'lobby' || screen === 'auth') && <LobbyScreen />}
-      {screen === 'setup' && <LobbyScreen />}
+      {screen === 'setup' && <SoloSetupScreen />}
       {screen === 'result' && <ResultScreen />}
       {screen === 'wallet' && <WalletScreen />}
       {screen === 'history' && <HistoryScreen />}
@@ -76,10 +116,13 @@ export default function App() {
       {screen === 'settings' && <SettingsScreen />}
       {screen === 'battle' && <BattleScreen />}
       {screen === 'prediction' && <PredictionScreen />}
+      {screen === 'fairness' && <FairnessScreen />}
+      {screen === 'season' && <SeasonScreen />}
       {screen === 'auth' && (
         <AuthScreen onSuccess={() => {
           syncProfile();
           setScreen('lobby');
+          navigate('/');
         }} />
       )}
       {isAuthenticated && <ChatToggle />}

@@ -1,4 +1,5 @@
 import { useGameStore } from '../../stores/gameStore';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { NavIcon } from './NavIcons';
 import { playButtonClick, hapticLight } from '../../utils/sounds';
@@ -6,35 +7,33 @@ import { playButtonClick, hapticLight } from '../../utils/sounds';
 const NAV_ITEMS = [
   { id: 'lobby', label: 'Lobby', icon: 'grid' },
   { id: 'solo', label: 'Solo', icon: 'play' },
-  { id: 'battle', label: 'Battle', icon: 'swords' },
+  { id: 'battle', label: 'Tournament', icon: 'swords' },
   { id: 'prediction', label: 'Predict', icon: 'candles' },
   { id: 'leaderboard', label: 'Ranks', icon: 'trophy' },
   { id: 'rewards', label: 'Rewards', icon: 'gift' },
+  { id: 'season', label: 'Season', icon: 'star' },
   { id: 'wallet', label: 'Wallet', icon: 'wallet' },
 ] as const;
 
 const BOTTOM_ITEMS = [
   { id: 'history', label: 'History', icon: 'clock' },
+  { id: 'fairness', label: 'Fair', icon: 'shield' },
   { id: 'settings', label: 'Settings', icon: 'gear' },
 ] as const;
 
 export function SideNav() {
   const screen = useGameStore((s) => s.screen);
-  const setScreen = useGameStore((s) => s.setScreen);
+  const go = useAppNavigate();
 
   const activeId = screen === 'lobby' || screen === 'setup' ? 'lobby' : screen;
 
   const handleNav = (id: string) => {
     playButtonClick();
     hapticLight();
-    if (id === 'lobby' || id === 'solo') {
-      setScreen('lobby');
-    } else if (id === 'battle') {
-      setScreen('battle' as any);
-    } else if (id === 'prediction') {
-      setScreen('prediction' as any);
-    } else if (id === 'leaderboard' || id === 'rewards' || id === 'wallet' || id === 'history' || id === 'settings') {
-      setScreen(id as any);
+    if (id === 'solo') {
+      go('lobby');
+    } else {
+      go(id);
     }
   };
 

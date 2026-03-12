@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { isMuted, setMuted, getVolume, setVolume } from '../../utils/sounds';
@@ -10,7 +11,7 @@ import { UploadIcon } from '../ui/GameIcons';
 
 export function SettingsScreen() {
   const profile = useGameStore((s) => s.profile);
-  const setScreen = useGameStore((s) => s.setScreen);
+  const go = useAppNavigate();
   const { logout } = useAuthStore();
   const syncProfile = useGameStore((s) => s.syncProfile);
   const [loggingOut, setLoggingOut] = useState(false);
@@ -24,7 +25,7 @@ export function SettingsScreen() {
     setLoggingOut(true);
     try {
       await logout();
-      setScreen('lobby');
+      go('lobby');
     } catch {
       // ignore
     } finally {

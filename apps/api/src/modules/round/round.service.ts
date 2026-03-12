@@ -178,7 +178,24 @@ export class RoundService {
       const payoutLamports = Math.floor(result.payout);
       const resultType = payoutLamports > bet.amount ? 'win' : payoutLamports < bet.amount ? 'loss' : 'breakeven';
 
-      // Create bet result
+      // L9 fix: Settle balance FIRST — if this throws, bet stays 'active' and can be retried
+      // betResult is only created after successful settlement to avoid orphaned results
+      try {
+        await this.walletService.settlePayout(
+          bet.userId,
+          bet.amount,
+          bet.fee,
+          payoutLamports,
+          'SOL',
+          { type: 'round', id: roundId },
+        );
+      } catch (settleErr) {
+        console.error(`[Round] Settlement failed for bet ${bet.id}, user ${bet.userId}:`, settleErr);
+        // Don't mark bet as settled — leave as 'active' for retry/investigation
+        continue;
+      }
+
+      // Create bet result (only after successful settlement)
       await this.db.insert(betResults).values({
         betId: bet.id,
         userId: bet.userId,
@@ -197,16 +214,6 @@ export class RoundService {
         },
       });
 
-      // Settle balance
-      await this.walletService.settlePayout(
-        bet.userId,
-        bet.amount,
-        bet.fee,
-        payoutLamports,
-        'SOL',
-        { type: 'round', id: roundId },
-      );
-
       // Record referral commission
       try {
         const { ReferralService } = await import('../referral/referral.service.js');
@@ -215,7 +222,7 @@ export class RoundService {
         // Non-critical — don't fail settlement
       }
 
-      // Update bet status
+      // Update bet status — only after successful settlement
       await this.db.update(bets).set({
         status: 'settled',
         settledAt: new Date(),
@@ -225,11 +232,18 @@ export class RoundService {
       await this.userService.addXP(bet.userId, result.xpGained, 'round');
 
       // Update user stats
+      // winRate = (total payout received) / (total wagered) — represents ROI
+      // A winRate > 1 means net positive, < 1 means net negative
       await this.db.execute(sql`
         UPDATE user_profiles
         SET rounds_played = rounds_played + 1,
             total_wagered = total_wagered + ${bet.amount},
             total_won = total_won + ${payoutLamports},
+            win_rate = CASE
+              WHEN (total_wagered + ${bet.amount}) > 0
+              THEN (total_won + ${payoutLamports})::numeric / (total_wagered + ${bet.amount})::numeric
+              ELSE 0
+            END,
             best_multiplier = GREATEST(best_multiplier, ${result.finalMultiplier}),
             current_streak = CASE
               WHEN ${payoutLamports} > ${bet.amount} THEN current_streak + 1

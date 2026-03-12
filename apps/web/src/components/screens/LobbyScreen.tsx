@@ -2,61 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
-import { RiskTier } from '../../types/game';
 import { api } from '../../utils/api';
-import { formatSol, lamportsToSol, solToLamports } from '../../utils/sol';
-import { playBetPlaced, hapticMedium } from '../../utils/sounds';
-import { GiftIcon, HandshakeIcon, SwordsIcon, PackageIcon, LockIcon, PartyIcon } from '../ui/GameIcons';
-
-const BET_OPTIONS = [
-  { label: '0.01', lamports: 10_000_000 },
-  { label: '0.05', lamports: 50_000_000 },
-  { label: '0.1',  lamports: 100_000_000 },
-  { label: '0.25', lamports: 250_000_000 },
-  { label: '0.5',  lamports: 500_000_000 },
-  { label: '1',    lamports: 1_000_000_000 },
-  { label: '2',    lamports: 2_000_000_000 },
-  { label: '5',    lamports: 5_000_000_000 },
-];
-
-const GAME_MODE_OPTIONS: {
-  tier: RiskTier;
-  label: string;
-  desc: string;
-  color: string;
-  multipliers: string[];
-  gainTag: string;
-  lossTag: string;
-}[] = [
-  {
-    tier: 'conservative',
-    label: 'Safe',
-    desc: 'Reduced gains & losses. Best for beginners.',
-    color: theme.success,
-    multipliers: ['x1.04-1.20', 'x1.20-1.48', 'x1.48-1.96', 'x1.96-3.00', 'x3.00-5.00', 'x5.00-8.20'],
-    gainTag: '0.80x',
-    lossTag: '0.85x',
-  },
-  {
-    tier: 'balanced',
-    label: 'Standard',
-    desc: 'Normal gains & losses. The default experience.',
-    color: theme.warning,
-    multipliers: ['x1.05-1.25', 'x1.25-1.60', 'x1.60-2.20', 'x2.20-3.50', 'x3.50-6.00', 'x6.00-10.0'],
-    gainTag: '1.00x',
-    lossTag: '1.00x',
-  },
-  {
-    tier: 'aggressive',
-    label: 'Degen',
-    desc: 'Boosted gains but amplified losses. High risk.',
-    color: theme.danger,
-    multipliers: ['x1.06-1.31', 'x1.31-1.75', 'x1.75-2.50', 'x2.50-4.13', 'x4.13-7.25', 'x7.25-10.0'],
-    gainTag: '1.25x',
-    lossTag: '1.40x',
-  },
-];
+import { formatSol } from '../../utils/sol';
+import { GiftIcon, LockIcon, PartyIcon } from '../ui/GameIcons';
 
 interface BannerData {
   id: string;
@@ -84,8 +34,8 @@ const BANNERS: BannerData[] = [
   {
     id: 'battle-arena',
     image: '/PvP-Battle-Arena.jpg',
-    cta: 'Enter Arena',
-    accentColor: '#f87171',
+    cta: 'Enter Tournament',
+    accentColor: '#FFD700',
     action: 'battle',
   },
   {
@@ -116,10 +66,10 @@ function timeAgo(dateStr: string) {
 
 export function LobbyScreen() {
   const isMobile = useIsMobile();
-  const { mode, setMode, betAmount, setBetAmount, riskTier, setRiskTier, startRound, profile, syncProfile, setScreen, enterBattle } = useGameStore();
+  const { profile, syncProfile } = useGameStore();
   const { isAuthenticated } = useAuthStore();
+  const go = useAppNavigate();
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
-  const [customBet, setCustomBet] = useState('');
   const [activityFeed, setActivityFeed] = useState<FeedItem[]>([]);
   const [liveStats, setLiveStats] = useState({ active: 0, volume: '0', topWin: '1.0x' });
   const [bonusClaimed, setBonusClaimed] = useState<boolean | null>(null);
@@ -189,32 +139,20 @@ export function LobbyScreen() {
     })();
   }, []);
 
-  const handleCustomBet = () => {
-    const val = parseFloat(customBet);
-    if (isNaN(val) || val <= 0) return;
-    const lamports = solToLamports(val);
-    if (lamports > profile.balance) return;
-    setBetAmount(lamports);
-    setCustomBet('');
-  };
-
-  // Check if current bet is a preset
-  const isCustomBetActive = betAmount > 0 && !BET_OPTIONS.some(o => o.lamports === betAmount);
-
   const handleBannerClick = (banner: BannerData) => {
     if (banner.action === 'bonus') {
       if (!isAuthenticated) {
-        setScreen('auth');
+        go('auth');
       } else if (bonusClaimed === false) {
         handleClaimBonus();
       }
     } else if (banner.action === 'battle') {
-      setMode('battle');
+      go('battle');
     } else if (banner.action === 'referrals' || banner.action === 'rewards') {
       if (!isAuthenticated) {
         setShowAuthPrompt(true);
       } else {
-        setScreen('rewards');
+        go('rewards');
       }
     }
   };
@@ -231,226 +169,68 @@ export function LobbyScreen() {
         ...styles.columns,
         ...(isMobile ? { gridTemplateColumns: '1fr', gap: '10px' } : {}),
       }}>
-        {/* Left column: Configuration */}
+        {/* Left column: Game cards */}
         <div style={styles.leftCol}>
 
-          {/* Mode */}
-          <div style={styles.panel}>
-            <div style={styles.panelHeader}>
-              <span style={styles.panelTitle}>Mode</span>
-            </div>
-            <div style={styles.modeRow}>
-              <button
-                onClick={() => setMode('solo')}
-                style={{
-                  ...styles.modeBtn,
-                  ...(mode === 'solo' ? styles.modeBtnActive : {}),
-                }}
-              >
-                Solo
-              </button>
-              <button
-                onClick={() => setMode('battle')}
-                style={{
-                  ...styles.modeBtn,
-                  ...(mode === 'battle' ? styles.modeBtnActive : {}),
-                }}
-              >
-                Battle
-              </button>
-            </div>
-          </div>
+          {/* Section Title */}
+          <div style={styles.sectionTitle}>Games</div>
 
-          {/* Position size */}
-          <div style={styles.panel}>
-            <div style={styles.panelHeader}>
-              <span style={styles.panelTitle}>Position size</span>
-              <span style={styles.panelValue} className="mono">
-                <img src="/sol-coin.png" alt="SOL" style={{ width: '26px', height: '26px', marginRight: '5px', verticalAlign: 'middle' }} />
-                {formatSol(betAmount)}
-              </span>
+          {/* Game Cards Grid */}
+          <div style={{
+            ...styles.gameCardsGrid,
+            ...(isMobile ? { gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' } : {}),
+          }}>
+            {/* Solo */}
+            <div
+              onClick={() => {
+                if (!isAuthenticated) { setShowAuthPrompt(true); return; }
+                go('setup');
+              }}
+              style={styles.gameCard}
+              className="game-card"
+            >
+              <img src="/game-solo.png" alt="Solo" draggable={false} style={styles.gameCardImg} />
+              <div style={styles.gameCardOverlay} />
+              <div style={styles.gameCardContent}>
+                <span style={styles.gameCardTitle}>Solo</span>
+                <span style={styles.gameCardSub}>Trade vs. the chart</span>
+              </div>
             </div>
-            <div style={styles.betGrid}>
-              {BET_OPTIONS.map((opt) => (
-                <button
-                  key={opt.lamports}
-                  onClick={() => { setBetAmount(opt.lamports); setCustomBet(''); }}
-                  disabled={opt.lamports > profile.balance}
-                  style={{
-                    ...styles.betChip,
-                    ...(betAmount === opt.lamports ? styles.betChipActive : {}),
-                    opacity: opt.lamports > profile.balance ? 0.25 : 1,
-                  }}
-                  className="mono"
-                >
-                  {opt.label}
-                </button>
-              ))}
+
+            {/* Tournament */}
+            <div
+              onClick={() => {
+                if (!isAuthenticated) { setShowAuthPrompt(true); return; }
+                go('battle');
+              }}
+              style={styles.gameCard}
+              className="game-card"
+            >
+              <img src="/game-tournament.png" alt="Tournament" draggable={false} style={styles.gameCardImg} />
+              <div style={styles.gameCardOverlay} />
+              <div style={styles.gameCardContent}>
+                <span style={styles.gameCardTitle}>Tournament</span>
+                <span style={styles.gameCardSub}>Winner takes all</span>
+              </div>
             </div>
-            <div style={styles.customBetRow}>
-              <span style={styles.customBetLabel}>Custom</span>
-              <div style={styles.customBetInputWrap}>
-                <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', flexShrink: 0 }} />
-                <input
-                  type="number"
-                  placeholder="0.00"
-                  value={customBet}
-                  onChange={(e) => setCustomBet(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleCustomBet(); }}
-                  style={{
-                    ...styles.customBetInput,
-                    ...(isCustomBetActive ? { color: '#c084fc' } : {}),
-                  }}
-                  className="mono"
-                  step="0.01"
-                  min="0"
-                />
-                <button
-                  onClick={handleCustomBet}
-                  disabled={!customBet || parseFloat(customBet) <= 0}
-                  style={{
-                    ...styles.customBetBtn,
-                    opacity: !customBet || parseFloat(customBet) <= 0 ? 0.35 : 1,
-                  }}
-                >
-                  Set
-                </button>
+
+            {/* Predictions */}
+            <div
+              onClick={() => {
+                if (!isAuthenticated) { setShowAuthPrompt(true); return; }
+                go('prediction');
+              }}
+              style={styles.gameCard}
+              className="game-card"
+            >
+              <img src="/game-predictions.png" alt="Predictions" draggable={false} style={styles.gameCardImg} />
+              <div style={styles.gameCardOverlay} />
+              <div style={styles.gameCardContent}>
+                <span style={styles.gameCardTitle}>Predictions</span>
+                <span style={styles.gameCardSub}>Up or Down?</span>
               </div>
             </div>
           </div>
-
-          {/* Game Mode */}
-          <div style={styles.panel}>
-            <div style={styles.panelHeader}>
-              <span style={styles.panelTitle}>Game Mode</span>
-            </div>
-            <div style={styles.riskGrid}>
-              {GAME_MODE_OPTIONS.map(({ tier, label, desc, color, multipliers, gainTag, lossTag }) => {
-                const isActive = riskTier === tier;
-                return (
-                  <button
-                    key={tier}
-                    onClick={() => setRiskTier(tier)}
-                    style={{
-                      ...styles.riskCard,
-                      ...(isActive ? {
-                        border: `1px solid ${color}40`,
-                        background: `${color}08`,
-                      } : {}),
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-                      <div style={{
-                        ...styles.riskIndicator,
-                        background: isActive ? color : theme.text.muted,
-                      }} />
-                      <div style={{ ...styles.riskInfo, flex: 1 }}>
-                        <span style={{
-                          ...styles.riskLabel,
-                          color: isActive ? color : theme.text.secondary,
-                          fontSize: '15px',
-                        }}>{label}</span>
-                        <span style={{
-                          fontSize: '12px',
-                          fontWeight: 500,
-                          color: theme.text.muted,
-                          lineHeight: 1.3,
-                        }}>{desc}</span>
-                      </div>
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column' as const,
-                        alignItems: 'flex-end',
-                        gap: '2px',
-                        flexShrink: 0,
-                      }}>
-                        <span style={{
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          color: theme.game.multiplier,
-                          fontFamily: '"JetBrains Mono", monospace',
-                        }}>gain {gainTag}</span>
-                        <span style={{
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          color: theme.game.divider,
-                          fontFamily: '"JetBrains Mono", monospace',
-                        }}>loss {lossTag}</span>
-                      </div>
-                    </div>
-                    {isActive && (
-                      <div style={styles.modeMultipliersWrap}>
-                        {multipliers.map((m, i) => {
-                          const rarities = ['common', 'common', 'uncommon', 'uncommon', 'rare', 'legendary'];
-                          const rarityColors: Record<string, string> = {
-                            common: 'rgba(148, 163, 184, 0.6)',
-                            uncommon: 'rgba(52, 211, 153, 0.8)',
-                            rare: 'rgba(96, 165, 250, 0.9)',
-                            legendary: 'rgba(251, 191, 36, 1)',
-                          };
-                          const rarity = rarities[i] || 'common';
-                          return (
-                            <span
-                              key={i}
-                              style={{
-                                fontSize: '11px',
-                                fontWeight: 600,
-                                fontFamily: '"JetBrains Mono", monospace',
-                                color: rarityColors[rarity],
-                                padding: '2px 5px',
-                                borderRadius: '3px',
-                                background: `${rarityColors[rarity]}10`,
-                                border: `1px solid ${rarityColors[rarity]}20`,
-                              }}
-                            >
-                              {m}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Start Round Button — Duolingo 3D style */}
-          <button
-            onClick={() => {
-              if (!isAuthenticated) {
-                setShowAuthPrompt(true);
-                return;
-              }
-              if (mode === 'battle') {
-                enterBattle();
-                return;
-              }
-              playBetPlaced();
-              hapticMedium();
-              startRound();
-            }}
-            disabled={isAuthenticated && betAmount > profile.balance}
-            className="btn-3d btn-3d-primary"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '4px',
-              padding: '14px 24px',
-              fontSize: '16px',
-              width: '100%',
-              opacity: isAuthenticated && betAmount > profile.balance ? 0.4 : 1,
-            }}
-          >
-            <span style={styles.executeBtnText}>
-              {mode === 'solo' ? 'Start Round' : 'Find Battle'}
-            </span>
-            <span style={styles.executeBtnSub} className="mono">
-              <img src="/sol-coin.png" alt="SOL" style={{ width: '24px', height: '24px', marginRight: '4px', verticalAlign: 'middle' }} />
-              {formatSol(betAmount)} · {GAME_MODE_OPTIONS.find(o => o.tier === riskTier)?.label || riskTier}
-            </span>
-          </button>
 
           {/* Auth prompt overlay */}
           {showAuthPrompt && (
@@ -461,7 +241,7 @@ export function LobbyScreen() {
                 <button
                   className="btn-3d btn-3d-primary"
                   style={{ padding: '12px 24px', fontSize: '16px', width: '100%' }}
-                  onClick={() => { setShowAuthPrompt(false); setScreen('auth'); }}
+                  onClick={() => { setShowAuthPrompt(false); go('auth'); }}
                 >
                   Sign in / Register
                 </button>
@@ -760,183 +540,70 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
 
-  // Mode Toggle
-  modeRow: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '1px',
-    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.25), rgba(20, 241, 149, 0.25))',
-  },
-  modeBtn: {
-    padding: '12px',
-    background: theme.bg.secondary,
-    border: 'none',
-    cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
-    fontSize: '16px',
-    fontWeight: 700,
+  // Section Title
+  sectionTitle: {
+    fontSize: '20px',
+    fontWeight: 800,
+    color: theme.text.primary,
+    fontFamily: "'Orbitron', sans-serif",
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-    color: theme.text.muted,
-    transition: 'all 0.15s ease',
-  },
-  modeBtnActive: {
-    color: '#c084fc',
-    background: 'rgba(153, 69, 255, 0.08)',
+    letterSpacing: '3px',
+    marginBottom: '10px',
   },
 
-  // Bet Grid
-  betGrid: {
+  // Game Cards
+  gameCardsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: '1px',
-    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.25), rgba(20, 241, 149, 0.25))',
+    gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '10px',
   },
-  betChip: {
-    padding: '10px 4px',
-    background: theme.bg.secondary,
-    border: 'none',
+  gameCard: {
+    position: 'relative',
+    borderRadius: '14px',
+    overflow: 'hidden',
     cursor: 'pointer',
-    fontFamily: '"JetBrains Mono", monospace',
-    fontSize: '14px',
-    fontWeight: 600,
-    color: theme.text.secondary,
-    transition: 'all 0.12s ease',
-    textAlign: 'center',
-  },
-  betChipActive: {
-    color: '#c084fc',
-    background: 'rgba(153, 69, 255, 0.08)',
-  },
-
-  // Custom Bet
-  customBetRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 12px',
-    borderTop: `1px solid ${theme.border.subtle}`,
-  },
-  customBetLabel: {
-    fontSize: '13px',
-    fontWeight: 600,
-    color: theme.text.muted,
-    flexShrink: 0,
-  },
-  customBetInputWrap: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    background: theme.bg.tertiary,
-    borderRadius: '6px',
-    padding: '0 8px',
+    aspectRatio: '3 / 4',
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
     border: `1px solid ${theme.border.subtle}`,
   },
-  customBetInput: {
-    flex: 1,
-    background: 'transparent',
-    border: 'none',
-    outline: 'none',
-    fontFamily: '"JetBrains Mono", monospace',
-    fontSize: '14px',
-    fontWeight: 600,
-    color: theme.text.secondary,
-    padding: '7px 0',
-    width: '60px',
-    minWidth: 0,
+  gameCardImg: {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover' as const,
   },
-  customBetBtn: {
-    padding: '5px 10px',
-    background: 'rgba(153, 69, 255, 0.12)',
-    border: `1px solid rgba(153, 69, 255, 0.2)`,
-    borderRadius: '5px',
-    cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
-    fontSize: '13px',
-    fontWeight: 700,
-    color: '#c084fc',
-    transition: 'all 0.12s ease',
-    flexShrink: 0,
+  gameCardOverlay: {
+    position: 'absolute',
+    inset: 0,
+    background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 40%, transparent 70%)',
+    zIndex: 1,
   },
-
-  // Risk Profile
-  riskGrid: {
+  gameCardContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: '14px 12px',
+    zIndex: 2,
     display: 'flex',
-    flexDirection: 'column',
-  },
-  riskCard: {
-    display: 'flex',
-    flexWrap: 'wrap' as const,
-    alignItems: 'center',
-    gap: '0px',
-    padding: '10px 12px',
-    background: 'transparent',
-    border: 'none',
-    borderBottom: `1px solid ${theme.border.subtle}`,
-    cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
-    transition: 'all 0.15s ease',
-    textAlign: 'left',
-  },
-  riskIndicator: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-    flexShrink: 0,
-    transition: 'background 0.15s ease',
-  },
-  riskInfo: {
-    display: 'flex',
-    flexDirection: 'column',
+    flexDirection: 'column' as const,
     gap: '2px',
   },
-  riskLabel: {
-    fontSize: '14px',
-    fontWeight: 600,
-    color: theme.text.secondary,
-    transition: 'color 0.15s ease',
+  gameCardTitle: {
+    fontSize: '16px',
+    fontWeight: 800,
+    color: '#fff',
+    fontFamily: "'Orbitron', sans-serif",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
+    textShadow: '0 2px 8px rgba(0,0,0,0.6)',
   },
-  riskTag: {
+  gameCardSub: {
     fontSize: '12px',
     fontWeight: 500,
-    color: theme.text.muted,
-  },
-  modeMultipliersWrap: {
-    display: 'flex',
-    flexWrap: 'wrap' as const,
-    gap: '4px',
-    marginTop: '6px',
-    paddingTop: '6px',
-    borderTop: `1px solid ${theme.border.subtle}`,
-    width: '100%',
-  },
-
-  // Execute Button
-  executeBtn: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '14px 24px',
-    background: '#9945FF',
-    border: 'none',
-    borderRadius: '10px',
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
-  },
-  executeBtnText: {
-    fontSize: '16px',
-    fontWeight: 700,
-    color: '#fff',
-    fontFamily: 'Rajdhani, sans-serif',
-  },
-  executeBtnSub: {
-    fontSize: '13px',
-    fontWeight: 500,
-    color: 'rgba(255,255,255,0.6)',
-    display: 'flex',
-    alignItems: 'center',
+    color: 'rgba(255,255,255,0.65)',
+    textShadow: '0 1px 4px rgba(0,0,0,0.5)',
   },
 
   // Stats

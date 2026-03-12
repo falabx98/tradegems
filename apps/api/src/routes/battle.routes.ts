@@ -2,455 +2,499 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import crypto from 'node:crypto';
 import { requireAuth, getAuthUser, optionalAuth } from '../middleware/auth.js';
+import { env } from '../config/env.js';
 import {
   DEFAULT_ENGINE_CONFIG,
-  calculateP2PPayout,
   generateRound,
 } from '@tradingarena/game-engine';
-import type { P2PPlayerEntry } from '@tradingarena/game-engine';
 
-// ─── Bot Names ───────────────────────────────────────────────────────────────
+// ─── Constants ───────────────────────────────────────────────────────────────
 
-const BOT_NAMES = [
-  'CryptoKing420', 'SolanaWhale', 'DegenTrader', 'MoonBoi99',
-  'DiamondHands', 'PumpChaser', 'RektNoMore', 'LamboSoon',
-  'WhaleAlert', 'FloorSweeper', 'AlphaLeaker', 'GigaBrain',
-  'RugPullSurvivor', 'BullishAF', 'TokenSniper', 'YieldFarmer',
-  'MEVBot_v2', 'ApeInOnly', 'PaperHandsNo', 'SatoshiJr',
+/** Valid buy-in tiers in lamports */
+const BUYIN_TIERS = [
+  100_000_000,    // 0.1 SOL
+  250_000_000,    // 0.25 SOL
+  500_000_000,    // 0.5 SOL
+  1_000_000_000,  // 1 SOL
+  2_000_000_000,  // 2 SOL
 ];
 
-const VIP_TIERS = ['bronze', 'silver', 'gold', 'platinum', 'titan'];
-const RISK_TIERS = ['conservative', 'balanced', 'aggressive'] as const;
-
-// ─── Timing Constants ────────────────────────────────────────────────────────
-
-const BETTING_DURATION = 20_000;  // 20s betting/lobby phase
-const ACTIVE_DURATION  = 15_000;  // 15s active round
-const RESULTS_DURATION =  5_000;  // 5s results display
+const FEE_RATE = env.PLATFORM_FEE_RATE; // Unified fee rate from env (default 5%)
+const MIN_PLAYERS = 2;            // Lowered: real players only (no bots)
+const MAX_PLAYERS = 8;
+const ROUNDS_PER_TOURNAMENT = 3;
+const WAITING_COUNTDOWN = 15_000; // 15s after min players
+const ROUND_DURATION = 15_000;    // 15s per round
+const RESULTS_DURATION = 5_000;   // 5s between rounds
+const FINAL_DURATION = 10_000;    // 10s final results
+const TICK_INTERVAL = 250;        // 250ms
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-interface BattleBot {
+type RoomPhase = 'waiting' | 'round_active' | 'round_results' | 'final_results' | 'closed';
+
+interface TournamentPlayer {
   id: string;
   username: string;
   level: number;
   vipTier: string;
-  betAmount: number;
-  riskTier: string;
   joinedAt: number;
-  finalMultiplier: number;
+  /** Per-round multipliers: index 0 = round 1, etc. null = not yet reported */
+  roundMultipliers: (number | null)[];
 }
 
-interface BattlePlayer {
+interface TournamentRoom {
   id: string;
-  username: string;
-  level: number;
-  vipTier: string;
-  betAmount: number;
-  fee: number;
-  riskTier: string;
-  joinedAt: number;
-  finalMultiplier: number | null;
-  isBot: false;
-}
-
-interface GlobalBattle {
-  roundNumber: number;
-  phase: 'betting' | 'active' | 'results';
+  buyIn: number;          // lamports
+  fee: number;            // lamports (buyIn * FEE_RATE)
+  players: TournamentPlayer[];
+  state: RoomPhase;
+  currentRound: number;   // 1-based, 0 = not started
+  roundConfigs: any[];    // one RoundConfig per round (generated at round start)
+  createdAt: number;
+  countdownStartedAt: number | null;
   phaseStartedAt: number;
   phaseEndsAt: number;
-  players: BattlePlayer[];
-  bots: BattleBot[];
-  roundConfig: any | null;
-  results: any | null;
-  botSpawnScheduled: boolean;
+  grossPool: number;
+  netPool: number;
+  settledAt: number | null;
 }
 
-// ─── Global State ────────────────────────────────────────────────────────────
+// ─── In-Memory State ─────────────────────────────────────────────────────────
 
-let currentBattle: GlobalBattle = createNewBettingPhase(1);
+const rooms = new Map<string, TournamentRoom>();
 let loopTimer: ReturnType<typeof setTimeout> | null = null;
-
-function createNewBettingPhase(roundNumber: number): GlobalBattle {
-  const now = Date.now();
-  return {
-    roundNumber,
-    phase: 'betting',
-    phaseStartedAt: now,
-    phaseEndsAt: now + BETTING_DURATION,
-    players: [],
-    bots: [],
-    roundConfig: null,
-    results: null,
-    botSpawnScheduled: false,
-  };
-}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function pickRandom<T>(arr: T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
-
-function generateBotMultiplier(): number {
+function generateFallbackMultiplier(): number {
+  // Random fallback for players who didn't report a multiplier
   const r = Math.random();
-  if (r < 0.15) return 0.3 + Math.random() * 0.4;
-  if (r < 0.50) return 0.7 + Math.random() * 0.5;
-  if (r < 0.80) return 1.0 + Math.random() * 0.8;
-  if (r < 0.95) return 1.5 + Math.random() * 1.5;
-  return 2.5 + Math.random() * 4.0;
+  if (r < 0.30) return 0.3 + Math.random() * 0.4;   // 0.3-0.7  (bust)
+  if (r < 0.60) return 0.7 + Math.random() * 0.5;    // 0.7-1.2  (breakeven)
+  if (r < 0.85) return 1.0 + Math.random() * 0.6;    // 1.0-1.6  (small win)
+  return 1.3 + Math.random() * 0.7;                   // 1.3-2.0  (medium win)
 }
 
-function createBot(baseBet: number, usedNames: Set<string>): BattleBot {
-  let name: string;
-  do {
-    name = pickRandom(BOT_NAMES);
-  } while (usedNames.has(name));
-  usedNames.add(name);
+function getCumulativeScore(player: TournamentPlayer): number {
+  return player.roundMultipliers.reduce((sum: number, m) => sum + (m ?? 0), 0);
+}
 
-  const betVariation = 0.8 + Math.random() * 0.4;
-
+function createRoom(buyIn: number): TournamentRoom {
+  const now = Date.now();
+  const fee = Math.floor(buyIn * FEE_RATE);
   return {
-    id: `bot-${crypto.randomUUID().slice(0, 8)}`,
-    username: name,
-    level: Math.floor(Math.random() * 35) + 1,
-    vipTier: pickRandom(VIP_TIERS),
-    betAmount: Math.round(baseBet * betVariation),
-    riskTier: pickRandom([...RISK_TIERS]),
-    joinedAt: 0,
-    finalMultiplier: generateBotMultiplier(),
+    id: `t-${crypto.randomUUID().slice(0, 8)}`,
+    buyIn,
+    fee,
+    players: [],
+    state: 'waiting',
+    currentRound: 0,
+    roundConfigs: [],
+    createdAt: now,
+    countdownStartedAt: null,
+    phaseStartedAt: now,
+    phaseEndsAt: now + 300_000, // 5 min max wait
+    grossPool: 0,
+    netPool: 0,
+    settledAt: null,
   };
 }
 
-function getAnimatedMultiplier(bot: BattleBot, elapsed: number, index: number): number {
-  const progress = Math.min(elapsed / 15000, 1);
-  const eased = progress < 0.5
-    ? 2 * progress * progress
-    : 1 - Math.pow(-2 * progress + 2, 2) / 2;
-  const oscillation = Math.sin(elapsed / 1000 * (1.5 + index * 0.3)) * 0.05 * (1 - progress);
-  return Math.max(0.1, 1.0 + (bot.finalMultiplier - 1.0) * eased + oscillation);
-}
+// ─── Room Phase Transitions ──────────────────────────────────────────────────
 
-// ─── Bot Spawning ────────────────────────────────────────────────────────────
-
-function scheduleBotSpawns() {
-  if (currentBattle.botSpawnScheduled) return;
-  currentBattle.botSpawnScheduled = true;
-
-  const baseBet = 100_000_000; // 0.1 SOL
-  const totalBots = 3 + Math.floor(Math.random() * 3); // 3-5 bots
-  const usedNames = new Set(currentBattle.bots.map(b => b.username));
-  const roundNum = currentBattle.roundNumber;
-
-  for (let i = 0; i < totalBots; i++) {
-    const delay = 2000 + Math.random() * 14000; // Spread across 2-16s of betting phase
-    setTimeout(() => {
-      if (currentBattle.roundNumber !== roundNum) return;
-      if (currentBattle.phase !== 'betting') return;
-      if (currentBattle.bots.length >= 5) return;
-      const bot = createBot(baseBet, usedNames);
-      bot.joinedAt = Date.now();
-      currentBattle.bots.push(bot);
-    }, delay);
-  }
-}
-
-// ─── Phase Transitions ──────────────────────────────────────────────────────
-
-function transitionToActive() {
+function startRound(room: TournamentRoom) {
   const now = Date.now();
+  room.currentRound += 1;
 
-  // Generate the RoundConfig (chart path + nodes) for all players to share
-  const seed = `battle-r${currentBattle.roundNumber}-${now}`;
+  // Generate round config
+  const seed = `tournament-${room.id}-r${room.currentRound}-${now}`;
   const roundConfig = generateRound(seed, DEFAULT_ENGINE_CONFIG);
+  room.roundConfigs.push(roundConfig);
 
-  // Ensure we have at least 3 bots
-  const usedNames = new Set(currentBattle.bots.map(b => b.username));
-  while (currentBattle.bots.length < 3) {
-    const bot = createBot(100_000_000, usedNames);
-    bot.joinedAt = now;
-    currentBattle.bots.push(bot);
+  // Initialize multiplier slots for all players (null = not reported yet)
+  for (const p of room.players) {
+    while (p.roundMultipliers.length < room.currentRound - 1) {
+      p.roundMultipliers.push(0);
+    }
+    p.roundMultipliers.push(null);
   }
 
-  currentBattle.phase = 'active';
-  currentBattle.phaseStartedAt = now;
-  currentBattle.phaseEndsAt = now + ACTIVE_DURATION;
-  currentBattle.roundConfig = roundConfig;
+  room.state = 'round_active';
+  room.phaseStartedAt = now;
+  room.phaseEndsAt = now + ROUND_DURATION;
 
-  console.log(`[Battle] Round ${currentBattle.roundNumber} ACTIVE — ${currentBattle.players.length} real + ${currentBattle.bots.length} bots`);
+  // Compute pool on first round
+  if (room.currentRound === 1) {
+    room.grossPool = room.players.length * room.buyIn;
+    room.netPool = Math.floor(room.grossPool * (1 - FEE_RATE));
+  }
+
+  console.log(`[Tournament] Room ${room.id} — Round ${room.currentRound} ACTIVE (${room.players.length} players)`);
 }
 
-function transitionToResults() {
+function endRound(room: TournamentRoom) {
   const now = Date.now();
-  currentBattle.phase = 'results';
-  currentBattle.phaseStartedAt = now;
-  currentBattle.phaseEndsAt = now + RESULTS_DURATION;
+  const roundIdx = room.currentRound - 1;
 
   // Assign fallback multiplier to any player who didn't report
-  for (const player of currentBattle.players) {
-    if (player.finalMultiplier === null) {
-      player.finalMultiplier = generateBotMultiplier();
+  for (const p of room.players) {
+    if (p.roundMultipliers[roundIdx] === null || p.roundMultipliers[roundIdx] === undefined) {
+      p.roundMultipliers[roundIdx] = generateFallbackMultiplier();
     }
   }
 
-  // Build P2P payout entries
-  const entries: P2PPlayerEntry[] = [];
+  if (room.currentRound >= ROUNDS_PER_TOURNAMENT) {
+    // Final results
+    room.state = 'final_results';
+    room.phaseStartedAt = now;
+    room.phaseEndsAt = now + FINAL_DURATION;
+    console.log(`[Tournament] Room ${room.id} — FINAL RESULTS`);
 
-  for (const player of currentBattle.players) {
-    entries.push({
-      playerId: player.id,
-      betAmount: player.betAmount,
-      finalMultiplier: player.finalMultiplier!,
+    // Settle payouts
+    settleTournament(room).catch(err => {
+      console.error(`[Tournament] Settlement error for room ${room.id}:`, err);
     });
-  }
-
-  for (const bot of currentBattle.bots) {
-    entries.push({
-      playerId: bot.id,
-      betAmount: bot.betAmount,
-      finalMultiplier: bot.finalMultiplier,
-    });
-  }
-
-  if (entries.length < 2) {
-    // Not enough players for P2P — just show raw results
-    currentBattle.results = {
-      rankings: entries.map((e, i) => ({
-        rank: i + 1,
-        playerId: e.playerId,
-        username: currentBattle.players.find(p => p.id === e.playerId)?.username
-          || currentBattle.bots.find(b => b.id === e.playerId)?.username || 'Unknown',
-        isBot: !currentBattle.players.some(p => p.id === e.playerId),
-        betAmount: e.betAmount,
-        finalMultiplier: e.finalMultiplier,
-        payout: e.betAmount,
-        band: 'breakeven',
-        profitLoss: 0,
-      })),
-      pool: { grossPool: 0, platformFee: 0, netPool: 0, feeRate: 0.03, playerCount: entries.length },
-    };
   } else {
-    const payoutResult = calculateP2PPayout(entries, DEFAULT_ENGINE_CONFIG, 0.03);
-
-    const rankings = payoutResult.playerPayouts.map((pp) => {
-      const realPlayer = currentBattle.players.find(p => p.id === pp.playerId);
-      const bot = currentBattle.bots.find(b => b.id === pp.playerId);
-      const entry = entries.find(e => e.playerId === pp.playerId)!;
-
-      return {
-        rank: pp.rank,
-        playerId: pp.playerId,
-        username: realPlayer?.username || bot?.username || 'Unknown',
-        isBot: !realPlayer,
-        level: realPlayer?.level || bot?.level || 1,
-        vipTier: realPlayer?.vipTier || bot?.vipTier || 'bronze',
-        betAmount: entry.betAmount,
-        finalMultiplier: entry.finalMultiplier,
-        payout: pp.payout,
-        band: pp.band,
-        profitLoss: pp.payout - entry.betAmount,
-      };
-    });
-
-    currentBattle.results = {
-      rankings,
-      pool: {
-        grossPool: payoutResult.grossPool,
-        platformFee: payoutResult.platformFee,
-        netPool: payoutResult.netPool,
-        feeRate: payoutResult.feeRate,
-        playerCount: entries.length,
-      },
-    };
+    // Interim results
+    room.state = 'round_results';
+    room.phaseStartedAt = now;
+    room.phaseEndsAt = now + RESULTS_DURATION;
+    console.log(`[Tournament] Room ${room.id} — Round ${room.currentRound} RESULTS`);
   }
-
-  // Settle payouts for real players
-  settleBattlePayouts(currentBattle).catch(err => {
-    console.error('[Battle] Settlement error:', err);
-  });
-
-  console.log(`[Battle] Round ${currentBattle.roundNumber} RESULTS`);
 }
 
-async function settleBattlePayouts(battle: GlobalBattle) {
-  if (!battle.results?.rankings) return;
+async function settleTournament(room: TournamentRoom) {
+  if (room.settledAt) return; // Already settled
+  room.settledAt = Date.now();
+
+  // Compute final standings
+  const standings = room.players
+    .map(p => ({
+      id: p.id,
+      username: p.username,
+      cumulative: getCumulativeScore(p),
+    }))
+    .sort((a, b) => b.cumulative - a.cumulative);
+
+  if (standings.length === 0) return;
+
+  // Find winner(s) — handle ties
+  const topScore = standings[0].cumulative;
+  const winners = standings.filter(s => s.cumulative === topScore);
 
   try {
     const { WalletService } = await import('../modules/wallet/wallet.service.js');
     const walletService = new WalletService();
 
-    for (const ranking of battle.results.rankings) {
-      // Only settle real players, not bots
-      const realPlayer = battle.players.find(p => p.id === ranking.playerId);
-      if (!realPlayer) continue;
+    const winnerPayout = Math.floor(room.netPool / winners.length);
 
-      const payoutLamports = Math.floor(ranking.payout);
-      const ref = { type: 'battle' as const, id: `battle-r${battle.roundNumber}` };
+    for (const player of room.players) {
+      const isWinner = winners.some(w => w.id === player.id);
+      const payout = isWinner ? winnerPayout : 0;
+      const ref = { type: 'battle' as const, id: `tournament-${room.id}` };
 
-      await walletService.settlePayout(
-        realPlayer.id,
-        realPlayer.betAmount,
-        realPlayer.fee,
-        payoutLamports,
-        'SOL',
-        ref,
-      );
+      try {
+        await walletService.settlePayout(
+          player.id,
+          room.buyIn,
+          room.fee,
+          payout,
+          'SOL',
+          ref,
+        );
+      } catch (settleErr) {
+        console.error(`[Tournament] Settlement failed for player ${player.id} in room ${room.id}:`, settleErr);
+        // Continue settling other players
+      }
 
       // Record referral commission
       try {
         const { ReferralService } = await import('../modules/referral/referral.service.js');
         await new ReferralService().recordCommission(
-          realPlayer.id,
-          `battle-r${battle.roundNumber}`,
-          realPlayer.betAmount,
-          realPlayer.fee,
+          player.id,
+          `tournament-${room.id}`,
+          room.buyIn,
+          room.fee,
         );
       } catch {
         // Non-critical
       }
     }
+
+    console.log(`[Tournament] Room ${room.id} settled — winner(s): ${winners.map(w => w.username).join(', ')} — payout: ${winnerPayout} lamports each`);
   } catch (err) {
-    console.error('[Battle] Failed to settle payouts:', err);
+    console.error(`[Tournament] Failed to settle room ${room.id}:`, err);
   }
 }
 
-function transitionToBetting() {
-  const nextRound = currentBattle.roundNumber + 1;
-  currentBattle = createNewBettingPhase(nextRound);
-  console.log(`[Battle] Round ${nextRound} BETTING — 20s to place bets`);
+function closeRoom(room: TournamentRoom) {
+  room.state = 'closed';
+  // Schedule cleanup after a short delay (let final polls arrive)
+  setTimeout(() => {
+    rooms.delete(room.id);
+    console.log(`[Tournament] Room ${room.id} destroyed`);
+  }, 5_000);
 }
 
-// ─── Main Loop ──────────────────────────────────────────────────────────────
+// ─── Main Tick Loop ──────────────────────────────────────────────────────────
 
-function startBattleLoop() {
+function startTournamentLoop() {
   const tick = () => {
     const now = Date.now();
 
-    if (now >= currentBattle.phaseEndsAt) {
-      switch (currentBattle.phase) {
-        case 'betting':
-          transitionToActive();
-          break;
-        case 'active':
-          transitionToResults();
-          break;
-        case 'results':
-          transitionToBetting();
-          break;
+    for (const room of rooms.values()) {
+      if (room.state === 'closed') continue;
+
+      if (now >= room.phaseEndsAt) {
+        switch (room.state) {
+          case 'waiting':
+            // Countdown expired — start tournament if enough players
+            if (room.players.length >= MIN_PLAYERS || room.countdownStartedAt !== null) {
+              startRound(room);
+            } else {
+              // L2 fix: Stale room (waiting expired without enough players) — refund & cleanup
+              console.log(`[Tournament] Room ${room.id} expired with ${room.players.length} players — refunding`);
+              for (const player of room.players) {
+                (async () => {
+                  try {
+                    const { WalletService } = await import('../modules/wallet/wallet.service.js');
+                    await new WalletService().settlePayout(
+                      player.id, room.buyIn, room.fee,
+                      room.buyIn + room.fee, // Full refund
+                      'SOL',
+                      { type: 'battle' as const, id: `tournament-${room.id}-expired-refund` },
+                    );
+                  } catch (err) {
+                    console.error(`[Tournament] Expired refund failed for ${player.id}:`, err);
+                  }
+                })();
+              }
+              room.state = 'closed';
+              setTimeout(() => rooms.delete(room.id), 2_000);
+            }
+            break;
+
+          case 'round_active':
+            endRound(room);
+            break;
+
+          case 'round_results':
+            startRound(room);
+            break;
+
+          case 'final_results':
+            closeRoom(room);
+            break;
+        }
+      }
+
+      // Start countdown when 4+ players arrive
+      if (room.state === 'waiting' && room.countdownStartedAt === null && room.players.length >= MIN_PLAYERS) {
+        room.countdownStartedAt = now;
+        room.phaseEndsAt = now + WAITING_COUNTDOWN;
+        console.log(`[Tournament] Room ${room.id} — ${room.players.length} players, countdown started (15s)`);
+      }
+
+      // Auto-start at max capacity
+      if (room.state === 'waiting' && room.players.length >= MAX_PLAYERS && room.countdownStartedAt !== null) {
+        startRound(room);
       }
     }
 
-    // Schedule bot spawns during betting phase
-    if (currentBattle.phase === 'betting' && !currentBattle.botSpawnScheduled) {
-      scheduleBotSpawns();
-    }
-
-    loopTimer = setTimeout(tick, 250);
+    loopTimer = setTimeout(tick, TICK_INTERVAL);
   };
 
-  console.log(`[Battle] Loop started — Round 1 BETTING`);
-  scheduleBotSpawns();
+  console.log(`[Tournament] Loop started`);
   tick();
+}
+
+// ─── Build Room Summary ──────────────────────────────────────────────────────
+
+function buildRoomState(room: TournamentRoom, userId?: string) {
+  const now = Date.now();
+  const roundIdx = room.currentRound > 0 ? room.currentRound - 1 : -1;
+  const elapsed = room.state === 'round_active'
+    ? Math.min(now - room.phaseStartedAt, ROUND_DURATION)
+    : null;
+
+  // Build player list
+  const players = room.players.map((p) => {
+    // L1 fix: During round_active, expose the current round's reported multiplier
+    // (null = not yet reported, so frontend uses local multiplier for self)
+    const currentRoundMultiplier = (room.state === 'round_active' && roundIdx >= 0)
+      ? (p.roundMultipliers[roundIdx] ?? null)
+      : null;
+
+    return {
+      id: p.id,
+      username: p.username,
+      level: p.level,
+      vipTier: p.vipTier,
+      joinedAt: p.joinedAt,
+      roundMultipliers: (room.state === 'round_results' || room.state === 'final_results')
+        ? p.roundMultipliers
+        : p.roundMultipliers.slice(0, roundIdx >= 0 ? roundIdx : 0), // Previous rounds only
+      currentRoundMultiplier, // L1 fix: reported multiplier for current active round
+      cumulativeScore: getCumulativeScore(p),
+    };
+  });
+
+  // Sort by cumulative score during results phases
+  if (room.state === 'round_results' || room.state === 'final_results') {
+    players.sort((a, b) => b.cumulativeScore - a.cumulativeScore);
+  }
+
+  // Determine the winner for final results
+  let winner = null;
+  if (room.state === 'final_results' || room.state === 'closed') {
+    const sorted = [...room.players].sort((a, b) => getCumulativeScore(b) - getCumulativeScore(a));
+    if (sorted.length > 0) {
+      winner = {
+        id: sorted[0].id,
+        username: sorted[0].username,
+        cumulativeScore: getCumulativeScore(sorted[0]),
+        payout: room.netPool,
+      };
+    }
+  }
+
+  const myPlayer = userId ? room.players.find(p => p.id === userId) : null;
+
+  return {
+    roomId: room.id,
+    buyIn: room.buyIn,
+    fee: room.fee,
+    state: room.state,
+    currentRound: room.currentRound,
+    totalRounds: ROUNDS_PER_TOURNAMENT,
+    phaseStartedAt: room.phaseStartedAt,
+    phaseEndsAt: room.phaseEndsAt,
+    countdownStartedAt: room.countdownStartedAt,
+    players,
+    playerCount: room.players.length,
+    maxPlayers: MAX_PLAYERS,
+    minPlayers: MIN_PLAYERS,
+    grossPool: room.grossPool,
+    netPool: room.netPool,
+    elapsed,
+    myPlayerId: myPlayer ? myPlayer.id : null,
+    roundConfig: room.state === 'round_active' && roundIdx >= 0
+      ? room.roundConfigs[roundIdx]
+      : null,
+    winner,
+  };
+}
+
+// ─── Graceful Shutdown: Refund all active tournament players ─────────────────
+
+async function refundAllActiveRooms() {
+  console.log(`[Tournament] Shutdown: refunding ${rooms.size} active rooms...`);
+  for (const room of rooms.values()) {
+    if (room.state === 'closed' || room.settledAt) continue;
+
+    for (const player of room.players) {
+      try {
+        const { WalletService } = await import('../modules/wallet/wallet.service.js');
+        const walletService = new WalletService();
+        // Full refund: payout = buyIn + fee
+        await walletService.settlePayout(
+          player.id,
+          room.buyIn,
+          room.fee,
+          room.buyIn + room.fee, // Full refund
+          'SOL',
+          { type: 'battle' as const, id: `tournament-${room.id}-shutdown-refund` },
+        );
+        console.log(`[Tournament] Refunded ${player.username} (${player.id}) from room ${room.id}`);
+      } catch (err) {
+        console.error(`[Tournament] Failed to refund ${player.id} in room ${room.id}:`, err);
+      }
+    }
+  }
+  rooms.clear();
+  console.log(`[Tournament] Shutdown refunds complete`);
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 export async function battleRoutes(server: FastifyInstance) {
 
-  // Start the continuous battle loop
-  startBattleLoop();
+  // Start the tournament tick loop
+  startTournamentLoop();
 
-  // ─── Get Current Battle State ─────────────────────────────
-  server.get('/current', { preHandler: [optionalAuth] }, async (request) => {
-    const user = (request as any).authUser;
-    const now = Date.now();
-    const elapsed = currentBattle.phase === 'active'
-      ? Math.min(now - currentBattle.phaseStartedAt, ACTIVE_DURATION)
-      : null;
-
-    // Build player list
-    const allPlayers: any[] = [];
-
-    // Real players
-    for (const player of currentBattle.players) {
-      allPlayers.push({
-        id: player.id,
-        username: player.username,
-        level: player.level,
-        vipTier: player.vipTier,
-        betAmount: player.betAmount,
-        riskTier: player.riskTier,
-        isBot: false,
-        joinedAt: player.joinedAt,
-        currentMultiplier: 1.0, // Client tracks its own
-        finalMultiplier: currentBattle.phase === 'results' ? player.finalMultiplier : null,
-      });
+  // Register graceful shutdown handler
+  server.addHook('onClose', async () => {
+    if (loopTimer) {
+      clearTimeout(loopTimer);
+      loopTimer = null;
     }
-
-    // Bots
-    currentBattle.bots.forEach((bot, i) => {
-      const botData: any = {
-        id: bot.id,
-        username: bot.username,
-        level: bot.level,
-        vipTier: bot.vipTier,
-        betAmount: bot.betAmount,
-        riskTier: bot.riskTier,
-        isBot: true,
-        joinedAt: bot.joinedAt,
-        currentMultiplier: elapsed !== null ? getAnimatedMultiplier(bot, elapsed, i) : 1.0,
-        finalMultiplier: currentBattle.phase === 'results' ? bot.finalMultiplier : null,
-      };
-      allPlayers.push(botData);
-    });
-
-    // Sort by current multiplier during active phase
-    if (currentBattle.phase === 'active' && elapsed !== null) {
-      allPlayers.sort((a: any, b: any) => b.currentMultiplier - a.currentMultiplier);
-    }
-
-    const grossPool = allPlayers.reduce((s: number, p: any) => s + p.betAmount, 0);
-
-    // Detect if the requesting user is a participant
-    const myPlayerId = user ? currentBattle.players.find(p => p.id === user.userId)?.id || null : null;
-
-    return {
-      roundNumber: currentBattle.roundNumber,
-      phase: currentBattle.phase,
-      phaseStartedAt: currentBattle.phaseStartedAt,
-      phaseEndsAt: currentBattle.phaseEndsAt,
-      players: allPlayers,
-      playerCount: allPlayers.length,
-      grossPool,
-      elapsed,
-      myPlayerId,
-      // Only send roundConfig during active phase (it's large ~50KB)
-      roundConfig: currentBattle.phase === 'active' ? currentBattle.roundConfig : null,
-      results: currentBattle.phase === 'results' ? currentBattle.results : null,
-    };
+    await refundAllActiveRooms();
   });
 
-  // ─── Join Current Battle ──────────────────────────────────
-  server.post('/join', { preHandler: [requireAuth] }, async (request, reply) => {
-    const user = getAuthUser(request);
+  // ─── List Open Rooms ─────────────────────────────────────
+  server.get('/rooms', { preHandler: [optionalAuth] }, async () => {
+    const openRooms: any[] = [];
 
-    if (currentBattle.phase !== 'betting') {
-      return reply.status(400).send({
-        error: 'Can only join during betting phase',
-        phase: currentBattle.phase,
-        phaseEndsAt: currentBattle.phaseEndsAt,
+    for (const room of rooms.values()) {
+      if (room.state !== 'waiting') continue;
+      openRooms.push({
+        roomId: room.id,
+        buyIn: room.buyIn,
+        playerCount: room.players.length,
+        maxPlayers: MAX_PLAYERS,
+        countdownStartedAt: room.countdownStartedAt,
+        phaseEndsAt: room.phaseEndsAt,
+        createdAt: room.createdAt,
       });
     }
 
-    // Check if already joined this round
-    if (currentBattle.players.some(p => p.id === user.userId)) {
-      return reply.status(400).send({ error: 'Already joined this round' });
-    }
+    // Group by buy-in tier
+    const tiers = BUYIN_TIERS.map(tier => ({
+      buyIn: tier,
+      label: `${tier / 1_000_000_000} SOL`,
+      rooms: openRooms.filter(r => r.buyIn === tier),
+      openCount: openRooms.filter(r => r.buyIn === tier).length,
+    }));
+
+    return { tiers, buyInOptions: BUYIN_TIERS };
+  });
+
+  // ─── Join / Create Room ──────────────────────────────────
+  server.post('/join', { preHandler: [requireAuth], config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
+    const user = getAuthUser(request);
 
     const body = z.object({
-      betAmount: z.number().int().positive().min(1_000_000).max(10_000_000_000),
-      riskTier: z.enum(['conservative', 'balanced', 'aggressive']),
+      buyIn: z.number().int().refine(v => BUYIN_TIERS.includes(v), {
+        message: 'Invalid buy-in tier',
+      }),
     }).parse(request.body);
+
+    // Check if player is already in an active room
+    for (const room of rooms.values()) {
+      if (room.state === 'closed') continue;
+      if (room.players.some(p => p.id === user.userId)) {
+        return reply.status(400).send({
+          error: 'Already in a tournament',
+          roomId: room.id,
+        });
+      }
+    }
+
+    // Find an existing waiting room at this buy-in, or create one
+    let targetRoom: TournamentRoom | null = null;
+    for (const room of rooms.values()) {
+      if (room.state === 'waiting' && room.buyIn === body.buyIn && room.players.length < MAX_PLAYERS) {
+        targetRoom = room;
+        break;
+      }
+    }
+
+    if (!targetRoom) {
+      targetRoom = createRoom(body.buyIn);
+      rooms.set(targetRoom.id, targetRoom);
+      console.log(`[Tournament] New room ${targetRoom.id} created (${body.buyIn / 1_000_000_000} SOL)`);
+    }
 
     // Get user info from DB
     let username = 'Player';
@@ -471,10 +515,8 @@ export async function battleRoutes(server: FastifyInstance) {
       // Fallback to defaults
     }
 
-    // Lock funds from player's balance (bet + 5% fee)
-    const feeRate = DEFAULT_ENGINE_CONFIG.platformFeeRate; // 0.05
-    const fee = Math.floor(body.betAmount * feeRate);
-    const totalCost = body.betAmount + fee;
+    // Lock funds
+    const totalCost = targetRoom.buyIn + targetRoom.fee;
 
     try {
       const { WalletService } = await import('../modules/wallet/wallet.service.js');
@@ -483,7 +525,7 @@ export async function battleRoutes(server: FastifyInstance) {
         user.userId,
         totalCost,
         'SOL',
-        { type: 'battle', id: `battle-r${currentBattle.roundNumber}` },
+        { type: 'battle' as const, id: `tournament-${targetRoom.id}` },
       );
     } catch (err: any) {
       return reply.status(400).send({
@@ -491,47 +533,193 @@ export async function battleRoutes(server: FastifyInstance) {
       });
     }
 
-    const player: BattlePlayer = {
+    // Add player
+    const player: TournamentPlayer = {
       id: user.userId,
       username,
       level,
       vipTier,
-      betAmount: body.betAmount,
-      fee,
-      riskTier: body.riskTier,
       joinedAt: Date.now(),
-      finalMultiplier: null,
-      isBot: false,
+      roundMultipliers: [],
     };
 
-    currentBattle.players.push(player);
+    targetRoom.players.push(player);
+
+    // M2 fix: Update pool preview (definitive pool is locked at round 1 start in startRound())
+    targetRoom.grossPool = targetRoom.players.length * targetRoom.buyIn;
+    targetRoom.netPool = Math.floor(targetRoom.grossPool * (1 - FEE_RATE));
+
+    console.log(`[Tournament] ${username} joined room ${targetRoom.id} (${targetRoom.players.length}/${MAX_PLAYERS})`);
 
     return {
       success: true,
-      roundNumber: currentBattle.roundNumber,
-      phase: currentBattle.phase,
-      phaseEndsAt: currentBattle.phaseEndsAt,
+      ...buildRoomState(targetRoom, user.userId),
     };
   });
 
-  // ─── Report Multiplier ────────────────────────────────────
-  server.post('/report', { preHandler: [requireAuth] }, async (request, reply) => {
-    const user = getAuthUser(request);
+  // ─── Get Room State (poll) ───────────────────────────────
+  server.get('/:roomId', { preHandler: [optionalAuth] }, async (request, reply) => {
+    const { roomId } = request.params as { roomId: string };
+    const user = (request as any).authUser;
 
-    if (currentBattle.phase !== 'active') {
-      return reply.status(400).send({ error: 'Can only report during active phase' });
+    const room = rooms.get(roomId);
+    if (!room) {
+      return reply.status(404).send({ error: 'Room not found or closed' });
+    }
+
+    return buildRoomState(room, user?.userId);
+  });
+
+  // ─── Report Round Multiplier ─────────────────────────────
+  // C2 FIX: Validate client multiplier within config bounds instead of re-simulating
+  // (simulateRound is deterministic — same inputs = same output for ALL players,
+  //  but the game is interactive: each player hits/misses different nodes)
+  server.post('/:roomId/report', { preHandler: [requireAuth] }, async (request, reply) => {
+    const user = getAuthUser(request);
+    const { roomId } = request.params as { roomId: string };
+
+    const room = rooms.get(roomId);
+    if (!room) {
+      return reply.status(404).send({ error: 'Room not found' });
+    }
+
+    if (room.state !== 'round_active') {
+      return reply.status(400).send({ error: 'Can only report during active round' });
     }
 
     const body = z.object({
+      round: z.number().int().min(1).max(ROUNDS_PER_TOURNAMENT),
       finalMultiplier: z.number().min(0).max(100),
+      nodesHit: z.number().int().min(0).optional(),
+      nodesTotal: z.number().int().min(0).optional(),
     }).parse(request.body);
 
-    const player = currentBattle.players.find(p => p.id === user.userId);
-    if (!player) {
-      return reply.status(400).send({ error: 'Not a participant in this round' });
+    if (body.round !== room.currentRound) {
+      return reply.status(400).send({ error: 'Round mismatch' });
     }
 
-    player.finalMultiplier = body.finalMultiplier;
+    const player = room.players.find(p => p.id === user.userId);
+    if (!player) {
+      return reply.status(400).send({ error: 'Not a participant in this tournament' });
+    }
+
+    // Prevent double-reporting for the same round
+    const roundIdx = room.currentRound - 1;
+    if (player.roundMultipliers[roundIdx] !== null && player.roundMultipliers[roundIdx] !== undefined) {
+      return { success: true, serverMultiplier: player.roundMultipliers[roundIdx] };
+    }
+
+    const roundConfig = room.roundConfigs[roundIdx];
+
+    // Validate multiplier is within the config's allowed range
+    // The max is bounded by engineConfig.maxFinalMultiplier (default ~10x)
+    // The min is 0 (total loss from dividers/bombs)
+    const maxAllowed = roundConfig?.engineConfig?.maxFinalMultiplier ?? DEFAULT_ENGINE_CONFIG.maxFinalMultiplier ?? 10;
+    const validatedMultiplier = Math.max(0, Math.min(maxAllowed, body.finalMultiplier));
+
+    // Sanity check: if reported multiplier was drastically different, log it
+    if (Math.abs(validatedMultiplier - body.finalMultiplier) > 0.01) {
+      console.warn(`[Tournament] Clamped multiplier for ${user.userId} in room ${roomId}: reported=${body.finalMultiplier}, clamped=${validatedMultiplier}`);
+    }
+
+    player.roundMultipliers[roundIdx] = validatedMultiplier;
+
+    return { success: true, serverMultiplier: validatedMultiplier };
+  });
+
+  // ─── Leave Room (waiting phase only) ─────────────────────
+  server.post('/:roomId/leave', { preHandler: [requireAuth] }, async (request, reply) => {
+    const user = getAuthUser(request);
+    const { roomId } = request.params as { roomId: string };
+
+    const room = rooms.get(roomId);
+    if (!room) {
+      return reply.status(404).send({ error: 'Room not found' });
+    }
+
+    if (room.state !== 'waiting') {
+      return reply.status(400).send({ error: 'Can only leave during waiting phase' });
+    }
+
+    const playerIdx = room.players.findIndex(p => p.id === user.userId);
+    if (playerIdx === -1) {
+      return reply.status(400).send({ error: 'Not in this room' });
+    }
+
+    // Refund locked funds
+    try {
+      const { WalletService } = await import('../modules/wallet/wallet.service.js');
+      const walletService = new WalletService();
+      // Unlock by settling with full refund (payout = buyIn + fee, so net zero)
+      await walletService.settlePayout(
+        user.userId,
+        room.buyIn,
+        room.fee,
+        room.buyIn + room.fee, // Full refund
+        'SOL',
+        { type: 'battle' as const, id: `tournament-${room.id}-refund` },
+      );
+    } catch (err) {
+      console.error(`[Tournament] Refund error for ${user.userId}:`, err);
+    }
+
+    room.players.splice(playerIdx, 1);
+
+    // Recalculate pool
+    room.grossPool = room.players.length * room.buyIn;
+    room.netPool = Math.floor(room.grossPool * (1 - FEE_RATE));
+
+    // Reset countdown if under threshold
+    if (room.players.length < MIN_PLAYERS) {
+      room.countdownStartedAt = null;
+      room.phaseEndsAt = room.createdAt + 300_000;
+    }
+
+    // Remove empty rooms
+    if (room.players.length === 0) {
+      rooms.delete(room.id);
+      console.log(`[Tournament] Room ${room.id} removed (empty)`);
+    }
+
     return { success: true };
+  });
+
+  // ─── Legacy: GET /current → redirect to rooms list ──────
+  server.get('/current', { preHandler: [optionalAuth] }, async (request) => {
+    const user = (request as any).authUser;
+
+    // If user is in an active room, return that room's state
+    if (user) {
+      for (const room of rooms.values()) {
+        if (room.state === 'closed') continue;
+        const player = room.players.find(p => p.id === user.userId);
+        if (player) {
+          return buildRoomState(room, user.userId);
+        }
+      }
+    }
+
+    // Otherwise return the rooms list for backwards compat
+    const openRooms: any[] = [];
+    for (const room of rooms.values()) {
+      if (room.state !== 'waiting') continue;
+      openRooms.push({
+        roomId: room.id,
+        buyIn: room.buyIn,
+        playerCount: room.players.length,
+        maxPlayers: MAX_PLAYERS,
+      });
+    }
+
+    return {
+      phase: 'lobby',
+      tiers: BUYIN_TIERS.map(tier => ({
+        buyIn: tier,
+        label: `${tier / 1_000_000_000} SOL`,
+        rooms: openRooms.filter(r => r.buyIn === tier),
+        openCount: openRooms.filter(r => r.buyIn === tier).length,
+      })),
+      buyInOptions: BUYIN_TIERS,
+    };
   });
 }

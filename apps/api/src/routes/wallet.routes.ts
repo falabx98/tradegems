@@ -66,7 +66,7 @@ export async function walletRoutes(server: FastifyInstance) {
     };
   });
 
-  server.post('/deposit/verify', async (request) => {
+  server.post('/deposit/verify', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request) => {
     const { txHash } = depositVerifySchema.parse(request.body);
     const userId = getAuthUser(request).userId;
     return depositService.submitDeposit(userId, txHash);
@@ -74,7 +74,7 @@ export async function walletRoutes(server: FastifyInstance) {
 
   // ─── Withdrawal ───────────────────────────────────────────
 
-  server.post('/withdraw', async (request, reply) => {
+  server.post('/withdraw', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
     const body = withdrawSchema.parse(request.body);
     const userId = getAuthUser(request).userId;
     const amount = parseInt(body.amount);
@@ -110,7 +110,7 @@ export async function walletRoutes(server: FastifyInstance) {
 
   // ─── Bonus: Claim new user bonus ────────────────────────
 
-  server.post('/claim-bonus', async (request) => {
+  server.post('/claim-bonus', { config: { rateLimit: { max: 3, timeWindow: '1 minute' } } }, async (request) => {
     const userId = getAuthUser(request).userId;
     return walletService.claimNewUserBonus(userId);
   });

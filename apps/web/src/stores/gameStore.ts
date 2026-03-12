@@ -19,7 +19,7 @@ import { api } from '../utils/api';
 
 interface GameState {
   // Current view
-  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'battle' | 'prediction';
+  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'battle' | 'prediction' | 'fairness' | 'season';
   mode: GameMode;
 
   // Round state
@@ -49,13 +49,10 @@ interface GameState {
   // Result
   result: RoundResult | null;
 
-  // Battle state (continuous loop)
-  battlePhase: 'idle' | 'betting' | 'active' | 'results';
-  battleRoundNumber: number | null;
-  battleRoundConfig: RoundConfig | null;
-  battleJoined: boolean;
-  battlePlayers: any[];
-  battleResults: any | null;
+  // Tournament state
+  tournamentRoomId: string | null;
+  tournamentState: any | null;
+  tournamentRoundConfig: RoundConfig | null;
 
   // Player profile
   profile: PlayerProfile;
@@ -78,9 +75,10 @@ interface GameState {
   resetRound: () => void;
   playAgain: () => void;
   syncProfile: () => Promise<void>;
-  joinBattle: () => Promise<void>;
+  joinTournament: (buyIn: number) => Promise<void>;
+  leaveTournament: () => Promise<void>;
   enterBattle: () => void;
-  resetBattle: () => void;
+  resetTournament: () => void;
   toggleChat: () => void;
   clearUnreadChat: () => void;
   incrementUnreadChat: (count: number) => void;
@@ -122,12 +120,9 @@ export const useGameStore = create<GameState>((set, get) => ({
   nearMissNodeIds: new Set(),
   engineConfig: DEFAULT_ENGINE_CONFIG,
   result: null,
-  battlePhase: 'idle',
-  battleRoundNumber: null,
-  battleRoundConfig: null,
-  battleJoined: false,
-  battlePlayers: [],
-  battleResults: null,
+  tournamentRoomId: null,
+  tournamentState: null,
+  tournamentRoundConfig: null,
   profile: DEFAULT_PROFILE,
   chatOpen: false,
   unreadChat: 0,
@@ -146,6 +141,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Generate round locally (deterministic engine)
     const config = generateRound(undefined, state.engineConfig);
 
+    // Deduct betAmount + fee from local balance immediately
+    // M1 fix: use cached server config fee rate (fetched on app load)
+    const feeRate = (globalThis as any).__serverFeeRate ?? 0.05;
+    const fee = Math.floor(state.betAmount * feeRate);
+    const totalCost = state.betAmount + fee;
+    const profile = { ...state.profile };
+    profile.balance = Math.max(0, profile.balance - totalCost);
+
     set({
       roundConfig: config,
       phase: 'opening',
@@ -160,13 +163,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       screen: 'playing',
       betPlaced: false,
       serverRoundId: null,
+      profile,
     });
 
     // Place bet on server in background (non-blocking)
     (async () => {
       try {
-        // Schedule a dev round and place bet
-        const round = await api.scheduleRound() as any;
+        // Schedule a solo round and place bet
+        const round = await api.startSoloRound() as any;
         const roundId = round.id;
 
         const idempotencyKey = `${roundId}-${Date.now()}`;
@@ -235,12 +239,14 @@ export const useGameStore = create<GameState>((set, get) => ({
     const result = simulateRound(state.roundConfig, state.betAmount, state.riskTier);
 
     // Update profile locally
+    // Balance was already deducted on startRound (betAmount + fee),
+    // so just credit the payout amount back
     const profile = { ...state.profile };
     profile.roundsPlayed++;
     profile.totalWagered += state.betAmount;
     profile.totalWon += result.payout;
     profile.xp += result.xpGained;
-    profile.balance += result.payout - state.betAmount;
+    profile.balance += Math.floor(result.payout); // credit payout (cost already deducted at start)
     if (result.finalMultiplier > profile.bestMultiplier) {
       profile.bestMultiplier = result.finalMultiplier;
     }
@@ -249,7 +255,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       profile.xp -= profile.xpToNext;
       profile.xpToNext = Math.floor(profile.xpToNext * 1.3);
     }
-    profile.winRate = profile.totalWon / Math.max(profile.totalWagered, 1);
+    // M4 fix: winRate = totalWon / totalWagered (ROI, same as server formula)
+    // Avoids the old _wins hack that didn't persist across reloads
+    profile.winRate = profile.totalWagered > 0
+      ? profile.totalWon / profile.totalWagered
+      : 0;
 
     set({
       phase: 'frozen',
@@ -264,9 +274,29 @@ export const useGameStore = create<GameState>((set, get) => ({
       const { serverRoundId, betPlaced } = get();
       if (serverRoundId && betPlaced) {
         try {
-          // Resolve dev round server-side
-          await api.devResolveRound(serverRoundId);
-          // Sync real profile from server
+          // Resolve solo round server-side (uses server's seed — source of truth)
+          await api.resolveSoloRound(serverRoundId);
+
+          // Fetch the actual server result to correct any seed mismatch
+          try {
+            const serverResult = await api.getRoundResult(serverRoundId) as any;
+            if (serverResult && serverResult.finalMultiplier !== undefined) {
+              const serverPayout = Number(serverResult.payoutAmount ?? 0);
+              const serverMult = parseFloat(serverResult.finalMultiplier);
+              // Update displayed result with server's authoritative values
+              set((s) => ({
+                result: s.result ? {
+                  ...s.result,
+                  finalMultiplier: serverMult,
+                  payout: serverPayout,
+                } : s.result,
+              }));
+            }
+          } catch {
+            // Non-critical — local result still displayed
+          }
+
+          // Sync real profile from server (balance, stats, etc.)
           await get().syncProfile();
         } catch (err) {
           console.warn('Server round resolution failed:', err);
@@ -311,34 +341,44 @@ export const useGameStore = create<GameState>((set, get) => ({
     });
   },
 
-  joinBattle: async () => {
-    const state = get();
+  joinTournament: async (buyIn: number) => {
     try {
-      const res = await api.joinBattle({
-        betAmount: state.betAmount,
-        riskTier: state.riskTier,
-      });
+      const res = await api.joinTournament(buyIn);
       set({
-        battleJoined: true,
-        battleRoundNumber: res.roundNumber,
+        tournamentRoomId: res.roomId,
+        tournamentState: res,
       });
     } catch (err) {
-      console.error('Failed to join battle:', err);
+      console.error('Failed to join tournament:', err);
+      throw err;
     }
+  },
+
+  leaveTournament: async () => {
+    const state = get();
+    if (state.tournamentRoomId) {
+      try {
+        await api.leaveTournament(state.tournamentRoomId);
+      } catch (err) {
+        console.error('Failed to leave tournament:', err);
+      }
+    }
+    set({
+      tournamentRoomId: null,
+      tournamentState: null,
+      tournamentRoundConfig: null,
+    });
   },
 
   enterBattle: () => {
     set({ screen: 'battle' });
   },
 
-  resetBattle: () => {
+  resetTournament: () => {
     set({
-      battlePhase: 'idle',
-      battleRoundNumber: null,
-      battleRoundConfig: null,
-      battleJoined: false,
-      battlePlayers: [],
-      battleResults: null,
+      tournamentRoomId: null,
+      tournamentState: null,
+      tournamentRoundConfig: null,
       screen: 'lobby',
     });
   },

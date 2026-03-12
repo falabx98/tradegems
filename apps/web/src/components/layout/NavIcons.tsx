@@ -109,6 +109,19 @@ export function NavIcon({ name, size = 18, color = 'currentColor' }: NavIconProp
           <circle cx="12" cy="19" r="1.5" fill={color} stroke="none" />
         </svg>
       );
+    case 'star':
+      return (
+        <svg {...props}>
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill={color} fillOpacity="0.15" />
+        </svg>
+      );
+    case 'shield':
+      return (
+        <svg {...props}>
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          <polyline points="9 12 11 14 15 10" />
+        </svg>
+      );
     default:
       return null;
   }

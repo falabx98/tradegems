@@ -104,6 +104,24 @@ export async function apiFetch<T = unknown>(
   return res.json();
 }
 
+// ─── Server Config Cache (M1 fix: fee rate from server) ─────────────────────
+
+let _serverConfig: { feeRate: number; minBetLamports: number; maxBetLamports: number } | null = null;
+let _configFetchedAt = 0;
+
+export async function getServerConfig() {
+  const now = Date.now();
+  if (_serverConfig && now - _configFetchedAt < 300_000) return _serverConfig; // Cache 5 min
+  try {
+    const data = await apiFetch<{ feeRate: number; minBetLamports: number; maxBetLamports: number }>('/v1/config');
+    _serverConfig = data;
+    _configFetchedAt = now;
+    return data;
+  } catch {
+    return _serverConfig ?? { feeRate: 0.05, minBetLamports: 1_000_000, maxBetLamports: 10_000_000_000 };
+  }
+}
+
 // ─── API Methods ─────────────────────────────────────────────────────────────
 
 export const api = {
@@ -168,7 +186,14 @@ export const api = {
   getRoundHistory: (limit?: number) =>
     apiFetch(`/v1/rounds/history?limit=${limit || 20}`),
 
-  // Dev
+  // Solo round lifecycle
+  startSoloRound: () =>
+    apiFetch('/v1/rounds/solo/start', { method: 'POST' }),
+
+  resolveSoloRound: (roundId: string) =>
+    apiFetch(`/v1/rounds/solo/resolve/${roundId}`, { method: 'POST' }),
+
+  // Dev (admin only — kept for admin tools)
   scheduleRound: () =>
     apiFetch('/v1/rounds/dev/schedule', { method: 'POST' }),
 
@@ -266,31 +291,65 @@ export const api = {
       reward?: { id: string; rarity: string; amountLamports: number; level: number; vipTier: string };
     }>('/v1/rewards/daily-box/claim', { method: 'POST' }),
 
-  // Battles (continuous loop)
-  getCurrentBattle: () =>
+  // Tournaments
+  getTournamentRooms: () =>
     apiFetch<{
-      roundNumber: number;
-      phase: 'betting' | 'active' | 'results';
-      phaseStartedAt: number;
-      phaseEndsAt: number;
+      tiers: Array<{
+        buyIn: number;
+        label: string;
+        rooms: Array<{ roomId: string; buyIn: number; playerCount: number; maxPlayers: number; countdownStartedAt: number | null; phaseEndsAt: number; createdAt: number }>;
+        openCount: number;
+      }>;
+      buyInOptions: number[];
+    }>('/v1/battles/rooms'),
+
+  joinTournament: (buyIn: number) =>
+    apiFetch<{
+      success: boolean;
+      roomId: string;
+      state: string;
       players: any[];
       playerCount: number;
+      buyIn: number;
       grossPool: number;
+      netPool: number;
+    }>('/v1/battles/join', {
+      method: 'POST',
+      body: JSON.stringify({ buyIn }),
+    }),
+
+  getTournamentRoom: (roomId: string) =>
+    apiFetch<{
+      roomId: string;
+      buyIn: number;
+      fee: number;
+      state: 'waiting' | 'round_active' | 'round_results' | 'final_results' | 'closed';
+      currentRound: number;
+      totalRounds: number;
+      phaseStartedAt: number;
+      phaseEndsAt: number;
+      countdownStartedAt: number | null;
+      players: any[];
+      playerCount: number;
+      maxPlayers: number;
+      minPlayers: number;
+      grossPool: number;
+      netPool: number;
       elapsed: number | null;
       myPlayerId: string | null;
       roundConfig: any | null;
-      results: any | null;
-    }>('/v1/battles/current'),
+      winner: { id: string; username: string; cumulativeScore: number; payout: number } | null;
+    }>(`/v1/battles/${roomId}`),
 
-  joinBattle: (data: { betAmount: number; riskTier: string }) =>
-    apiFetch<{ success: boolean; roundNumber: number; phase: string; phaseEndsAt: number }>(
-      '/v1/battles/join', { method: 'POST', body: JSON.stringify(data) },
-    ),
-
-  reportBattleMultiplier: (finalMultiplier: number) =>
-    apiFetch('/v1/battles/report', {
+  reportTournamentMultiplier: (roomId: string, round: number, finalMultiplier: number) =>
+    apiFetch('/v1/battles/' + roomId + '/report', {
       method: 'POST',
-      body: JSON.stringify({ finalMultiplier }),
+      body: JSON.stringify({ round, finalMultiplier }),
+    }),
+
+  leaveTournament: (roomId: string) =>
+    apiFetch('/v1/battles/' + roomId + '/leave', {
+      method: 'POST',
     }),
 
   // Referrals / Affiliates
@@ -345,4 +404,14 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ message, channel }),
     }),
+
+  // Tips
+  sendTip: (data: { recipientUsername: string; amount: number; message?: string }) =>
+    apiFetch<{ success: boolean; amount: number; recipient: string; tipId: string }>('/v1/tips/send', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getTipHistory: () =>
+    apiFetch<{ tips: Array<{ id: string; type: string; amount: number; metadata: any; createdAt: string }> }>('/v1/tips/history'),
 };

@@ -3,13 +3,14 @@ import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useSolPrice } from '../../hooks/useSolPrice';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { isPhotoAvatar, getAvatarGradient, getInitials } from '../../utils/avatars';
 
 export function TopBar() {
   const profile = useGameStore((s) => s.profile);
-  const setScreen = useGameStore((s) => s.setScreen);
+  const go = useAppNavigate();
   const { isAuthenticated } = useAuthStore();
   const isMobile = useIsMobile();
   const { price } = useSolPrice();
@@ -47,7 +48,7 @@ export function TopBar() {
               )}
             </div>
 
-            <button style={styles.depositBtn} onClick={() => setScreen('wallet')}>Deposit</button>
+            <button style={styles.depositBtn} onClick={() => go('wallet')}>Deposit</button>
 
             <div style={styles.profilePill} className="profile-glow">
               {isPhotoAvatar(profile.avatarUrl) ? (
@@ -77,7 +78,7 @@ export function TopBar() {
         ) : (
           <button
             style={styles.depositBtn}
-            onClick={() => setScreen('auth')}
+            onClick={() => go('auth')}
           >
             Login
           </button>

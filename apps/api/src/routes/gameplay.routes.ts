@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { BetService } from '../modules/bet/bet.service.js';
 import { RoundService } from '../modules/round/round.service.js';
-import { requireAuth, getAuthUser } from '../middleware/auth.js';
+import { requireAuth, requireAdmin, getAuthUser } from '../middleware/auth.js';
 
 const placeBetSchema = z.object({
   amount: z.number().int().positive().min(1_000_000).max(10_000_000_000), // 0.001 SOL to 10 SOL in lamports
@@ -76,14 +76,40 @@ export async function gameplayRoutes(server: FastifyInstance) {
     return { data: results };
   });
 
-  // ─── Round lifecycle (solo mode) ─────────────────────────
-  server.post('/dev/schedule', { preHandler: [requireAuth] }, async () => {
+  // ─── Solo round lifecycle (any authenticated user) ──────
+  server.post('/solo/start', { preHandler: [requireAuth], config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request) => {
+    const userId = getAuthUser(request).userId;
+    const round = await roundService.scheduleRound('solo', 10000);
+    await roundService.openEntry(round.id);
+    return { id: round.id, status: round.status, scheduledAt: round.scheduledAt, userId };
+  });
+
+  server.post('/solo/resolve/:id', { preHandler: [requireAuth] }, async (request) => {
+    const { id } = request.params as { id: string };
+    const userId = getAuthUser(request).userId;
+
+    // Verify user has an active bet on this round
+    const bets = await betService.getBetsForRound(id);
+    const userBet = bets.find((b: any) => b.userId === userId);
+    if (!userBet) {
+      return { error: 'NO_BET', message: 'You have no bet on this round' };
+    }
+
+    await roundService.generateRoundPayload(id);
+    await roundService.startRound(id);
+    await roundService.freezeRound(id);
+    await roundService.resolveRound(id);
+    return { message: 'Round resolved', roundId: id };
+  });
+
+  // ─── Admin-only dev endpoints (kept for admin tools) ───
+  server.post('/dev/schedule', { preHandler: [requireAdmin] }, async () => {
     const round = await roundService.scheduleRound('solo', 10000);
     await roundService.openEntry(round.id);
     return round;
   });
 
-  server.post('/dev/resolve/:id', { preHandler: [requireAuth] }, async (request) => {
+  server.post('/dev/resolve/:id', { preHandler: [requireAdmin] }, async (request) => {
     const { id } = request.params as { id: string };
     await roundService.generateRoundPayload(id);
     await roundService.startRound(id);

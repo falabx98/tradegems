@@ -107,7 +107,7 @@ export class AuthService {
     return { sessionId: session.id, refreshToken };
   }
 
-  async refreshSession(refreshToken: string): Promise<{ userId: string; role: string; sessionId: string } | null> {
+  async refreshSession(refreshToken: string): Promise<{ userId: string; role: string; sessionId: string; newRefreshToken: string } | null> {
     const hash = crypto.createHash('sha256').update(refreshToken).digest('hex');
 
     const session = await this.db.query.userSessions.findFirst({
@@ -118,7 +118,7 @@ export class AuthService {
       return null;
     }
 
-    // Rotate token
+    // Rotate token — return the new token so the route handler can set the cookie
     const newRefreshToken = nanoid(64);
     const newHash = crypto.createHash('sha256').update(newRefreshToken).digest('hex');
 
@@ -132,13 +132,21 @@ export class AuthService {
 
     if (!user || user.status !== 'active') return null;
 
-    return { userId: user.id, role: user.role, sessionId: session.id };
+    return { userId: user.id, role: user.role, sessionId: session.id, newRefreshToken };
   }
 
   async revokeSession(sessionId: string) {
     await this.db.update(userSessions)
       .set({ revokedAt: new Date() })
       .where(eq(userSessions.id, sessionId));
+
+    // H2: Immediately mark as revoked in Redis cache for fast auth checks
+    try {
+      const redis = getRedis();
+      await redis.set(`revoked:session:${sessionId}`, '1', 'EX', 300);
+    } catch {
+      // Non-critical — auth middleware will check DB on cache miss
+    }
   }
 
   // ─── Wallet Auth ─────────────────────────────────────────

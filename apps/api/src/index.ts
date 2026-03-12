@@ -1,6 +1,7 @@
 import { buildServer } from './server.js';
 import { env } from './config/env.js';
 import { startSweepWorker, stopSweepWorker } from './workers/sweepWorker.js';
+import { stopBotEngine } from './workers/botEngine.worker.js';
 
 async function main() {
   const server = await buildServer();
@@ -22,6 +23,7 @@ async function main() {
     process.on(signal, async () => {
       server.log.info(`${signal} received, shutting down...`);
       stopSweepWorker();
+      stopBotEngine();
       await server.close();
       process.exit(0);
     });

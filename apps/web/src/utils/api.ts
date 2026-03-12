@@ -453,4 +453,20 @@ export const api = {
   // Spectate
   spectateTournament: (roomId: string) =>
     apiFetch(`/v1/battles/${roomId}/spectate`),
+
+  // Activity Feed
+  getActivityFeed: (limit?: number, after?: string) => {
+    const params = new URLSearchParams();
+    if (limit) params.set('limit', String(limit));
+    if (after) params.set('after', after);
+    return apiFetch<{
+      data: Array<{
+        id: number;
+        feedType: string;
+        userId: string;
+        payload: any;
+        createdAt: string;
+      }>;
+    }>(`/v1/activity/feed?${params.toString()}`);
+  },
 };

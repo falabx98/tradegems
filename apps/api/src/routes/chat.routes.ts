@@ -10,15 +10,15 @@ const rateLimitMap = new Map<string, number>();
 
 // ─── Online Tracking ────────────────────────────────────────
 // Track users who have polled chat recently (userId → lastSeenMs)
-const onlineUsers = new Map<string, number>();
+export const onlineUsers = new Map<string, number>();
 const ONLINE_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
-function trackOnline(userId: string | null) {
+export function trackOnline(userId: string | null) {
   if (!userId) return;
   onlineUsers.set(userId, Date.now());
 }
 
-function getOnlineCount(): number {
+export function getOnlineCount(): number {
   const cutoff = Date.now() - ONLINE_WINDOW_MS;
   let count = 0;
   for (const [uid, ts] of onlineUsers) {

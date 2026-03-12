@@ -19,6 +19,8 @@ import { referralRoutes } from './routes/referral.routes.js';
 import { chatRoutes } from './routes/chat.routes.js';
 import { tipRoutes } from './routes/tip.routes.js';
 import { startDepositWorker } from './workers/depositConfirmation.worker.js';
+import { startBotEngine } from './workers/botEngine.worker.js';
+import { activityRoutes } from './routes/activity.routes.js';
 import { initSentry } from './config/sentry.js';
 import { fairnessRoutes } from './routes/fairness.routes.js';
 import { seasonRoutes } from './routes/season.routes.js';
@@ -121,9 +123,11 @@ export async function buildServer() {
   await server.register(fairnessRoutes, { prefix: '/v1/fairness' });
   await server.register(seasonRoutes, { prefix: '/v1/season' });
   await server.register(predictionRoutes, { prefix: '/v1/predictions' });
+  await server.register(activityRoutes, { prefix: '/v1/activity' });
 
   // Start background workers
   startDepositWorker();
+  startBotEngine();
 
   return server;
 }

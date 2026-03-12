@@ -7,6 +7,7 @@ import { theme } from '../../styles/theme';
 import { api } from '../../utils/api';
 import { formatSol } from '../../utils/sol';
 import { GiftIcon, LockIcon, PartyIcon } from '../ui/GameIcons';
+import { ActivityFeed } from '../ActivityFeed';
 
 interface BannerData {
   id: string;
@@ -47,30 +48,12 @@ const BANNERS: BannerData[] = [
   },
 ];
 
-interface FeedItem {
-  user: string;
-  mult: string;
-  amount: string;
-  win: boolean;
-  time: string;
-}
-
-function timeAgo(dateStr: string) {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const secs = Math.floor(diff / 1000);
-  if (secs < 60) return `${secs}s ago`;
-  const mins = Math.floor(secs / 60);
-  if (mins < 60) return `${mins}m ago`;
-  return `${Math.floor(mins / 60)}h ago`;
-}
-
 export function LobbyScreen() {
   const isMobile = useIsMobile();
   const { profile, syncProfile } = useGameStore();
   const { isAuthenticated } = useAuthStore();
   const go = useAppNavigate();
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
-  const [activityFeed, setActivityFeed] = useState<FeedItem[]>([]);
   const [liveStats, setLiveStats] = useState({ active: 0, volume: '0', topWin: '1.0x' });
   const [bonusClaimed, setBonusClaimed] = useState<boolean | null>(null);
   const [claimingBonus, setClaimingBonus] = useState(false);
@@ -113,19 +96,6 @@ export function LobbyScreen() {
       try {
         const res = await api.getLeaderboard('profit', 'daily') as any;
         const data = res.data || [];
-        const feed: FeedItem[] = data.slice(0, 7).map((entry: any) => {
-          const score = Number(entry.score || 0);
-          const isWin = score > 0;
-          return {
-            user: entry.username || 'anon',
-            mult: `${(score / 10000).toFixed(1)}x`,
-            amount: `${isWin ? '+' : ''}${formatSol(score)} SOL`,
-            win: isWin,
-            time: 'today',
-          };
-        });
-        if (feed.length > 0) setActivityFeed(feed);
-
         const topScore = data.reduce((max: number, e: any) => Math.max(max, Number(e.score || 0)), 0);
         const totalVol = data.reduce((sum: number, e: any) => sum + Number(e.score || 0), 0);
         setLiveStats({
@@ -340,38 +310,7 @@ export function LobbyScreen() {
           )}
 
           {/* Recent plays */}
-          <div style={{ ...styles.panel, flex: 1 }}>
-            <div style={styles.panelHeader}>
-              <span style={styles.panelTitle}>Recent plays</span>
-              {activityFeed.length > 0 && <span style={styles.liveBadge}>LIVE</span>}
-            </div>
-            <div style={styles.feedList}>
-              {activityFeed.length === 0 ? (
-                <div style={{ padding: '24px 16px', textAlign: 'center' as const, color: theme.text.muted, fontSize: '13px' }}>
-                  No recent activity
-                </div>
-              ) : (
-                activityFeed.map((item, i) => (
-                  <div key={i} style={styles.feedRow}>
-                    <span style={styles.feedUser}>{item.user}</span>
-                    <span style={{
-                      ...styles.feedMult,
-                      color: item.win ? theme.game.multiplier : theme.game.divider,
-                    }} className="mono">
-                      {item.mult}
-                    </span>
-                    <span style={{
-                      ...styles.feedAmount,
-                      color: item.win ? theme.game.multiplier : theme.game.divider,
-                    }} className="mono">
-                      {item.amount}
-                    </span>
-                    <span style={styles.feedTime}>{item.time}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+          <ActivityFeed />
 
           {/* Quick Stats */}
           <div style={styles.quickStats}>
@@ -641,54 +580,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: '#9945FF',
     borderRadius: '2px',
     transition: 'width 0.3s ease',
-  },
-
-  // Live Feed
-  liveBadge: {
-    fontSize: '11px',
-    fontWeight: 600,
-    color: theme.success,
-    padding: '2px 6px',
-    background: `${theme.success}15`,
-    borderRadius: '4px',
-  },
-  feedList: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  feedRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '7px 12px',
-    borderBottom: `1px solid ${theme.border.subtle}`,
-  },
-  feedUser: {
-    fontSize: '14px',
-    fontWeight: 500,
-    color: theme.text.secondary,
-    flex: 1,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  feedMult: {
-    fontSize: '14px',
-    fontWeight: 700,
-    minWidth: '38px',
-    textAlign: 'right',
-  },
-  feedAmount: {
-    fontSize: '14px',
-    fontWeight: 600,
-    minWidth: '70px',
-    textAlign: 'right',
-  },
-  feedTime: {
-    fontSize: '12px',
-    color: theme.text.muted,
-    minWidth: '38px',
-    textAlign: 'right',
   },
 
   // Quick Stats

@@ -19,8 +19,15 @@ import { referralRoutes } from './routes/referral.routes.js';
 import { chatRoutes } from './routes/chat.routes.js';
 import { tipRoutes } from './routes/tip.routes.js';
 import { startDepositWorker } from './workers/depositConfirmation.worker.js';
+import { initSentry } from './config/sentry.js';
+import { fairnessRoutes } from './routes/fairness.routes.js';
+import { seasonRoutes } from './routes/season.routes.js';
+import { predictionRoutes } from './routes/prediction.routes.js';
 
 export async function buildServer() {
+  // Initialize Sentry error tracking
+  initSentry();
+
   const server = Fastify({
     logger: {
       level: env.NODE_ENV === 'production' ? 'info' : 'debug',
@@ -111,6 +118,9 @@ export async function buildServer() {
   await server.register(referralRoutes, { prefix: '/v1/referrals' });
   await server.register(chatRoutes, { prefix: '/v1/chat' });
   await server.register(tipRoutes, { prefix: '/v1/tips' });
+  await server.register(fairnessRoutes, { prefix: '/v1/fairness' });
+  await server.register(seasonRoutes, { prefix: '/v1/season' });
+  await server.register(predictionRoutes, { prefix: '/v1/predictions' });
 
   // Start background workers
   startDepositWorker();

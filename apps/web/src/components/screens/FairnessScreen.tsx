@@ -61,7 +61,7 @@ export function FairnessScreen() {
     setVerified(false);
 
     try {
-      const data = await api.getRound(roundId.trim()) as any;
+      const data = await api.verifyRoundFairness(roundId.trim()) as any;
 
       const parsed: RoundSeedData = {
         id: data.id || roundId,

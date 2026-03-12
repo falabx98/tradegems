@@ -14,6 +14,7 @@
     "@fastify/cors": "^11.0.0",
     "@fastify/jwt": "^9.1.0",
     "@fastify/rate-limit": "^10.2.0",
+    "@sentry/node": "^10.43.0",
     "@solana/web3.js": "^1.98.4",
     "@tradingarena/db": "*",
     "@tradingarena/game-engine": "*",

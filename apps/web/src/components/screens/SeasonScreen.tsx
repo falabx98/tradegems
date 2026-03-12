@@ -4,6 +4,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
+import { api } from '../../utils/api';
 
 // ─── Season Data ────────────────────────────────────────────────────────────
 
@@ -65,19 +66,48 @@ export function SeasonScreen() {
   const [claimedFree, setClaimedFree] = useState<Set<number>>(new Set());
   const [claimedPremium, setClaimedPremium] = useState<Set<number>>(new Set());
   const [hasPremium] = useState(false);
+  const [claimLoading, setClaimLoading] = useState<number | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setTimeLeft(getTimeRemaining()), 60_000);
     return () => clearInterval(timer);
   }, []);
 
-  function handleClaimFree(level: number) {
-    setClaimedFree((prev) => new Set(prev).add(level));
+  // Fetch claimed rewards from server
+  useEffect(() => {
+    (async () => {
+      try {
+        const status = await api.getSeasonStatus();
+        setClaimedFree(new Set(status.claimedFree));
+        setClaimedPremium(new Set(status.claimedPremium));
+      } catch { /* Non-critical */ }
+    })();
+  }, []);
+
+  async function handleClaimFree(level: number) {
+    if (claimLoading !== null) return;
+    setClaimLoading(level);
+    try {
+      await api.claimSeasonReward(level, 'free');
+      setClaimedFree((prev) => new Set(prev).add(level));
+    } catch (err: any) {
+      console.error('Claim failed:', err?.message);
+    } finally {
+      setClaimLoading(null);
+    }
   }
 
-  function handleClaimPremium(level: number) {
-    if (!hasPremium) return;
-    setClaimedPremium((prev) => new Set(prev).add(level));
+  async function handleClaimPremium(level: number) {
+    if (!hasPremium || claimLoading !== null) return;
+    setClaimLoading(level);
+    try {
+      await api.claimSeasonReward(level, 'premium');
+      setClaimedPremium((prev) => new Set(prev).add(level));
+    } catch (err: any) {
+      console.error('Premium claim failed:', err?.message);
+    } finally {
+      setClaimLoading(null);
+    }
   }
 
   // Calculate total free SOL earned

@@ -414,4 +414,43 @@ export const api = {
 
   getTipHistory: () =>
     apiFetch<{ tips: Array<{ id: string; type: string; amount: number; metadata: any; createdAt: string }> }>('/v1/tips/history'),
+
+  // Fairness
+  verifyRoundFairness: (roundId: string) =>
+    apiFetch(`/v1/fairness/${roundId}`),
+
+  // Season Pass
+  getSeasonStatus: () =>
+    apiFetch<{ seasonNumber: number; playerLevel: number; claimedFree: number[]; claimedPremium: number[]; hasPremium: boolean }>('/v1/season/status'),
+
+  claimSeasonReward: (level: number, track: 'free' | 'premium') =>
+    apiFetch<{ success: boolean; amount: number; newBalance: number }>('/v1/season/claim', {
+      method: 'POST',
+      body: JSON.stringify({ level, track }),
+    }),
+
+  // Predictions
+  savePredictionRound: (data: { direction: string; betAmount: number; result: string; payout: number; multiplier: number; pattern?: string }) =>
+    apiFetch<{ success: boolean; id: string }>('/v1/predictions/save', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getPredictionHistory: (limit?: number) =>
+    apiFetch<{ data: Array<{ id: string; direction: string; betAmount: number; result: string; payout: number; multiplier: string; pattern: string | null; createdAt: string }> }>(`/v1/predictions/history?limit=${limit || 20}`),
+
+  // Player Profile
+  getPlayerProfile: (id: string) =>
+    apiFetch(`/v1/users/${id}/profile`),
+
+  searchUsers: (q: string) =>
+    apiFetch<{ data: Array<{ id: string; username: string; level: number; vipTier: string; avatarUrl: string | null; roundsPlayed: number }> }>(`/v1/users/search?q=${encodeURIComponent(q)}`),
+
+  // Tournament History
+  getTournamentHistory: (limit?: number) =>
+    apiFetch(`/v1/battles/history?limit=${limit || 20}`),
+
+  // Spectate
+  spectateTournament: (roomId: string) =>
+    apiFetch(`/v1/battles/${roomId}/spectate`),
 };

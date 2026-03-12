@@ -122,6 +122,14 @@ export function NavIcon({ name, size = 18, color = 'currentColor' }: NavIconProp
           <polyline points="9 12 11 14 15 10" />
         </svg>
       );
+    case 'terminal':
+      return (
+        <svg {...props}>
+          <rect x="2" y="3" width="20" height="18" rx="2" />
+          <polyline points="7 9 10 12 7 15" />
+          <line x1="13" y1="15" x2="17" y2="15" />
+        </svg>
+      );
     default:
       return null;
   }

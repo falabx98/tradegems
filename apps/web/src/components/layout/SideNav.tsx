@@ -18,6 +18,7 @@ const NAV_ITEMS = [
 const BOTTOM_ITEMS = [
   { id: 'history', label: 'History', icon: 'clock' },
   { id: 'fairness', label: 'Fair', icon: 'shield' },
+  { id: 'admin', label: 'Admin', icon: 'terminal' },
   { id: 'settings', label: 'Settings', icon: 'gear' },
 ] as const;
 

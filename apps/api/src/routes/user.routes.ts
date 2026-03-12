@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { eq } from 'drizzle-orm';
 import { UserService } from '../modules/user/user.service.js';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
 
@@ -34,6 +35,13 @@ export async function userRoutes(server: FastifyInstance) {
   server.get('/:id/profile', async (request) => {
     const { id } = request.params as { id: string };
     const profile = await userService.getProfile(id);
+
+    // Get stats
+    let stats: any = {};
+    try {
+      stats = await userService.getStats(id);
+    } catch { /* New user, no stats */ }
+
     return {
       id: profile.id,
       username: profile.username,
@@ -41,6 +49,40 @@ export async function userRoutes(server: FastifyInstance) {
       vipTier: profile.vipTier,
       displayName: profile.displayName,
       avatarUrl: profile.avatarUrl,
+      totalWagered: stats.totalWagered ?? 0,
+      totalWon: stats.totalWon ?? 0,
+      roundsPlayed: stats.roundsPlayed ?? 0,
+      bestMultiplier: stats.bestMultiplier ?? '1.0',
+      winRate: stats.winRate ?? '0.0',
+      currentStreak: stats.currentStreak ?? 0,
+      bestStreak: stats.bestStreak ?? 0,
     };
+  });
+
+  // Search users by username
+  server.get('/search', async (request) => {
+    const { q, limit } = request.query as { q?: string; limit?: string };
+    if (!q || q.length < 2) return { data: [] };
+
+    const { ilike } = await import('drizzle-orm');
+    const { getDb } = await import('../config/database.js');
+    const { users, userProfiles } = await import('@tradingarena/db');
+
+    const db = getDb();
+    const results = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        level: users.level,
+        vipTier: users.vipTier,
+        avatarUrl: userProfiles.avatarUrl,
+        roundsPlayed: userProfiles.roundsPlayed,
+      })
+      .from(users)
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(ilike(users.username, `%${q}%`))
+      .limit(parseInt(limit || '10'));
+
+    return { data: results };
   });
 }

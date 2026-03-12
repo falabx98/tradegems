@@ -223,6 +223,54 @@ async function settleTournament(room: TournamentRoom) {
     }
 
     console.log(`[Tournament] Room ${room.id} settled — winner(s): ${winners.map(w => w.username).join(', ')} — payout: ${winnerPayout} lamports each`);
+
+    // Persist tournament to database
+    try {
+      const { getDb } = await import('../config/database.js');
+      const { tournaments, tournamentParticipants } = await import('@tradingarena/db');
+      const tdb = getDb();
+
+      const [saved] = await tdb.insert(tournaments).values({
+        roomId: room.id,
+        buyIn: room.buyIn,
+        fee: room.fee,
+        grossPool: room.grossPool,
+        netPool: room.netPool,
+        playerCount: room.players.length,
+        winnerId: winners[0]?.id ?? null,
+        winnerUsername: winners[0]?.username ?? null,
+        winnerPayout,
+        standings,
+        roundData: room.roundConfigs.map((_, i) => ({
+          round: i + 1,
+          multipliers: room.players.map(p => ({
+            playerId: p.id,
+            username: p.username,
+            multiplier: p.roundMultipliers[i] ?? 0,
+          })),
+        })),
+        settledAt: new Date(),
+      }).returning();
+
+      // Save participants
+      for (let rank = 0; rank < standings.length; rank++) {
+        const s = standings[rank];
+        const player = room.players.find(p => p.id === s.id);
+        if (!player) continue;
+
+        await tdb.insert(tournamentParticipants).values({
+          tournamentId: saved.id,
+          userId: s.id,
+          username: s.username,
+          finalRank: rank + 1,
+          cumulativeScore: String(s.cumulative),
+          payout: winners.some(w => w.id === s.id) ? winnerPayout : 0,
+          roundMultipliers: player.roundMultipliers,
+        });
+      }
+    } catch (persistErr) {
+      console.error(`[Tournament] Failed to persist tournament ${room.id}:`, persistErr);
+    }
   } catch (err) {
     console.error(`[Tournament] Failed to settle room ${room.id}:`, err);
   }
@@ -720,6 +768,56 @@ export async function battleRoutes(server: FastifyInstance) {
         openCount: openRooms.filter(r => r.buyIn === tier).length,
       })),
       buyInOptions: BUYIN_TIERS,
+    };
+  });
+
+  // ─── Tournament History ─────────────────────────────────
+  server.get('/history', { preHandler: [requireAuth] }, async (request) => {
+    const userId = getAuthUser(request).userId;
+    const { limit } = request.query as { limit?: string };
+
+    const { getDb } = await import('../config/database.js');
+    const { tournamentParticipants, tournaments } = await import('@tradingarena/db');
+    const { eq, desc } = await import('drizzle-orm');
+    const tdb = getDb();
+
+    const participations = await tdb
+      .select({
+        odId: tournamentParticipants.id,
+        odTournamentId: tournamentParticipants.tournamentId,
+        finalRank: tournamentParticipants.finalRank,
+        cumulativeScore: tournamentParticipants.cumulativeScore,
+        payout: tournamentParticipants.payout,
+        roundMultipliers: tournamentParticipants.roundMultipliers,
+        tRoomId: tournaments.roomId,
+        tBuyIn: tournaments.buyIn,
+        tPlayerCount: tournaments.playerCount,
+        tWinnerUsername: tournaments.winnerUsername,
+        tNetPool: tournaments.netPool,
+        tCreatedAt: tournaments.createdAt,
+      })
+      .from(tournamentParticipants)
+      .innerJoin(tournaments, eq(tournamentParticipants.tournamentId, tournaments.id))
+      .where(eq(tournamentParticipants.userId, userId))
+      .orderBy(desc(tournaments.createdAt))
+      .limit(parseInt(limit || '20'));
+
+    return { data: participations };
+  });
+
+  // ─── Spectate a room (no auth needed) ──────────────────
+  server.get('/:roomId/spectate', { preHandler: [optionalAuth] }, async (request, reply) => {
+    const { roomId } = request.params as { roomId: string };
+    const room = rooms.get(roomId);
+    if (!room) {
+      return reply.status(404).send({ error: 'Room not found or closed' });
+    }
+
+    // Return room state without myPlayerId (spectator view)
+    return {
+      ...buildRoomState(room),
+      isSpectating: true,
+      spectatorCount: 0, // Could track this with Redis in the future
     };
   });
 }

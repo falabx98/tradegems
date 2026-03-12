@@ -506,3 +506,78 @@ export const chatMessages = pgTable('chat_messages', {
 }, (table) => [
   index('idx_chat_channel_created').on(table.channel, table.createdAt),
 ]);
+
+// ============================================================
+// SEASON PASS
+// ============================================================
+
+export const seasonPassClaims = pgTable('season_pass_claims', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  seasonNumber: integer('season_number').notNull(),
+  level: integer('level').notNull(),
+  track: text('track').notNull().default('free'),
+  amountLamports: bigint('amount_lamports', { mode: 'number' }).notNull(),
+  claimedAt: timestamp('claimed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_season_claim_unique').on(table.userId, table.seasonNumber, table.level, table.track),
+  index('idx_season_claims_user').on(table.userId),
+]);
+
+// ============================================================
+// TOURNAMENT HISTORY
+// ============================================================
+
+export const tournaments = pgTable('tournaments', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  roomId: text('room_id').notNull(),
+  buyIn: bigint('buy_in', { mode: 'number' }).notNull(),
+  fee: bigint('fee', { mode: 'number' }).notNull(),
+  grossPool: bigint('gross_pool', { mode: 'number' }).notNull(),
+  netPool: bigint('net_pool', { mode: 'number' }).notNull(),
+  playerCount: integer('player_count').notNull(),
+  winnerId: uuid('winner_id').references(() => users.id),
+  winnerUsername: text('winner_username'),
+  winnerPayout: bigint('winner_payout', { mode: 'number' }).notNull().default(0),
+  standings: jsonb('standings').notNull().default([]),
+  roundData: jsonb('round_data').notNull().default([]),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_tournaments_winner').on(table.winnerId),
+  index('idx_tournaments_created').on(table.createdAt),
+]);
+
+export const tournamentParticipants = pgTable('tournament_participants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  tournamentId: uuid('tournament_id').notNull().references(() => tournaments.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  username: text('username').notNull(),
+  finalRank: integer('final_rank'),
+  cumulativeScore: numeric('cumulative_score', { precision: 10, scale: 4 }).notNull().default('0'),
+  payout: bigint('payout', { mode: 'number' }).notNull().default(0),
+  roundMultipliers: jsonb('round_multipliers').notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_tp_tournament').on(table.tournamentId),
+  index('idx_tp_user').on(table.userId, table.createdAt),
+]);
+
+// ============================================================
+// PREDICTION ROUNDS
+// ============================================================
+
+export const predictionRounds = pgTable('prediction_rounds', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  direction: text('direction').notNull(),
+  betAmount: bigint('bet_amount', { mode: 'number' }).notNull(),
+  result: text('result').notNull(),
+  payout: bigint('payout', { mode: 'number' }).notNull().default(0),
+  multiplier: numeric('multiplier', { precision: 10, scale: 4 }).notNull().default('0'),
+  pattern: text('pattern'),
+  metadata: jsonb('metadata'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_prediction_user').on(table.userId, table.createdAt),
+]);

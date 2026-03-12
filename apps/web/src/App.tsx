@@ -17,6 +17,8 @@ import { SoloSetupScreen } from './components/screens/SoloSetupScreen';
 import { PredictionScreen } from './components/screens/PredictionScreen';
 import { FairnessScreen } from './components/screens/FairnessScreen';
 import { SeasonScreen } from './components/screens/SeasonScreen';
+import { AdminScreen } from './components/screens/AdminScreen';
+import { PlayerProfileScreen } from './components/screens/PlayerProfileScreen';
 import { OnboardingModal, useOnboarding } from './components/OnboardingModal';
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggle } from './components/layout/ChatToggle';
@@ -118,6 +120,8 @@ export default function App() {
       {screen === 'prediction' && <PredictionScreen />}
       {screen === 'fairness' && <FairnessScreen />}
       {screen === 'season' && <SeasonScreen />}
+      {screen === 'admin' && <AdminScreen />}
+      {screen === 'profile' && <PlayerProfileScreen />}
       {screen === 'auth' && (
         <AuthScreen onSuccess={() => {
           syncProfile();

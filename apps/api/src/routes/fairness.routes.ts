@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { rounds, roundNodes, betResults, bets } from '@tradingarena/db';
 import { getDb } from '../config/database.js';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
@@ -27,9 +27,9 @@ export async function fairnessRoutes(server: FastifyInstance) {
       };
     }
 
-    // Get the user's bet result for this round (if any)
+    // Get the user's bet result for this round (if any) — filter by userId to prevent privacy leak
     const userResult = await db.query.betResults.findFirst({
-      where: eq(betResults.roundId, roundId),
+      where: and(eq(betResults.roundId, roundId), eq(betResults.userId, userId)),
     });
 
     // Get nodes for the round

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, sql } from 'drizzle-orm';
 import { seasonPassClaims, balances, balanceLedgerEntries, users } from '@tradingarena/db';
 import { getDb } from '../config/database.js';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
@@ -78,15 +78,19 @@ export async function seasonRoutes(server: FastifyInstance) {
       return reply.status(400).send({ error: 'Already claimed' });
     }
 
-    // Credit balance
-    const [bal] = await db.select().from(balances).where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL')));
-    const newBalance = (bal?.availableAmount ?? 0) + rewardAmount;
+    // Credit balance atomically
+    const updated = await db.update(balances)
+      .set({ availableAmount: sql`${balances.availableAmount} + ${rewardAmount}`, updatedAt: new Date() })
+      .where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL')))
+      .returning({ newBalance: balances.availableAmount });
 
-    if (bal) {
-      await db.update(balances).set({ availableAmount: newBalance, updatedAt: new Date() })
-        .where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL')));
+    let newBalance: number;
+    if (updated.length === 0) {
+      // No row existed — insert
+      const [ins] = await db.insert(balances).values({ userId, asset: 'SOL', availableAmount: rewardAmount, updatedAt: new Date() }).returning({ newBalance: balances.availableAmount });
+      newBalance = ins.newBalance;
     } else {
-      await db.insert(balances).values({ userId, asset: 'SOL', availableAmount: rewardAmount, updatedAt: new Date() });
+      newBalance = updated[0].newBalance;
     }
 
     // Ledger entry

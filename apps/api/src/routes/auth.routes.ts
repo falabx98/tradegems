@@ -54,15 +54,15 @@ export async function authRoutes(server: FastifyInstance) {
 
     reply.setCookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
       maxAge: 7 * 24 * 60 * 60, // 7 days
     });
 
     return reply.status(201).send({
       accessToken,
-      expiresIn: 3600, // 15 min
+      expiresIn: 3600, // 1 hour (matches JWT_ACCESS_EXPIRY)
       userId,
     });
   });
@@ -82,8 +82,8 @@ export async function authRoutes(server: FastifyInstance) {
 
     reply.setCookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
       maxAge: 7 * 24 * 60 * 60,
     });
@@ -110,8 +110,8 @@ export async function authRoutes(server: FastifyInstance) {
     // Set rotated refresh token cookie (M5 fix)
     reply.setCookie('refreshToken', result.newRefreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
       maxAge: 7 * 24 * 60 * 60,
     });
@@ -212,8 +212,8 @@ export async function authRoutes(server: FastifyInstance) {
 
     reply.setCookie('refreshToken', refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true,
+      sameSite: 'none',
       path: '/',
       maxAge: 7 * 24 * 60 * 60,
     });

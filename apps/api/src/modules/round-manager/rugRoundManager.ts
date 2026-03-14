@@ -304,8 +304,8 @@ export async function cashOut(userId: string): Promise<{ success: boolean; multi
   // Settle wallet (skip for bots)
   const user = await database.query.users.findFirst({ where: eq(users.id, userId) });
   if (user && user.role !== 'bot') {
-    const fee = Math.floor(bet.betAmount * 0.04); // 4% house edge
-    await wallet.settlePayout(userId, bet.betAmount, fee, payout, 'SOL', { type: 'rug_round', id: state.roundId });
+    // fee=0 because house edge is embedded in the crash point algorithm; lockFunds only locked betAmount
+    await wallet.settlePayout(userId, bet.betAmount, 0, payout, 'SOL', { type: 'rug_round', id: state.roundId });
   }
 
   await saveToRedis();

@@ -170,25 +170,25 @@ export async function adminRoutes(server: FastifyInstance) {
     const actor = getAuthUser(request);
     const assetType = asset || 'SOL';
 
-    // Upsert balance
-    const [existing] = await db.select().from(balances).where(and(eq(balances.userId, id), eq(balances.asset, assetType)));
+    // Upsert balance atomically
+    const updated = await db.update(balances).set({
+      availableAmount: sql`${balances.availableAmount} + ${amount}`,
+      updatedAt: new Date(),
+    }).where(and(eq(balances.userId, id), eq(balances.asset, assetType)))
+      .returning({ newBalance: balances.availableAmount });
 
-    if (existing) {
-      await db.update(balances).set({
-        availableAmount: existing.availableAmount + amount,
-        updatedAt: new Date(),
-      }).where(and(eq(balances.userId, id), eq(balances.asset, assetType)));
-    } else {
-      await db.insert(balances).values({
+    let newBalance: number;
+    if (updated.length === 0) {
+      const [ins] = await db.insert(balances).values({
         userId: id,
         asset: assetType,
         availableAmount: amount,
         updatedAt: new Date(),
-      });
+      }).returning({ newBalance: balances.availableAmount });
+      newBalance = ins.newBalance;
+    } else {
+      newBalance = updated[0].newBalance;
     }
-
-    // Ledger entry
-    const newBalance = (existing?.availableAmount ?? 0) + amount;
     await db.insert(balanceLedgerEntries).values({
       userId: id,
       asset: assetType,

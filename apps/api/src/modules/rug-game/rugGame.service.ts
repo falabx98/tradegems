@@ -88,19 +88,17 @@ export class RugGameService {
     // Check if the player is trying to cash out past the rug point
     if (currentMultiplier >= rugMultiplier) {
       // Got rugged! They lose
-      return this.resolveRuq(gameId, game);
+      return this.resolveRug(gameId, game);
     }
 
-    // Successful cash out
+    // Successful cash out — fee=0 because house edge is in the crash point; lockFunds only locked betAmount
     const payout = Math.floor(game.betAmount * currentMultiplier);
-    const fee = Math.floor(game.betAmount * HOUSE_EDGE);
-    const netPayout = Math.max(0, payout - fee);
 
     await this.wallet.settlePayout(
       userId,
       game.betAmount,
-      fee,
-      netPayout,
+      0,
+      payout,
       'SOL',
       { type: 'rug_game', id: gameId },
     );
@@ -110,7 +108,7 @@ export class RugGameService {
       .set({
         status: 'cashed_out',
         cashOutMultiplier: currentMultiplier.toFixed(4),
-        payout: netPayout,
+        payout,
         resolvedAt: new Date(),
       })
       .where(eq(rugGames.id, gameId))
@@ -133,10 +131,10 @@ export class RugGameService {
     if (game.userId !== userId) throw new Error('Not your game');
     if (game.status !== 'active') throw new Error('Game is not active');
 
-    return this.resolveRuq(gameId, game);
+    return this.resolveRug(gameId, game);
   }
 
-  private async resolveRuq(gameId: string, game: any) {
+  private async resolveRug(gameId: string, game: any) {
     // Player got rugged — lose bet
     try {
       await this.wallet.settlePayout(

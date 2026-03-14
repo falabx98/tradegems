@@ -319,12 +319,12 @@ export class TradingSimService {
     }
 
     if (winner && participantRoles.get(winner.userId) !== 'bot') {
-      const fee = room.prizePool - payoutAmount;
+      // fee=0: lockFunds only locked entryFee; platform fee taken from pool difference
       try {
         await this.walletService.settlePayout(
           winner.userId,
           room.entryFee,
-          fee,
+          0,
           payoutAmount,
           'SOL',
           { type: 'trading_sim', id: roomId },

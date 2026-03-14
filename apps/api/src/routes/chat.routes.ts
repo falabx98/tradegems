@@ -8,6 +8,14 @@ import { chatMessages, users, userProfiles } from '@tradingarena/db';
 // Simple in-memory rate limiter: userId → last send timestamp
 const rateLimitMap = new Map<string, number>();
 
+// Prune stale entries every 5 minutes to prevent memory leak
+setInterval(() => {
+  const cutoff = Date.now() - 60_000; // keep entries from last minute only
+  for (const [uid, ts] of rateLimitMap) {
+    if (ts < cutoff) rateLimitMap.delete(uid);
+  }
+}, 5 * 60_000).unref();
+
 // ─── Online Tracking ────────────────────────────────────────
 // Track users who have polled chat recently (userId → lastSeenMs)
 export const onlineUsers = new Map<string, number>();

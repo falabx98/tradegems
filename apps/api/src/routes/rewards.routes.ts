@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { sql } from 'drizzle-orm';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
@@ -56,7 +57,7 @@ const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary'] as cons
 
 function rollMysteryBox(vipTier: string): { rarity: string; amountLamports: number } {
   const rewards = MYSTERY_BOX_REWARDS[vipTier] || MYSTERY_BOX_REWARDS.bronze;
-  const roll = Math.random();
+  const roll = crypto.randomInt(1_000_000) / 1_000_000; // cryptographically secure
   let cumulative = 0;
 
   for (const rarity of RARITY_ORDER) {
@@ -153,7 +154,7 @@ export async function rewardsRoutes(server: FastifyInstance) {
     const rows = statsResult as unknown as Array<Record<string, unknown>>;
     const stats = rows[0] || { rounds_played: 0, total_wagered: 0, best_multiplier: 0 };
     const rp = Number(stats.rounds_played);
-    const tw = Number(stats.total_wagered) / 100;
+    const tw = Number(stats.total_wagered) / 1_000_000_000; // lamports to SOL
     const bm = Number(stats.best_multiplier);
 
     const completionMap: Record<string, boolean> = {

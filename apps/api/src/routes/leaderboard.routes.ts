@@ -6,9 +6,15 @@ import { requireAuth, getAuthUser } from '../middleware/auth.js';
 export async function leaderboardRoutes(server: FastifyInstance) {
   const db = getDb();
 
-  server.get('/:type', async (request) => {
+  server.get('/:type', async (request, reply) => {
     const { type } = request.params as { type: string };
     const { period, limit } = request.query as { period?: string; limit?: string };
+
+    // Whitelist type to prevent SQL injection via sql.raw
+    const allowedTypes = ['profit', 'multiplier', 'volume'];
+    if (!allowedTypes.includes(type)) {
+      return reply.status(400).send({ error: 'Invalid leaderboard type' });
+    }
 
     // Period filter
     let periodFilterSolo = '';

@@ -264,8 +264,13 @@ export class WalletService {
   // ─── Transactions ────────────────────────────────────────
 
   async getTransactions(userId: string, limit: number = 20, cursor?: string) {
+    const conditions = [eq(balanceLedgerEntries.userId, userId)];
+    if (cursor) {
+      // cursor is the id of the last item from previous page — fetch older entries
+      conditions.push(sql`${balanceLedgerEntries.id} < ${parseInt(cursor, 10)}`);
+    }
     const entries = await this.db.query.balanceLedgerEntries.findMany({
-      where: eq(balanceLedgerEntries.userId, userId),
+      where: and(...conditions),
       orderBy: [desc(balanceLedgerEntries.createdAt)],
       limit: limit + 1,
     });

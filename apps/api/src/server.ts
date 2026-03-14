@@ -32,6 +32,7 @@ import { candleflipRoutes } from './routes/candleflip.routes.js';
 import { rugGameRoutes } from './routes/rug-game.routes.js';
 import { startRugRoundManager } from './modules/round-manager/rugRoundManager.js';
 import { startCandleflipRoundManager } from './modules/round-manager/candleflipRoundManager.js';
+import { startSweepWorker } from './workers/sweepWorker.js';
 
 
 export async function buildServer() {
@@ -134,15 +135,16 @@ export async function buildServer() {
   await server.register(candleflipRoutes, { prefix: '/v1/candleflip' });
   await server.register(rugGameRoutes, { prefix: '/v1/rug-game' });
 
-  // Start round managers
-  startRugRoundManager();
-  startCandleflipRoundManager();
+  // Start round managers (with error handling)
+  try { startRugRoundManager(); } catch (e) { server.log.error(e, 'Failed to start rug round manager'); }
+  try { startCandleflipRoundManager(); } catch (e) { server.log.error(e, 'Failed to start candleflip round manager'); }
 
-  // Start background workers
-  startDepositWorker();
-  startBotEngine();
-  startLotteryDrawWorker();
-  startTradingSimWorker();
+  // Start background workers (with error handling)
+  try { startDepositWorker(); } catch (e) { server.log.error(e, 'Failed to start deposit worker'); }
+  try { startBotEngine(); } catch (e) { server.log.error(e, 'Failed to start bot engine'); }
+  try { startLotteryDrawWorker(); } catch (e) { server.log.error(e, 'Failed to start lottery draw worker'); }
+  try { startTradingSimWorker(); } catch (e) { server.log.error(e, 'Failed to start trading sim worker'); }
+  try { startSweepWorker(); } catch (e) { server.log.error(e, 'Failed to start sweep worker'); }
 
   return server;
 }

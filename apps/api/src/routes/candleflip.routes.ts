@@ -1,10 +1,39 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
+import { AppError } from '../middleware/errorHandler.js';
 import { CandleflipService } from '../modules/candleflip/candleflip.service.js';
+import { getCandleflipCurrentRound, betOnRound, getRecentCandleflipRounds } from '../modules/round-manager/candleflipRoundManager.js';
 
 export async function candleflipRoutes(server: FastifyInstance) {
   const service = new CandleflipService();
+
+  // ── Public Round Routes ──────────────────────────────────────
+
+  server.get('/round', async () => {
+    const round = await getCandleflipCurrentRound();
+    return { round };
+  });
+
+  server.get('/rounds/recent', async (request) => {
+    const { limit } = request.query as { limit?: string };
+    const rounds = await getRecentCandleflipRounds(parseInt(limit || '10'));
+    return { rounds };
+  });
+
+  server.post('/bet', { preHandler: requireAuth }, async (request) => {
+    const userId = getAuthUser(request).userId;
+    const body = z.object({
+      pick: z.enum(['bullish', 'bearish']),
+      betAmount: z.number().int().positive().min(1_000_000),
+    }).parse(request.body);
+
+    const result = await betOnRound(userId, body.pick, body.betAmount);
+    if (!result.success) {
+      throw new AppError(400, 'BET_FAILED', result.message || 'Cannot place bet');
+    }
+    return result;
+  });
 
   // GET /lobbies — open lobbies (public)
   server.get('/lobbies', async () => {

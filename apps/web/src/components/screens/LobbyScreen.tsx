@@ -22,7 +22,7 @@ interface BannerData {
 const BANNERS: BannerData[] = [
   {
     id: 'welcome-bonus',
-    image: '/Welcome-Bonus.jpg',
+    image: '/Welcome-Bonus.png',
     cta: 'Claim Now',
     accentColor: theme.accent.green,
     action: 'bonus',
@@ -169,13 +169,11 @@ export function LobbyScreen() {
               <span style={styles.gameCardSub}>Up or Down?</span>
             </div>
           </div>
-          <div onClick={() => go('trading-sim')} style={{ ...styles.gameCard, background: 'linear-gradient(135deg, #064e3b, #0d9488)', '--glow-color': 'rgba(13, 148, 136, 0.25)', '--glow-border': 'rgba(13, 148, 136, 0.4)' } as React.CSSProperties} className="game-card card-glow-hover">
+          <div onClick={() => go('trading-sim')} style={styles.gameCard} className="game-card">
+            <img src="/game-trading-sim.png" alt="Trading Sim" draggable={false} style={styles.gameCardImg} />
             <div style={styles.gameCardOverlay} />
             {activeRoomCount > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#0d9488" /></span>}
-            <div style={{ ...styles.gameCardContent, height: '100%', justifyContent: 'flex-end' }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-              </svg>
+            <div style={styles.gameCardContent}>
               <span style={styles.gameCardTitle}>Trading Sim</span>
               <span style={styles.gameCardSub}>PvP Trading Arena</span>
               {activeRoomCount > 0 && (
@@ -185,24 +183,20 @@ export function LobbyScreen() {
               )}
             </div>
           </div>
-          <div onClick={() => go('lottery')} style={{ ...styles.gameCard, background: 'linear-gradient(135deg, #78350f, #d97706)' }} className="game-card">
+          <div onClick={() => go('lottery')} style={styles.gameCard} className="game-card">
+            <img src="/game-lottery.png" alt="Lottery" draggable={false} style={styles.gameCardImg} />
             <div style={styles.gameCardOverlay} />
-            <div style={{ ...styles.gameCardContent, height: '100%', justifyContent: 'flex-end' }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                <path d="M6 3h12l4 6-10 13L2 9z" />
-              </svg>
+            <div style={styles.gameCardContent}>
               <span style={styles.gameCardTitle}>Lottery</span>
               <span style={styles.gameCardSub}>Jackpot Draws</span>
             </div>
           </div>
 
-          <div onClick={() => go('candleflip')} style={{ ...styles.gameCard, background: 'linear-gradient(135deg, #713f12, #eab308)', '--glow-color': 'rgba(234, 179, 8, 0.25)', '--glow-border': 'rgba(234, 179, 8, 0.4)' } as React.CSSProperties} className="game-card card-glow-hover">
+          <div onClick={() => go('candleflip')} style={styles.gameCard} className="game-card">
+            <img src="/game-candleflip.png" alt="Candleflip" draggable={false} style={styles.gameCardImg} />
             <div style={styles.gameCardOverlay} />
             {candleRecent.length > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#eab308" /></span>}
-            <div style={{ ...styles.gameCardContent, height: '100%', justifyContent: 'flex-end' }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" strokeLinecap="round" style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                <rect x="4" y="8" width="16" height="8" rx="2" /><path d="M12 4v4" /><path d="M12 16v4" />
-              </svg>
+            <div style={styles.gameCardContent}>
               <span style={styles.gameCardTitle}>Candleflip</span>
               <span style={styles.gameCardSub}>Over/Under 1.00x</span>
               {candleRecent.length > 0 && (
@@ -215,13 +209,11 @@ export function LobbyScreen() {
             </div>
           </div>
 
-          <div onClick={() => go('rug-game')} style={{ ...styles.gameCard, background: 'linear-gradient(135deg, #450a0a, #dc2626)', '--glow-color': 'rgba(248, 113, 113, 0.25)', '--glow-border': 'rgba(248, 113, 113, 0.4)' } as React.CSSProperties} className="game-card card-glow-hover">
+          <div onClick={() => go('rug-game')} style={styles.gameCard} className="game-card">
+            <img src="/game-rug-game.png" alt="Rug Game" draggable={false} style={styles.gameCardImg} />
             <div style={styles.gameCardOverlay} />
             {rugRecent.length > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#f87171" /></span>}
-            <div style={{ ...styles.gameCardContent, height: '100%', justifyContent: 'flex-end' }}>
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" strokeLinecap="round" style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-              </svg>
+            <div style={styles.gameCardContent}>
               <span style={styles.gameCardTitle}>Rug Game</span>
               <span style={styles.gameCardSub}>Cash Out or Get Rugged</span>
               {rugRecent.length > 0 && (
@@ -345,13 +337,11 @@ export function LobbyScreen() {
                 <span style={styles.gameCardSub}>Up or Down?</span>
               </div>
             </div>
-            <div onClick={() => go('trading-sim')} style={{ ...styles.gameCard, aspectRatio: '4 / 3', background: 'linear-gradient(135deg, #064e3b, #0d9488)', '--glow-color': 'rgba(13, 148, 136, 0.25)', '--glow-border': 'rgba(13, 148, 136, 0.4)' } as React.CSSProperties} className="game-card card-glow-hover">
+            <div onClick={() => go('trading-sim')} style={{ ...styles.gameCard, aspectRatio: '4 / 3' }} className="game-card">
+              <img src="/game-trading-sim.png" alt="Trading Sim" draggable={false} style={styles.gameCardImg} />
               <div style={styles.gameCardOverlay} />
               {activeRoomCount > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#0d9488" /></span>}
-              <div style={{ ...styles.gameCardContent, height: '100%', justifyContent: 'flex-end' }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                </svg>
+              <div style={styles.gameCardContent}>
                 <span style={styles.gameCardTitle}>Trading Sim</span>
                 <span style={styles.gameCardSub}>PvP Trading Arena</span>
                 {activeRoomCount > 0 && (
@@ -361,23 +351,19 @@ export function LobbyScreen() {
                 )}
               </div>
             </div>
-            <div onClick={() => go('lottery')} style={{ ...styles.gameCard, aspectRatio: '4 / 3', background: 'linear-gradient(135deg, #78350f, #d97706)' }} className="game-card">
+            <div onClick={() => go('lottery')} style={{ ...styles.gameCard, aspectRatio: '4 / 3' }} className="game-card">
+              <img src="/game-lottery.png" alt="Lottery" draggable={false} style={styles.gameCardImg} />
               <div style={styles.gameCardOverlay} />
-              <div style={{ ...styles.gameCardContent, height: '100%', justifyContent: 'flex-end' }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                  <path d="M6 3h12l4 6-10 13L2 9z" />
-                </svg>
+              <div style={styles.gameCardContent}>
                 <span style={styles.gameCardTitle}>Lottery</span>
                 <span style={styles.gameCardSub}>Jackpot Draws</span>
               </div>
             </div>
-            <div onClick={() => go('candleflip')} style={{ ...styles.gameCard, aspectRatio: '4 / 3', background: 'linear-gradient(135deg, #713f12, #eab308)', '--glow-color': 'rgba(234, 179, 8, 0.25)', '--glow-border': 'rgba(234, 179, 8, 0.4)' } as React.CSSProperties} className="game-card card-glow-hover">
+            <div onClick={() => go('candleflip')} style={{ ...styles.gameCard, aspectRatio: '4 / 3' }} className="game-card">
+              <img src="/game-candleflip.png" alt="Candleflip" draggable={false} style={styles.gameCardImg} />
               <div style={styles.gameCardOverlay} />
               {candleRecent.length > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#eab308" /></span>}
-              <div style={{ ...styles.gameCardContent, height: '100%', justifyContent: 'flex-end' }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" strokeLinecap="round" style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                  <rect x="4" y="8" width="16" height="8" rx="2" /><path d="M12 4v4" /><path d="M12 16v4" />
-                </svg>
+              <div style={styles.gameCardContent}>
                 <span style={styles.gameCardTitle}>Candleflip</span>
                 <span style={styles.gameCardSub}>Over/Under 1.00x</span>
                 {candleRecent.length > 0 && (
@@ -389,13 +375,11 @@ export function LobbyScreen() {
                 )}
               </div>
             </div>
-            <div onClick={() => go('rug-game')} style={{ ...styles.gameCard, aspectRatio: '4 / 3', background: 'linear-gradient(135deg, #450a0a, #dc2626)', '--glow-color': 'rgba(248, 113, 113, 0.25)', '--glow-border': 'rgba(248, 113, 113, 0.4)' } as React.CSSProperties} className="game-card card-glow-hover">
+            <div onClick={() => go('rug-game')} style={{ ...styles.gameCard, aspectRatio: '4 / 3' }} className="game-card">
+              <img src="/game-rug-game.png" alt="Rug Game" draggable={false} style={styles.gameCardImg} />
               <div style={styles.gameCardOverlay} />
               {rugRecent.length > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#f87171" /></span>}
-              <div style={{ ...styles.gameCardContent, height: '100%', justifyContent: 'flex-end' }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.6)" strokeWidth="1.5" strokeLinecap="round" style={{ position: 'absolute', top: '16px', right: '16px' }}>
-                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
-                </svg>
+              <div style={styles.gameCardContent}>
                 <span style={styles.gameCardTitle}>Rug Game</span>
                 <span style={styles.gameCardSub}>Cash Out or Get Rugged</span>
                 {rugRecent.length > 0 && (
@@ -838,8 +822,9 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
               alt={banner.id}
               draggable={false}
               style={{
-                width: '100%',
-                height: '100%',
+                width: 'calc(100% + 8px)',
+                height: 'calc(100% + 8px)',
+                margin: '-4px',
                 objectFit: 'cover' as const,
                 display: 'block',
               }}
@@ -905,6 +890,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '12px',
     overflow: 'hidden',
     borderRadius: '8px',
+    background: 'transparent',
   },
   bannerCard: {
     borderRadius: '8px',
@@ -913,6 +899,10 @@ const styles: Record<string, React.CSSProperties> = {
     flexShrink: 0,
     transition: 'transform 0.15s ease, box-shadow 0.15s ease',
     aspectRatio: '16 / 7',
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    lineHeight: 0,
   },
   dotsRow: {
     display: 'flex',

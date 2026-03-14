@@ -499,8 +499,21 @@ export const api = {
       body: JSON.stringify({ roomId }),
     }),
 
-  // ─── Candleflip ─────────────────────────────────────────────
+  // ─── Candleflip (Public Rounds) ──────────────────────────────
 
+  getCandleflipRound: () =>
+    apiFetch<any>('/v1/candleflip/round'),
+
+  betCandleflipRound: (pick: 'bullish' | 'bearish', betAmount: number) =>
+    apiFetch<{ success: boolean; message?: string }>('/v1/candleflip/bet', {
+      method: 'POST',
+      body: JSON.stringify({ pick, betAmount }),
+    }),
+
+  getCandleflipRecentRounds: (limit = 10) =>
+    apiFetch<any[]>(`/v1/candleflip/rounds/recent?limit=${limit}`),
+
+  // Legacy candleflip endpoints (backward compat)
   getCandleflipLobbies: () =>
     apiFetch<{ lobbies: any[] }>('/v1/candleflip/lobbies'),
 
@@ -510,29 +523,30 @@ export const api = {
   getCandleflipGame: (gameId: string) =>
     apiFetch<{ game: any }>(`/v1/candleflip/game/${gameId}`),
 
-  createCandleflipGame: (betAmount: number, pick: 'bullish' | 'bearish') =>
-    apiFetch<{ game: any }>('/v1/candleflip/create', {
-      method: 'POST',
-      body: JSON.stringify({ betAmount, pick }),
-    }),
-
-  joinCandleflipGame: (gameId: string) =>
-    apiFetch<{ game: any }>('/v1/candleflip/join', {
-      method: 'POST',
-      body: JSON.stringify({ gameId }),
-    }),
-
-  cancelCandleflipGame: (gameId: string) =>
-    apiFetch<{ success: boolean }>('/v1/candleflip/cancel', {
-      method: 'POST',
-      body: JSON.stringify({ gameId }),
-    }),
-
   getCandleflipHistory: (limit = 20) =>
     apiFetch<{ games: any[] }>(`/v1/candleflip/history?limit=${limit}`),
 
-  // ─── Rug Game ──────────────────────────────────────────────
+  // ─── Rug Game (Public Rounds) ────────────────────────────────
 
+  getRugGameRound: () =>
+    apiFetch<any>('/v1/rug-game/round'),
+
+  joinRugGameRound: (betAmount: number) =>
+    apiFetch<{ success: boolean; message?: string }>('/v1/rug-game/join', {
+      method: 'POST',
+      body: JSON.stringify({ betAmount }),
+    }),
+
+  cashOutRugGameRound: (roundId: string) =>
+    apiFetch<{ success: boolean; multiplier?: number; payout?: number; message?: string }>('/v1/rug-game/round-cashout', {
+      method: 'POST',
+      body: JSON.stringify({ roundId }),
+    }),
+
+  getRugGameRecentRounds: (limit = 10) =>
+    apiFetch<any[]>(`/v1/rug-game/rounds/recent?limit=${limit}`),
+
+  // Legacy rug game endpoints (backward compat)
   startRugGame: (betAmount: number) =>
     apiFetch<{ game: any }>('/v1/rug-game/start', {
       method: 'POST',
@@ -545,17 +559,8 @@ export const api = {
       body: JSON.stringify({ gameId, multiplier }),
     }),
 
-  rugGameRuq: (gameId: string) =>
-    apiFetch<{ game: any }>('/v1/rug-game/rug', {
-      method: 'POST',
-      body: JSON.stringify({ gameId }),
-    }),
-
   getRugGameRecent: (limit = 20) =>
     apiFetch<{ games: any[] }>(`/v1/rug-game/recent?limit=${limit}`),
-
-  getRugGameLive: (limit = 10) =>
-    apiFetch<{ games: any[] }>(`/v1/rug-game/live?limit=${limit}`),
 
   getRugGame: (gameId: string) =>
     apiFetch<{ game: any }>(`/v1/rug-game/game/${gameId}`),

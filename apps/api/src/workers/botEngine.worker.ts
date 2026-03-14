@@ -4,6 +4,8 @@ import { users, userProfiles, chatMessages, activityFeedItems, rounds, bets, bet
 import { eq, sql, and, inArray } from 'drizzle-orm';
 import { trackOnline } from '../routes/chat.routes.js';
 import { generateSimulatedChart } from '../utils/chartGenerator.js';
+import { joinRound as rugJoinRound, getCurrentRound as getRugCurrentRound } from '../modules/round-manager/rugRoundManager.js';
+import { betOnRound as candleflipBetOnRound, getCandleflipCurrentRound } from '../modules/round-manager/candleflipRoundManager.js';
 
 // ─── Types ──────────────────────────────────────────────────
 interface BotUser {
@@ -12,25 +14,6 @@ interface BotUser {
   level: number;
   vipTier: string;
   avatarUrl: string | null;
-}
-
-interface PendingRugGame {
-  gameId: string;
-  bot: BotUser;
-  betAmount: number;
-  rugMultiplier: number;
-  seed: string;
-  resolveAt: number; // timestamp ms
-}
-
-interface PendingCandleflip {
-  gameId: string;
-  bot1: BotUser;
-  bot2: BotUser;
-  betAmount: number;
-  creatorPick: 'bullish' | 'bearish';
-  seed: string;
-  joinAt: number; // timestamp ms
 }
 
 interface PendingSimJoin {
@@ -50,8 +33,6 @@ let botUsers: BotUser[] = [];
 let engineTimer: ReturnType<typeof setInterval> | null = null;
 
 // Pending lifecycle arrays
-const pendingRugGames: PendingRugGame[] = [];
-const pendingCandleflips: PendingCandleflip[] = [];
 const pendingSimJoins: PendingSimJoin[] = [];
 const pendingSimRooms: PendingSimRoom[] = [];
 
@@ -424,250 +405,42 @@ async function simulatePrediction(bot: BotUser): Promise<void> {
   }
 }
 
-// ─── Rug Game — Phase 1: Create Active Game ──────────────────
+// ─── Rug Game — Join Public Round ──────────────────────────
 
-async function createActiveRugGame(bot: BotUser): Promise<void> {
+async function botJoinRugRound(bot: BotUser): Promise<void> {
   try {
-    const db = getDb();
-    const gameId = crypto.randomUUID();
-    const betAmounts = [10_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000, 1_000_000_000];
-    const betAmount = pickRandom(betAmounts);
+    const round = await getRugCurrentRound();
+    if (!round || round.status !== 'waiting') return;
 
-    // Provably fair seed
-    const seed = crypto.randomBytes(32).toString('hex');
-    const seedHash = crypto.createHash('sha256').update(seed).digest('hex');
-
-    // Generate crash point (same algorithm as service)
-    const hash = crypto.createHash('sha256')
-      .update(seed + ':' + gameId)
-      .digest('hex');
-    const h = parseInt(hash.slice(0, 13), 16);
-    let rugMultiplier: number;
-    if (h % 25 === 0) {
-      rugMultiplier = 1.00;
-    } else {
-      const e = Math.pow(2, 52);
-      const raw = e / (e - (h % e));
-      rugMultiplier = Math.min(parseFloat((Math.max(1.00, raw * 0.96)).toFixed(2)), 100.00);
-    }
-
-    const now = new Date();
-
-    // Insert as ACTIVE game (not finished yet)
-    await db.insert(rugGames).values({
-      id: gameId,
-      userId: bot.id,
-      betAmount,
-      status: 'active',
-      rugMultiplier: rugMultiplier.toFixed(4),
-      cashOutMultiplier: null,
-      payout: 0,
-      seed,
-      seedHash,
-      createdAt: now,
-      resolvedAt: null,
-    });
-
-    // Schedule resolution in 8-15 seconds
-    pendingRugGames.push({
-      gameId,
-      bot,
-      betAmount,
-      rugMultiplier,
-      seed,
-      resolveAt: Date.now() + randomBetween(8000, 15000),
-    });
-
-    console.log(`[BotEngine] Rug game ${gameId} created (active) for ${bot.username}, crashes at ${rugMultiplier.toFixed(2)}x`);
-  } catch (err) {
-    console.error(`[BotEngine] Rug game create error for ${bot.username}:`, err);
-  }
-}
-
-// ─── Rug Game — Phase 2: Resolve Pending Games ──────────────
-
-async function resolvePendingRugGames(): Promise<void> {
-  const now = Date.now();
-  const toResolve = pendingRugGames.filter(g => now >= g.resolveAt);
-
-  for (const pending of toResolve) {
-    try {
-      const db = getDb();
-      const { gameId, bot, betAmount, rugMultiplier } = pending;
-
-      // Bot decides whether to cash out or get rugged
-      const cashOutChance = 0.4 + (bot.level / 100) * 0.3;
-      const didCashOut = Math.random() < cashOutChance && rugMultiplier > 1.05;
-
-      let status: string;
-      let cashOutMultiplier: string | null = null;
-      let payout: number = 0;
-
-      if (didCashOut) {
-        const maxCashOut = Math.min(rugMultiplier * 0.95, rugMultiplier - 0.01);
-        const cashOut = 1.01 + Math.random() * (maxCashOut - 1.01);
-        cashOutMultiplier = cashOut.toFixed(4);
-        const fee = Math.floor(betAmount * 0.04);
-        payout = Math.max(0, Math.floor(betAmount * cashOut) - fee);
-        status = 'cashed_out';
-      } else {
-        status = 'rugged';
-      }
-
-      // Update game to resolved
-      await db.update(rugGames)
-        .set({
-          status,
-          cashOutMultiplier,
-          payout,
-          resolvedAt: new Date(),
-        })
-        .where(eq(rugGames.id, gameId));
-
-      // Activity feed
-      await db.insert(activityFeedItems).values({
-        feedType: 'rug_game_result',
-        userId: bot.id,
-        payload: {
-          username: bot.username,
-          level: bot.level,
-          vipTier: bot.vipTier,
-          betAmount,
-          status,
-          rugMultiplier,
-          cashOutMultiplier: cashOutMultiplier ? parseFloat(cashOutMultiplier) : null,
-          payout,
-          isWin: status === 'cashed_out',
-        },
-      });
-
-      console.log(`[BotEngine] Rug game ${gameId} resolved: ${status} (${bot.username})`);
-    } catch (err) {
-      console.error(`[BotEngine] Rug game resolve error:`, err);
-    }
-
-    // Remove from pending
-    const idx = pendingRugGames.indexOf(pending);
-    if (idx >= 0) pendingRugGames.splice(idx, 1);
-  }
-}
-
-// ─── Candleflip — Phase 1: Create Open Lobby ────────────────
-
-async function createCandleflipLobby(bot1: BotUser, bot2: BotUser): Promise<void> {
-  try {
-    const db = getDb();
-    const gameId = crypto.randomUUID();
     const betAmounts = [10_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000];
     const betAmount = pickRandom(betAmounts);
-    const creatorPick = Math.random() > 0.5 ? 'bullish' : 'bearish';
 
-    // Provably fair seed
-    const seed = crypto.randomBytes(32).toString('hex');
-    const seedHash = crypto.createHash('sha256').update(seed).digest('hex');
-
-    const now = new Date();
-
-    // Insert as OPEN lobby
-    await db.insert(candleflipGames).values({
-      id: gameId,
-      creatorId: bot1.id,
-      opponentId: null,
-      betAmount,
-      creatorPick,
-      status: 'open',
-      seed,
-      seedHash,
-      createdAt: now,
-    });
-
-    // Schedule bot2 join in 5-15 seconds
-    pendingCandleflips.push({
-      gameId,
-      bot1,
-      bot2,
-      betAmount,
-      creatorPick,
-      seed,
-      joinAt: Date.now() + randomBetween(5000, 15000),
-    });
-
-    console.log(`[BotEngine] Candleflip lobby ${gameId} created by ${bot1.username}, ${bot2.username} joins in ~10s`);
+    const result = await rugJoinRound(bot.id, betAmount);
+    if (result.success) {
+      console.log(`[BotEngine] ${bot.username} joined rug round ${round.roundId.slice(0, 8)} (${(betAmount / 1e9).toFixed(2)} SOL)`);
+    }
   } catch (err) {
-    console.error(`[BotEngine] Candleflip lobby create error:`, err);
+    // Silently ignore join errors (already in round, etc)
   }
 }
 
-// ─── Candleflip — Phase 2: Bot2 Joins Pending Lobbies ────────
+// ─── Candleflip — Join Public Round ──────────────────────────
 
-async function resolvePendingCandleflips(): Promise<void> {
-  const now = Date.now();
-  const toJoin = pendingCandleflips.filter(g => now >= g.joinAt);
+async function botJoinCandleflipRound(bot: BotUser): Promise<void> {
+  try {
+    const round = await getCandleflipCurrentRound();
+    if (!round || round.status !== 'waiting') return;
 
-  for (const pending of toJoin) {
-    try {
-      const db = getDb();
-      const { gameId, bot1, bot2, betAmount, creatorPick, seed } = pending;
+    const betAmounts = [10_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000];
+    const betAmount = pickRandom(betAmounts);
+    const pick = Math.random() > 0.5 ? 'bullish' : 'bearish' as const;
 
-      // Check if game is still open (a real player may have joined)
-      const game = await db.query.candleflipGames.findFirst({
-        where: eq(candleflipGames.id, gameId),
-      });
-
-      if (!game || game.status !== 'open') {
-        console.log(`[BotEngine] Candleflip ${gameId} already joined by real player, skipping`);
-      } else {
-        // Generate result
-        const resultHash = crypto.createHash('sha256')
-          .update(seed + ':' + gameId)
-          .digest('hex');
-        const resultValue = parseInt(resultHash.slice(0, 8), 16);
-        const multiplier = 0.50 + (resultValue / 0xFFFFFFFF);
-        const result = multiplier >= 1.0 ? 'bullish' : 'bearish';
-
-        const winnerId = creatorPick === result ? bot1.id : bot2.id;
-        const totalPool = betAmount * 2;
-        const houseFee = Math.floor(totalPool * 0.05);
-        const prizeAmount = totalPool - houseFee;
-
-        // Update game: bot2 joins and resolve
-        await db.update(candleflipGames)
-          .set({
-            opponentId: bot2.id,
-            status: 'finished',
-            result,
-            resultMultiplier: multiplier.toFixed(4),
-            winnerId,
-            prizeAmount,
-            resolvedAt: new Date(),
-          })
-          .where(eq(candleflipGames.id, gameId));
-
-        // Activity feed
-        const winnerBot = winnerId === bot1.id ? bot1 : bot2;
-        await db.insert(activityFeedItems).values({
-          feedType: 'candleflip_result',
-          userId: winnerId,
-          payload: {
-            username: winnerBot.username,
-            level: winnerBot.level,
-            vipTier: winnerBot.vipTier,
-            betAmount,
-            result,
-            prizeAmount,
-            isWin: true,
-          },
-        });
-
-        console.log(`[BotEngine] Candleflip ${gameId} resolved: ${result} (winner: ${winnerBot.username})`);
-      }
-    } catch (err) {
-      console.error(`[BotEngine] Candleflip resolve error:`, err);
+    const result = await candleflipBetOnRound(bot.id, pick, betAmount);
+    if (result.success) {
+      console.log(`[BotEngine] ${bot.username} bet ${pick} on candleflip round ${round.roundId.slice(0, 8)}`);
     }
-
-    // Remove from pending
-    const idx = pendingCandleflips.indexOf(pending);
-    if (idx >= 0) pendingCandleflips.splice(idx, 1);
+  } catch (err) {
+    // Silently ignore bet errors
   }
 }
 
@@ -833,9 +606,7 @@ async function engineTick(): Promise<void> {
 
   const now = Date.now();
 
-  // ── Resolve pending games first ──
-  await resolvePendingRugGames();
-  await resolvePendingCandleflips();
+  // ── Process pending lifecycle events ──
   await processPendingSimJoins();
   await autoStartPendingSimRooms();
 
@@ -862,26 +633,27 @@ async function engineTick(): Promise<void> {
     simulatePrediction(bot).catch(() => {});
   }
 
-  // Candleflip lobbies (cooldown 15-30s) — creates OPEN lobby, resolved later
+  // Candleflip — bots join public rounds (cooldown 8-15s)
   if (now - lastCandleflipAt >= candleflipCooldown) {
     lastCandleflipAt = now;
-    candleflipCooldown = randomBetween(15000, 30000);
+    candleflipCooldown = randomBetween(8000, 15000);
 
-    const [bot1, bot2] = pickRandomN(botUsers, 2);
-    if (bot1 && bot2) {
-      createCandleflipLobby(bot1, bot2).catch(() => {});
+    const count = randomBetween(1, 3);
+    const selectedBots = pickRandomN(botUsers, count);
+    for (const bot of selectedBots) {
+      botJoinCandleflipRound(bot).catch(() => {});
     }
   }
 
-  // Rug Game (cooldown 10-20s) — creates ACTIVE game, resolved later
+  // Rug Game — bots join public rounds (cooldown 6-12s)
   if (now - lastRugGameAt >= rugGameCooldown) {
     lastRugGameAt = now;
-    rugGameCooldown = randomBetween(10000, 20000);
+    rugGameCooldown = randomBetween(6000, 12000);
 
-    const count = randomBetween(1, 2);
+    const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);
     for (const bot of selectedBots) {
-      createActiveRugGame(bot).catch(() => {});
+      botJoinRugRound(bot).catch(() => {});
     }
   }
 

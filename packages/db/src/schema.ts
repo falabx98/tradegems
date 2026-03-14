@@ -767,3 +767,73 @@ export const rugGames = pgTable('rug_games', {
   index('idx_rug_games_status').on(table.status),
 ]);
 
+// ── Public Rug Rounds (rugs.fun-style auto-cycling) ──────────────────────────
+
+export const rugRounds = pgTable('rug_rounds', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  roundNumber: serial('round_number'),
+  status: text('status').notNull().default('waiting'), // waiting | active | resolved
+  rugMultiplier: numeric('rug_multiplier', { precision: 8, scale: 4 }).notNull(),
+  seed: text('seed').notNull(),
+  seedHash: text('seed_hash').notNull(),
+  candleData: jsonb('candle_data'), // OHLC array updated progressively
+  waitStartedAt: timestamp('wait_started_at', { withTimezone: true }).notNull().defaultNow(),
+  activeStartedAt: timestamp('active_started_at', { withTimezone: true }),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  playerCount: integer('player_count').notNull().default(0),
+  totalBetAmount: bigint('total_bet_amount', { mode: 'number' }).notNull().default(0),
+}, (table) => [
+  index('idx_rug_rounds_status').on(table.status),
+]);
+
+export const rugRoundBets = pgTable('rug_round_bets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  roundId: uuid('round_id').notNull().references(() => rugRounds.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  betAmount: bigint('bet_amount', { mode: 'number' }).notNull(),
+  cashOutMultiplier: numeric('cash_out_multiplier', { precision: 8, scale: 4 }),
+  payout: bigint('payout', { mode: 'number' }).notNull().default(0),
+  status: text('status').notNull().default('active'), // active | cashed_out | rugged
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('idx_rug_round_bets_unique').on(table.roundId, table.userId),
+  index('idx_rug_round_bets_round').on(table.roundId),
+]);
+
+// ── Public Candleflip Rounds ─────────────────────────────────────────────────
+
+export const candleflipRounds = pgTable('candleflip_rounds', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  roundNumber: serial('round_number'),
+  status: text('status').notNull().default('waiting'), // waiting | flipping | resolved
+  result: text('result'), // bullish | bearish (null until resolved)
+  resultMultiplier: numeric('result_multiplier', { precision: 8, scale: 4 }),
+  seed: text('seed').notNull(),
+  seedHash: text('seed_hash').notNull(),
+  candleData: jsonb('candle_data'), // 10-candle OHLC array
+  waitStartedAt: timestamp('wait_started_at', { withTimezone: true }).notNull().defaultNow(),
+  flipStartedAt: timestamp('flip_started_at', { withTimezone: true }),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  playerCount: integer('player_count').notNull().default(0),
+  totalBullish: integer('total_bullish').notNull().default(0),
+  totalBearish: integer('total_bearish').notNull().default(0),
+}, (table) => [
+  index('idx_candleflip_rounds_status').on(table.status),
+]);
+
+export const candleflipRoundBets = pgTable('candleflip_round_bets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  roundId: uuid('round_id').notNull().references(() => candleflipRounds.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  pick: text('pick').notNull(), // bullish | bearish
+  betAmount: bigint('bet_amount', { mode: 'number' }).notNull(),
+  payout: bigint('payout', { mode: 'number' }).notNull().default(0),
+  status: text('status').notNull().default('pending'), // pending | won | lost
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('idx_candleflip_round_bets_unique').on(table.roundId, table.userId),
+  index('idx_candleflip_round_bets_round').on(table.roundId),
+]);
+

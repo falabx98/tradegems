@@ -30,6 +30,8 @@ import { lotteryRoutes } from './routes/lottery.routes.js';
 import { tradingSimRoutes } from './routes/trading-sim.routes.js';
 import { candleflipRoutes } from './routes/candleflip.routes.js';
 import { rugGameRoutes } from './routes/rug-game.routes.js';
+import { startRugRoundManager } from './modules/round-manager/rugRoundManager.js';
+import { startCandleflipRoundManager } from './modules/round-manager/candleflipRoundManager.js';
 
 
 export async function buildServer() {
@@ -131,6 +133,10 @@ export async function buildServer() {
   await server.register(tradingSimRoutes, { prefix: '/v1/trading-sim' });
   await server.register(candleflipRoutes, { prefix: '/v1/candleflip' });
   await server.register(rugGameRoutes, { prefix: '/v1/rug-game' });
+
+  // Start round managers
+  startRugRoundManager();
+  startCandleflipRoundManager();
 
   // Start background workers
   startDepositWorker();

@@ -77,7 +77,8 @@ function randomFloat(min: number, max: number): number {
 }
 
 async function main() {
-  const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:KMgUGZNVFRLiAMlkTGaVbtvWZSEvBuSm@turntable.proxy.rlwy.net:45790/railway';
+  const connectionString = process.env.DATABASE_URL;
+  if (!connectionString) { console.error('DATABASE_URL is required'); process.exit(1); }
   const client = postgres(connectionString);
   const db = drizzle(client);
 

@@ -58,8 +58,9 @@ export async function requireAuth(request: FastifyRequest, _reply: FastifyReply)
       // cached === '0' means valid session (cached), do nothing
     } catch (err) {
       if (err instanceof AppError) throw err;
-      // If Redis/DB check fails, allow request (don't block auth on transient issues)
-      request.log.warn({ err }, 'Session revocation check failed (non-blocking)');
+      // Fail closed: reject request if session validation is unavailable
+      request.log.error({ err }, 'Session revocation check failed — blocking request');
+      throw new AppError(503, 'AUTH_UNAVAILABLE', 'Authentication service temporarily unavailable');
     }
   } catch (err) {
     if (err instanceof AppError) throw err;

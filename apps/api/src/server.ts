@@ -14,17 +14,23 @@ import { gameplayRoutes } from './routes/gameplay.routes.js';
 import { rewardsRoutes } from './routes/rewards.routes.js';
 import { leaderboardRoutes } from './routes/leaderboard.routes.js';
 import { adminRoutes } from './routes/admin.routes.js';
-import { battleRoutes } from './routes/battle.routes.js';
 import { referralRoutes } from './routes/referral.routes.js';
 import { chatRoutes } from './routes/chat.routes.js';
 import { tipRoutes } from './routes/tip.routes.js';
 import { startDepositWorker } from './workers/depositConfirmation.worker.js';
 import { startBotEngine } from './workers/botEngine.worker.js';
+import { startLotteryDrawWorker } from './workers/lotteryDraw.worker.js';
+import { startTradingSimWorker } from './workers/tradingSim.worker.js';
 import { activityRoutes } from './routes/activity.routes.js';
 import { initSentry } from './config/sentry.js';
 import { fairnessRoutes } from './routes/fairness.routes.js';
 import { seasonRoutes } from './routes/season.routes.js';
 import { predictionRoutes } from './routes/prediction.routes.js';
+import { lotteryRoutes } from './routes/lottery.routes.js';
+import { tradingSimRoutes } from './routes/trading-sim.routes.js';
+import { candleflipRoutes } from './routes/candleflip.routes.js';
+import { rugGameRoutes } from './routes/rug-game.routes.js';
+
 
 export async function buildServer() {
   // Initialize Sentry error tracking
@@ -45,9 +51,7 @@ export async function buildServer() {
   await server.register(cors, {
     origin: env.CORS_ORIGINS
       ? env.CORS_ORIGINS.split(',').map(s => s.trim())
-      : env.NODE_ENV === 'production'
-        ? false
-        : true,
+      : ['https://tradegems.app', 'https://tradesol-web.vercel.app', 'http://localhost:5173'],
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -116,7 +120,6 @@ export async function buildServer() {
   await server.register(rewardsRoutes, { prefix: '/v1/rewards' });
   await server.register(leaderboardRoutes, { prefix: '/v1/leaderboards' });
   await server.register(adminRoutes, { prefix: '/v1/admin' });
-  await server.register(battleRoutes, { prefix: '/v1/battles' });
   await server.register(referralRoutes, { prefix: '/v1/referrals' });
   await server.register(chatRoutes, { prefix: '/v1/chat' });
   await server.register(tipRoutes, { prefix: '/v1/tips' });
@@ -124,10 +127,16 @@ export async function buildServer() {
   await server.register(seasonRoutes, { prefix: '/v1/season' });
   await server.register(predictionRoutes, { prefix: '/v1/predictions' });
   await server.register(activityRoutes, { prefix: '/v1/activity' });
+  await server.register(lotteryRoutes, { prefix: '/v1/lottery' });
+  await server.register(tradingSimRoutes, { prefix: '/v1/trading-sim' });
+  await server.register(candleflipRoutes, { prefix: '/v1/candleflip' });
+  await server.register(rugGameRoutes, { prefix: '/v1/rug-game' });
 
   // Start background workers
   startDepositWorker();
   startBotEngine();
+  startLotteryDrawWorker();
+  startTradingSimWorker();
 
   return server;
 }

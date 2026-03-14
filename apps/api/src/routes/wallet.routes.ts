@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { eq, and, desc, count } from 'drizzle-orm';
+import { eq, and, desc, count, sql } from 'drizzle-orm';
 import { linkedWallets, bonusCodes, bonusCodeRedemptions, balances, balanceLedgerEntries, users } from '@tradingarena/db';
 import { WalletService } from '../modules/wallet/wallet.service.js';
 import { DepositService } from '../modules/solana/deposit.service.js';
@@ -12,7 +12,14 @@ import { env } from '../config/env.js';
 
 const withdrawSchema = z.object({
   asset: z.literal('SOL'),
-  amount: z.string(),
+  amount: z.union([
+    z.number().int().positive(),
+    z.string().transform((v) => {
+      const n = parseInt(v, 10);
+      if (isNaN(n) || n <= 0) throw new Error('Amount must be a positive integer');
+      return n;
+    }),
+  ]),
   destination: z.string().min(32).max(64),
 });
 
@@ -49,6 +56,22 @@ export async function walletRoutes(server: FastifyInstance) {
     return walletService.getLinkedWallets(getAuthUser(request).userId);
   });
 
+  // ─── P&L History ──────────────────────────────────────────
+  server.get('/pnl-history', async (request) => {
+    const userId = getAuthUser(request).userId;
+    const db = getDb();
+    const rows = await db
+      .select({
+        date: sql<string>`date_trunc('day', ${balanceLedgerEntries.createdAt})::text`,
+        balance: sql<number>`max(${balanceLedgerEntries.balanceAfter})`,
+      })
+      .from(balanceLedgerEntries)
+      .where(eq(balanceLedgerEntries.userId, userId))
+      .groupBy(sql`date_trunc('day', ${balanceLedgerEntries.createdAt})`)
+      .orderBy(sql`date_trunc('day', ${balanceLedgerEntries.createdAt})`);
+    return { data: rows };
+  });
+
   // ─── Deposit ──────────────────────────────────────────────
 
   server.get('/deposit/:asset', async (request) => {
@@ -77,7 +100,10 @@ export async function walletRoutes(server: FastifyInstance) {
   server.post('/withdraw', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
     const body = withdrawSchema.parse(request.body);
     const userId = getAuthUser(request).userId;
-    const amount = parseInt(body.amount);
+    const amount = typeof body.amount === 'number' ? body.amount : parseInt(String(body.amount), 10);
+    if (!amount || amount <= 0) {
+      return reply.status(400).send({ error: { code: 'INVALID_AMOUNT', message: 'Amount must be a positive integer' } });
+    }
 
     // Check bonus withdrawal restriction
     const eligibility = await walletService.checkWithdrawalEligibility(userId, amount);
@@ -154,7 +180,7 @@ export async function walletRoutes(server: FastifyInstance) {
   // ─── Bonus: Redeem bonus code ──────────────────────────
 
   server.post('/redeem-code', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request, reply) => {
-    const { code } = request.body as { code: string };
+    const { code } = z.object({ code: z.string().min(1).max(30).trim() }).parse(request.body);
     const userId = getAuthUser(request).userId;
     const db = getDb();
 
@@ -204,12 +230,33 @@ export async function walletRoutes(server: FastifyInstance) {
       });
     }
 
-    // 6. Credit balance
+    // 6. Validate amount is reasonable
+    if (bonusCode.amountLamports <= 0 || bonusCode.amountLamports > 100_000_000_000) {
+      return reply.status(400).send({
+        error: { code: 'INVALID_CODE', message: 'Invalid bonus code amount' },
+      });
+    }
+
+    // 7. Atomic: increment usedCount with WHERE guard (prevents race condition)
+    const [updated] = await db.update(bonusCodes).set({
+      usedCount: sql`${bonusCodes.usedCount} + 1`,
+    }).where(and(
+      eq(bonusCodes.id, bonusCode.id),
+      sql`${bonusCodes.usedCount} < ${bonusCodes.maxUses}`,
+    )).returning();
+
+    if (!updated) {
+      return reply.status(400).send({
+        error: { code: 'CODE_EXHAUSTED', message: 'This bonus code has reached its maximum number of uses' },
+      });
+    }
+
+    // 8. Credit balance atomically using SQL increment
     const [existing] = await db.select().from(balances).where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL')));
 
     if (existing) {
       await db.update(balances).set({
-        availableAmount: existing.availableAmount + bonusCode.amountLamports,
+        availableAmount: sql`${balances.availableAmount} + ${bonusCode.amountLamports}`,
         updatedAt: new Date(),
       }).where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL')));
     } else {
@@ -221,7 +268,7 @@ export async function walletRoutes(server: FastifyInstance) {
       });
     }
 
-    // 7. Create ledger entry
+    // 9. Create ledger entry
     const newBalance = (existing?.availableAmount ?? 0) + bonusCode.amountLamports;
     await db.insert(balanceLedgerEntries).values({
       userId,
@@ -234,19 +281,13 @@ export async function walletRoutes(server: FastifyInstance) {
       metadata: { code: bonusCode.code },
     });
 
-    // 8. Insert redemption record
+    // 10. Insert redemption record
     await db.insert(bonusCodeRedemptions).values({
       bonusCodeId: bonusCode.id,
       userId,
       amountLamports: bonusCode.amountLamports,
     });
 
-    // 9. Increment used count
-    await db.update(bonusCodes).set({
-      usedCount: bonusCode.usedCount + 1,
-    }).where(eq(bonusCodes.id, bonusCode.id));
-
-    // 10. Return success
     return {
       success: true,
       message: `Redeemed ${bonusCode.code} for bonus SOL`,

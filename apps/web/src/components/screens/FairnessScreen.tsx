@@ -117,7 +117,7 @@ export function FairnessScreen() {
         {/* Verify Round Panel */}
         <div style={styles.panel}>
           <div style={styles.panelHeader}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9945FF" strokeWidth="2" strokeLinecap="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7717ff" strokeWidth="2" strokeLinecap="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
             <span style={styles.panelTitle}>Verify a Round</span>
@@ -289,7 +289,7 @@ export function FairnessScreen() {
                 onClick={() => handleHistoryClick(round.id)}
                 style={{
                   ...styles.historyItem,
-                  ...(roundId === round.id ? { background: 'rgba(153, 69, 255, 0.08)' } : {}),
+                  ...(roundId === round.id ? { background: 'rgba(119, 23, 255, 0.08)' } : {}),
                 }}
               >
                 <div style={styles.historyLeft}>
@@ -331,9 +331,9 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100%',
+    minHeight: '100%',
     padding: '16px',
-    overflow: 'auto',
+    boxSizing: 'border-box',
   },
 
   header: {
@@ -359,7 +359,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '20px',
     fontWeight: 700,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
     textAlign: 'center' as const,
@@ -394,7 +394,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
@@ -431,11 +431,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   verifyBtn: {
     padding: '10px 20px',
-    background: 'rgba(153, 69, 255, 0.15)',
-    border: '1px solid rgba(153, 69, 255, 0.3)',
+    background: 'rgba(119, 23, 255, 0.15)',
+    border: '1px solid rgba(119, 23, 255, 0.3)',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '14px',
     fontWeight: 700,
     color: '#c084fc',
@@ -467,7 +467,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontWeight: 700,
     color: '#34d399',
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     letterSpacing: '1px',
   },
 
@@ -522,14 +522,14 @@ const styles: Record<string, React.CSSProperties> = {
     width: '28px',
     height: '28px',
     borderRadius: '50%',
-    background: 'rgba(153, 69, 255, 0.12)',
-    border: '1px solid rgba(153, 69, 255, 0.25)',
+    background: 'rgba(119, 23, 255, 0.12)',
+    border: '1px solid rgba(119, 23, 255, 0.25)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '13px',
     fontWeight: 700,
-    color: '#9945FF',
+    color: '#7717ff',
     fontFamily: '"JetBrains Mono", monospace',
     flexShrink: 0,
   },
@@ -543,7 +543,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 700,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     letterSpacing: '0.5px',
   },
   stepDesc: {

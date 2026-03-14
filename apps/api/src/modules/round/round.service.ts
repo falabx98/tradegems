@@ -1,6 +1,6 @@
 import { eq, and, desc, sql } from 'drizzle-orm';
 import crypto from 'node:crypto';
-import { rounds, roundNodes, roundEvents, roundPools, bets, betResults, userProfiles } from '@tradingarena/db';
+import { rounds, roundNodes, roundEvents, roundPools, bets, betResults, userProfiles, activityFeedItems, users } from '@tradingarena/db';
 import {
   generateRound,
   simulateRound,
@@ -231,6 +231,29 @@ export class RoundService {
       // Award XP
       await this.userService.addXP(bet.userId, result.xpGained, 'round');
 
+      // Insert activity feed item for real players
+      try {
+        const player = await this.db.query.users.findFirst({ where: eq(users.id, bet.userId) });
+        if (player) {
+          await this.db.insert(activityFeedItems).values({
+            feedType: 'solo_result',
+            userId: bet.userId,
+            payload: {
+              username: player.username,
+              level: player.level,
+              vipTier: player.vipTier,
+              betAmount: bet.amount,
+              multiplier: parseFloat(result.finalMultiplier.toFixed(4)),
+              payout: payoutLamports,
+              riskTier: bet.riskTier,
+              isWin: resultType === 'win',
+            },
+          });
+        }
+      } catch {
+        // Non-critical — don't fail settlement
+      }
+
       // Update user stats
       // winRate = (total payout received) / (total wagered) — represents ROI
       // A winRate > 1 means net positive, < 1 means net negative
@@ -256,6 +279,23 @@ export class RoundService {
             updated_at = now()
         WHERE user_id = ${bet.userId}
       `);
+    }
+
+    // Safety net: refund any bets that failed settlement (still 'active' after loop)
+    const unsettledBets = await this.db.query.bets.findMany({
+      where: and(eq(bets.roundId, roundId), eq(bets.status, 'active')),
+    });
+    for (const stuckBet of unsettledBets) {
+      try {
+        const totalCost = stuckBet.amount + stuckBet.fee;
+        await this.walletService.releaseFunds(stuckBet.userId, totalCost, 'SOL', { type: 'round', id: `refund-${roundId}` });
+        await this.db.update(bets).set({ status: 'refunded', settledAt: new Date() }).where(eq(bets.id, stuckBet.id));
+        console.warn(`[Round] Refunded stuck bet ${stuckBet.id} for user ${stuckBet.userId}`);
+      } catch (refundErr) {
+        console.error(`[Round] Failed to refund stuck bet ${stuckBet.id}:`, refundErr);
+        // Last resort: just mark cancelled so it doesn't stay active forever
+        await this.db.update(bets).set({ status: 'cancelled', settledAt: new Date() }).where(eq(bets.id, stuckBet.id));
+      }
     }
 
     // Update pool

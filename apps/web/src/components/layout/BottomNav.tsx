@@ -17,7 +17,6 @@ const MORE_ITEMS = [
   { id: 'prediction', label: 'Predict', icon: 'candles' },
   { id: 'rewards', label: 'Rewards', icon: 'gift' },
   { id: 'history', label: 'History', icon: 'clock' },
-  { id: 'battle', label: 'Tournament', icon: 'swords' },
   { id: 'settings', label: 'Settings', icon: 'gear' },
 ] as const;
 
@@ -26,7 +25,7 @@ export function BottomNav() {
   const go = useAppNavigate();
   const [showMore, setShowMore] = useState(false);
 
-  const activeId = screen === 'lobby' || screen === 'setup' ? 'lobby' : screen;
+  const activeId = screen === 'setup' ? 'solo' : screen;
   const isMoreActive = MORE_ITEMS.some((m) => m.id === activeId);
 
   const handleTab = (id: string) => {
@@ -38,7 +37,7 @@ export function BottomNav() {
     }
     setShowMore(false);
     if (id === 'solo') {
-      go('lobby');
+      go('setup');
     } else {
       go(id);
     }
@@ -68,11 +67,11 @@ export function BottomNav() {
                     ...(isActive ? styles.moreItemActive : {}),
                   }}
                 >
-                  <NavIcon name={item.icon} size={20} color={isActive ? '#c084fc' : theme.text.secondary} />
+                  <NavIcon name={item.icon} size={20} color={isActive ? theme.accent.violet : theme.text.secondary} />
                   <span style={{
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    color: isActive ? '#c084fc' : theme.text.primary,
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: isActive ? '#fff' : theme.text.primary,
                   }}>
                     {item.label}
                   </span>
@@ -95,13 +94,13 @@ export function BottomNav() {
             >
               <NavIcon
                 name={tab.icon}
-                size={20}
-                color={isActive ? '#c084fc' : theme.text.muted}
+                size={22}
+                color={isActive ? '#fff' : theme.text.muted}
               />
               <span style={{
-                fontSize: '11px',
+                fontSize: '10px',
                 fontWeight: 600,
-                color: isActive ? '#c084fc' : theme.text.muted,
+                color: isActive ? '#fff' : theme.text.muted,
                 marginTop: '2px',
               }}>
                 {tab.label}
@@ -120,14 +119,12 @@ const styles: Record<string, React.CSSProperties> = {
     bottom: 0,
     left: 0,
     right: 0,
-    height: '56px',
+    height: theme.layout.bottomNavHeight,
     paddingBottom: 'env(safe-area-inset-bottom, 0px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-around',
-    background: 'rgba(21, 15, 33, 0.92)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
+    background: theme.bg.secondary,
     borderTop: `1px solid ${theme.border.subtle}`,
     zIndex: 200,
   },
@@ -141,21 +138,21 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'transparent',
     border: 'none',
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     padding: 0,
   },
   overlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(0,0,0,0.5)',
+    background: 'rgba(0,0,0,0.6)',
     zIndex: 199,
     display: 'flex',
     alignItems: 'flex-end',
     justifyContent: 'center',
-    paddingBottom: '68px',
+    paddingBottom: '72px',
   },
   moreMenu: {
-    background: theme.bg.elevated,
+    background: theme.bg.card,
     border: `1px solid ${theme.border.medium}`,
     borderRadius: '12px',
     padding: '8px',
@@ -173,11 +170,11 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 16px',
     background: 'transparent',
     border: 'none',
-    borderRadius: '8px',
+    borderRadius: '6px',
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
   },
   moreItemActive: {
-    background: 'rgba(153, 69, 255, 0.08)',
+    background: 'rgba(52, 56, 67, 0.6)',
   },
 };

@@ -6,7 +6,7 @@ import { theme } from '../../styles/theme';
 
 interface AppLayoutProps {
   children: React.ReactNode;
-  hideChrome?: boolean; // Hide top bar + nav during gameplay
+  hideChrome?: boolean;
 }
 
 export function AppLayout({ children, hideChrome = false }: AppLayoutProps) {
@@ -15,7 +15,6 @@ export function AppLayout({ children, hideChrome = false }: AppLayoutProps) {
   if (hideChrome) {
     return (
       <div style={styles.fullscreen}>
-        <div className="neon-grid" />
         {children}
       </div>
     );
@@ -23,13 +22,12 @@ export function AppLayout({ children, hideChrome = false }: AppLayoutProps) {
 
   return (
     <div style={styles.root}>
-      <div className="neon-grid" />
       <TopBar />
       <div style={styles.body}>
         {!isMobile && <SideNav />}
         <main style={{
           ...styles.main,
-          ...(isMobile ? { paddingBottom: '64px' } : {}),
+          ...(isMobile ? { paddingBottom: '68px' } : {}),
         }}>
           {children}
         </main>
@@ -55,7 +53,7 @@ const styles: Record<string, React.CSSProperties> = {
   main: {
     flex: 1,
     overflow: 'auto',
-    position: 'relative',
+    background: theme.bg.primary,
   },
   fullscreen: {
     height: '100vh',

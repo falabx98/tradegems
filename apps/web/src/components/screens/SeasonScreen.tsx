@@ -296,7 +296,7 @@ export function SeasonScreen() {
                         <span style={styles.premiumLockBadge}>Premium</span>
                       ) : isUnlocked && !claimedPremium.has(lvl) ? (
                         <button
-                          style={{ ...styles.claimBtn, background: 'rgba(153, 69, 255, 0.3)', borderColor: 'rgba(153, 69, 255, 0.5)' }}
+                          style={{ ...styles.claimBtn, background: 'rgba(119, 23, 255, 0.3)', borderColor: 'rgba(119, 23, 255, 0.5)' }}
                           onClick={() => handleClaimPremium(lvl)}
                         >
                           Claim
@@ -328,16 +328,16 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '12px',
     padding: '16px',
-    height: '100%',
-    overflow: 'auto',
+    minHeight: '100%',
+    boxSizing: 'border-box',
   },
 
   // Header Card
   headerCard: {
-    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.18), rgba(20, 241, 149, 0.08))',
+    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.18), rgba(20, 241, 149, 0.08))',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(153, 69, 255, 0.25)',
+    border: '1px solid rgba(119, 23, 255, 0.25)',
     borderRadius: '14px',
     padding: '20px',
     boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
@@ -357,10 +357,10 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '22px',
     fontWeight: 800,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '2px',
-    background: 'linear-gradient(135deg, #c084fc, #9945FF)',
+    background: 'linear-gradient(135deg, #c084fc, #7717ff)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
   },
@@ -418,17 +418,17 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(28, 20, 42, 0.9)',
     borderRadius: '5px',
     overflow: 'visible',
-    border: '1px solid rgba(153, 69, 255, 0.15)',
+    border: '1px solid rgba(119, 23, 255, 0.15)',
   },
   progressBarInner: {
     position: 'absolute',
     top: 0,
     left: 0,
     height: '100%',
-    background: 'linear-gradient(90deg, #9945FF, #c084fc, #14F195)',
+    background: 'linear-gradient(90deg, #7717ff, #c084fc, #14F195)',
     borderRadius: '5px',
     transition: 'width 0.5s ease',
-    boxShadow: '0 0 12px rgba(153, 69, 255, 0.4)',
+    boxShadow: '0 0 12px rgba(119, 23, 255, 0.4)',
   },
   levelMarker: {
     position: 'absolute',
@@ -449,7 +449,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   xpSubBarFill: {
     height: '100%',
-    background: '#9945FF',
+    background: '#7717ff',
     borderRadius: '2px',
     transition: 'width 0.3s ease',
   },
@@ -462,11 +462,11 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Premium Card
   premiumCard: {
-    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.12), rgba(192, 132, 252, 0.06))',
-    border: '1px solid rgba(153, 69, 255, 0.3)',
+    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.12), rgba(192, 132, 252, 0.06))',
+    border: '1px solid rgba(119, 23, 255, 0.3)',
     borderRadius: '12px',
     overflow: 'hidden',
-    boxShadow: '0 0 20px rgba(153, 69, 255, 0.1)',
+    boxShadow: '0 0 20px rgba(119, 23, 255, 0.1)',
   },
   premiumContent: {
     display: 'flex',
@@ -484,7 +484,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: 700,
     color: '#c084fc',
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
   },
@@ -509,7 +509,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '1px',
-    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.2), rgba(20, 241, 149, 0.15))',
+    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.2), rgba(20, 241, 149, 0.15))',
     borderRadius: '10px',
     overflow: 'hidden',
   },
@@ -539,7 +539,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(28, 20, 42, 0.85)',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(153, 69, 255, 0.18)',
+    border: '1px solid rgba(119, 23, 255, 0.18)',
     borderRadius: '14px',
     overflow: 'hidden',
     boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
@@ -553,14 +553,14 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '12px 16px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
     background: 'rgba(32, 24, 48, 0.95)',
   },
   trackTitle: {
     fontSize: '15px',
     fontWeight: 700,
     color: theme.text.secondary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
@@ -583,9 +583,9 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: '#c084fc',
     padding: '2px 8px',
-    background: 'rgba(153, 69, 255, 0.1)',
+    background: 'rgba(119, 23, 255, 0.1)',
     borderRadius: '4px',
-    border: '1px solid rgba(153, 69, 255, 0.2)',
+    border: '1px solid rgba(119, 23, 255, 0.2)',
   },
 
   // Track Scroll
@@ -602,13 +602,13 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '10px',
     padding: '8px 12px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.06)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
     transition: 'background-color 0.15s ease',
     minHeight: '56px',
   },
   tierRowCurrent: {
-    background: 'rgba(153, 69, 255, 0.08)',
-    borderLeft: '3px solid #9945FF',
+    background: 'rgba(119, 23, 255, 0.08)',
+    borderLeft: '3px solid #7717ff',
   },
   tierRowUnlocked: {
     background: 'rgba(20, 241, 149, 0.03)',
@@ -623,7 +623,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     background: 'rgba(28, 20, 42, 0.9)',
-    border: '2px solid rgba(153, 69, 255, 0.15)',
+    border: '2px solid rgba(119, 23, 255, 0.15)',
     flexShrink: 0,
   },
   tierLevelUnlocked: {
@@ -631,9 +631,9 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(20, 241, 149, 0.06)',
   },
   tierLevelCurrent: {
-    border: '2px solid #9945FF',
-    background: 'rgba(153, 69, 255, 0.15)',
-    boxShadow: '0 0 12px rgba(153, 69, 255, 0.3)',
+    border: '2px solid #7717ff',
+    background: 'rgba(119, 23, 255, 0.15)',
+    boxShadow: '0 0 12px rgba(119, 23, 255, 0.3)',
   },
   tierLevelText: {
     fontSize: '13px',
@@ -656,7 +656,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '8px',
     padding: '6px 10px',
     background: 'rgba(28, 20, 42, 0.6)',
-    border: '1px solid rgba(153, 69, 255, 0.1)',
+    border: '1px solid rgba(119, 23, 255, 0.1)',
     borderRadius: '8px',
     width: '100%',
     maxWidth: '200px',
@@ -668,11 +668,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   rewardBoxClaimed: {
     opacity: 0.5,
-    border: '1px solid rgba(153, 69, 255, 0.06)',
+    border: '1px solid rgba(119, 23, 255, 0.06)',
   },
   rewardBoxPremium: {
-    border: '1px solid rgba(153, 69, 255, 0.15)',
-    background: 'rgba(153, 69, 255, 0.04)',
+    border: '1px solid rgba(119, 23, 255, 0.15)',
+    background: 'rgba(119, 23, 255, 0.04)',
   },
   premiumLockOverlay: {
     position: 'absolute',
@@ -707,7 +707,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
     transition: 'all 0.15s ease',

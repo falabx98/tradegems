@@ -18,6 +18,7 @@ import { CandlestickChart } from '../arena/CandlestickChart';
 import { playBetPlaced, playCountdownBeep, playLevelUp, playRoundEnd, hapticMedium, hapticHeavy } from '../../utils/sounds';
 import { ArrowUpIcon, ArrowDownIcon, ArrowSidewaysIcon, TrophyIcon, ExplosionIcon } from '../ui/GameIcons';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
+import { toast } from '../../stores/toastStore';
 
 const BET_OPTIONS = [
   { label: '0.01', lamports: 10_000_000 },
@@ -48,7 +49,7 @@ function ConfettiCanvas({ active }: { active: boolean }) {
     const w = canvas.offsetWidth;
     const h = canvas.offsetHeight;
 
-    const colors = ['#34d399', '#9945FF', '#fbbf24', '#c084fc', '#5b8def', '#f472b6'];
+    const colors = ['#34d399', '#7717ff', '#fbbf24', '#c084fc', '#5b8def', '#f472b6'];
     const particles = Array.from({ length: 80 }, () => ({
       x: w / 2 + (Math.random() - 0.5) * w * 0.3,
       y: h * 0.4,
@@ -111,8 +112,9 @@ export function PredictionScreen() {
   const [result, setResult] = useState<PredictionResult | null>(null);
   const [revealProgress, setRevealProgress] = useState(0);
   const [countdown, setCountdown] = useState(3);
-  const [serverRoundId, setServerRoundId] = useState<string | null>(null);
   const [customBet, setCustomBet] = useState('');
+  const [lockRef, setLockRef] = useState<string | null>(null);
+  const [locking, setLocking] = useState(false);
 
   const handleCustomBet = () => {
     const val = parseFloat(customBet);
@@ -172,8 +174,37 @@ export function PredictionScreen() {
 
   const WIN_PROBABILITY = 0.45;
 
-  function handlePrediction(dir: PredictionDirection) {
-    if (!roundConfig) return;
+  async function handlePrediction(dir: PredictionDirection) {
+    if (!roundConfig || locking) return;
+    // Balance pre-check: prevent betting more than available
+    if (isAuthenticated && betAmount > profile.balance) {
+      toast.error('Insufficient Balance', 'You don\'t have enough SOL for this bet');
+      return;
+    }
+
+    // Pre-lock funds on server before starting the game
+    if (isAuthenticated) {
+      setLocking(true);
+      try {
+        const lockResult = await api.lockPrediction(betAmount);
+        setLockRef(lockResult.lockRef);
+        // Deduct from local balance immediately for UI feedback
+        const feeRate = (globalThis as any).__serverFeeRate ?? 0.03;
+        const fee = Math.floor(betAmount * feeRate);
+        const totalCost = betAmount + fee;
+        useGameStore.setState((s) => ({
+          profile: { ...s.profile, balance: Math.max(0, s.profile.balance - totalCost) },
+        }));
+      } catch (err: any) {
+        setLocking(false);
+        toast.error('Bet Failed', err?.message || 'Could not lock funds for prediction');
+        // Sync real balance in case it's stale
+        syncProfile();
+        return;
+      }
+      setLocking(false);
+    }
+
     setPrediction(dir);
     playBetPlaced();
     hapticMedium();
@@ -181,38 +212,22 @@ export function PredictionScreen() {
     // Apply 45% win rate: decide if player should win, then adjust reveal candles
     const shouldWin = Math.random() < WIN_PROBABILITY;
     if (shouldWin && roundConfig.outcome !== dir) {
-      // Player should win but current outcome doesn't match — regenerate to match
       setRoundConfig(regenerateWithOutcome(roundConfig, dir));
     } else if (!shouldWin && roundConfig.outcome === dir) {
-      // Player should lose but current outcome matches — regenerate to a different outcome
       const alternatives: PredictionDirection[] = (['long', 'short', 'range'] as const).filter(d => d !== dir);
       const altTarget = alternatives[Math.floor(Math.random() * alternatives.length)];
       setRoundConfig(regenerateWithOutcome(roundConfig, altTarget));
     }
-    // Otherwise the current outcome already aligns with the desired result
 
     setPhase('countdown');
-
-    // Place bet on server in background
-    if (isAuthenticated) {
-      (async () => {
-        try {
-          const round = await api.scheduleRound() as any;
-          const roundId = round.id || round.roundId;
-          if (roundId) {
-            await api.placeBet(roundId, {
-              amount: betAmount,
-              riskTier: 'balanced',
-              idempotencyKey: `${roundId}-pred-${Date.now()}`,
-            });
-            setServerRoundId(roundId);
-          }
-        } catch {
-          // Silent — game continues locally
-        }
-      })();
-    }
   }
+
+  // Map frontend direction names to backend enum
+  const DIR_MAP: Record<PredictionDirection, 'up' | 'down' | 'sideways'> = {
+    long: 'up',
+    short: 'down',
+    range: 'sideways',
+  };
 
   function resolveRound() {
     if (!roundConfig || !prediction) return;
@@ -228,13 +243,28 @@ export function PredictionScreen() {
       playRoundEnd(false);
     }
 
-    // Server settlement
-    if (serverRoundId) {
+    // Settle prediction on server using pre-locked funds and sync balance
+    if (isAuthenticated && lockRef) {
       (async () => {
         try {
-          await api.devResolveRound(serverRoundId);
+          const serverResult = await api.savePredictionRound({
+            lockRef,
+            direction: DIR_MAP[prediction],
+            result: predResult.correct ? 'win' : 'loss',
+          });
+          // Update local balance with server-confirmed payout
+          if (serverResult.payout > 0) {
+            useGameStore.setState((s) => ({
+              profile: { ...s.profile, balance: s.profile.balance + serverResult.payout },
+            }));
+          }
+        } catch (err: any) {
+          console.warn('Failed to save prediction round:', err);
+          toast.error('Save Failed', err?.message || 'Prediction could not be saved to server');
+        } finally {
           await syncProfile();
-        } catch { /* silent */ }
+          setLockRef(null);
+        }
       })();
     }
   }
@@ -245,7 +275,7 @@ export function PredictionScreen() {
     setResult(null);
     setRevealProgress(0);
     setCountdown(3);
-    setServerRoundId(null);
+    setLockRef(null);
     setRoundConfig(generatePredictionRound());
   }
 
@@ -265,7 +295,7 @@ export function PredictionScreen() {
       </div>
 
       {/* Chart */}
-      <div style={{ ...s.chartWrap, height: isMobile ? '280px' : '400px', position: 'relative' }}>
+      <div style={{ ...s.chartWrap, flex: 1, minHeight: isMobile ? '250px' : '350px', position: 'relative' }}>
         <CandlestickChart
           historicalCandles={roundConfig.historicalCandles}
           revealCandles={roundConfig.revealCandles}
@@ -327,13 +357,27 @@ export function PredictionScreen() {
                 );
               })}
             </div>
-            <div style={s.customBetRow}>
-              <span style={s.customBetLabel}>Custom</span>
+            {/* Quick bet modifiers */}
+            <div style={s.quickBetRow}>
+              <button
+                onClick={() => {
+                  const half = Math.max(1_000_000, Math.floor(betAmount / 2));
+                  setBetAmount(half);
+                  setCustomBet('');
+                }}
+                disabled={betAmount <= 1_000_000}
+                style={{
+                  ...s.quickBetBtn,
+                  opacity: betAmount <= 1_000_000 ? 0.35 : 1,
+                }}
+              >
+                ½
+              </button>
               <div style={s.customBetInputWrap}>
                 <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', flexShrink: 0 }} />
                 <input
                   type="number"
-                  placeholder="0.00"
+                  placeholder="Custom"
                   value={customBet}
                   onChange={(e) => setCustomBet(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') handleCustomBet(); }}
@@ -356,24 +400,39 @@ export function PredictionScreen() {
                   Set
                 </button>
               </div>
+              <button
+                onClick={() => {
+                  const doubled = betAmount * 2;
+                  if (isAuthenticated && doubled > profile.balance) return;
+                  setBetAmount(doubled);
+                  setCustomBet('');
+                }}
+                disabled={isAuthenticated && betAmount * 2 > profile.balance}
+                style={{
+                  ...s.quickBetBtn,
+                  opacity: isAuthenticated && betAmount * 2 > profile.balance ? 0.35 : 1,
+                }}
+              >
+                2×
+              </button>
             </div>
           </div>
 
           <p style={s.instruction}>CALL IT</p>
           <div style={{ ...s.dirRow, ...(isMobile ? { gap: '8px' } : {}) }}>
-            <button onClick={() => handlePrediction('long')} className="dir-btn dir-long" style={s.dirBtn}>
-              <ArrowUpIcon size={28} color="#34d399" />
-              <span style={s.dirLabel}>LONG</span>
+            <button onClick={() => handlePrediction('long')} disabled={locking} className="dir-btn dir-long" style={{ ...s.dirBtn, ...(locking ? { opacity: 0.5 } : {}) }}>
+              <ArrowUpIcon size={36} color="#34d399" />
+              <span style={s.dirLabel}>{locking ? 'LOCKING...' : 'LONG'}</span>
               <span style={s.dirPayout}>1.9x</span>
             </button>
-            <button onClick={() => handlePrediction('range')} className="dir-btn dir-range" style={s.dirBtn}>
-              <ArrowSidewaysIcon size={28} color="#fbbf24" />
-              <span style={s.dirLabel}>RANGE</span>
+            <button onClick={() => handlePrediction('range')} disabled={locking} className="dir-btn dir-range" style={{ ...s.dirBtn, ...(locking ? { opacity: 0.5 } : {}) }}>
+              <ArrowSidewaysIcon size={36} color="#fbbf24" />
+              <span style={s.dirLabel}>{locking ? 'LOCKING...' : 'RANGE'}</span>
               <span style={s.dirPayout}>3.0x</span>
             </button>
-            <button onClick={() => handlePrediction('short')} className="dir-btn dir-short" style={s.dirBtn}>
-              <ArrowDownIcon size={28} color="#f87171" />
-              <span style={s.dirLabel}>SHORT</span>
+            <button onClick={() => handlePrediction('short')} disabled={locking} className="dir-btn dir-short" style={{ ...s.dirBtn, ...(locking ? { opacity: 0.5 } : {}) }}>
+              <ArrowDownIcon size={36} color="#f87171" />
+              <span style={s.dirLabel}>{locking ? 'LOCKING...' : 'SHORT'}</span>
               <span style={s.dirPayout}>1.9x</span>
             </button>
           </div>
@@ -405,17 +464,17 @@ export function PredictionScreen() {
             background: result.correct ? 'rgba(52, 211, 153, 0.12)' : 'rgba(248, 113, 113, 0.12)',
             borderColor: result.correct ? 'rgba(52, 211, 153, 0.3)' : 'rgba(248, 113, 113, 0.3)',
           }}>
-            {result.correct ? <TrophyIcon size={28} color="#34d399" /> : <ExplosionIcon size={28} color="#f87171" />}
-            <div>
+            {result.correct ? <TrophyIcon size={32} color="#34d399" /> : <ExplosionIcon size={32} color="#f87171" />}
+            <div style={{ flex: 1 }}>
               <div style={{
-                fontSize: '20px',
+                fontSize: '22px',
                 fontWeight: 800,
                 color: result.correct ? '#34d399' : '#f87171',
-                fontFamily: "'Orbitron', sans-serif",
+                fontFamily: "inherit",
               }}>
                 {result.correct ? 'CORRECT!' : 'WRONG'}
               </div>
-              <div style={{ fontSize: '13px', color: theme.text.muted }}>
+              <div style={{ fontSize: '14px', color: theme.text.secondary }}>
                 Price went <span style={{
                   color: result.outcome === 'long' ? '#34d399' : result.outcome === 'short' ? '#f87171' : '#fbbf24',
                   fontWeight: 700,
@@ -425,16 +484,15 @@ export function PredictionScreen() {
                 {' '}({result.priceChangePercent >= 0 ? '+' : ''}{result.priceChangePercent.toFixed(2)}%)
               </div>
             </div>
-            {result.correct && (
-              <div style={{ marginLeft: 'auto', textAlign: 'right' }}>
-                <div className="mono" style={{ fontSize: '22px', fontWeight: 800, color: '#34d399' }}>
-                  {result.multiplier}x
-                </div>
-                <div className="mono" style={{ fontSize: '13px', color: theme.text.muted }}>
-                  +{formatSol(result.payout - result.betAmount)} SOL
-                </div>
+            <div style={{ textAlign: 'right' }}>
+              <div className="mono" style={{ fontSize: '24px', fontWeight: 800, color: result.correct ? '#34d399' : '#f87171' }}>
+                {result.correct ? result.multiplier + 'x' : '0x'}
               </div>
-            )}
+              <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', fontSize: '16px', fontWeight: 700, color: result.correct ? '#34d399' : '#f87171' }}>
+                <img src="/sol-coin.png" alt="SOL" style={{ width: '18px', height: '18px' }} />
+                {result.correct ? '+' : '-'}{formatSol(result.correct ? result.payout - result.betAmount : result.betAmount)} SOL
+              </div>
+            </div>
           </div>
 
           {/* Stats row */}
@@ -489,9 +547,10 @@ const s: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: '12px',
-    padding: '16px',
-    height: '100%',
-    overflow: 'auto',
+    padding: '16px 24px',
+    width: '100%',
+    minHeight: '100%',
+    boxSizing: 'border-box' as const,
   },
   header: {
     display: 'flex',
@@ -499,10 +558,10 @@ const s: Record<string, CSSProperties> = {
     justifyContent: 'space-between',
   },
   title: {
-    fontSize: '20px',
+    fontSize: '24px',
     fontWeight: 800,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     margin: 0,
     letterSpacing: '1px',
     textTransform: 'uppercase' as const,
@@ -513,7 +572,7 @@ const s: Record<string, CSSProperties> = {
     gap: '6px',
     padding: '6px 12px',
     borderRadius: '20px',
-    background: 'rgba(153, 69, 255, 0.1)',
+    background: 'rgba(119, 23, 255, 0.1)',
     border: `1px solid ${theme.border.subtle}`,
   },
   chartWrap: {
@@ -523,10 +582,10 @@ const s: Record<string, CSSProperties> = {
   // Bet selector
   betSection: {
     width: '100%',
-    maxWidth: '500px',
+    maxWidth: '700px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '10px',
   },
   betSectionHeader: {
     display: 'flex',
@@ -537,7 +596,7 @@ const s: Record<string, CSSProperties> = {
     fontSize: '12px',
     fontWeight: 700,
     color: theme.text.muted,
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "inherit",
     letterSpacing: '1px',
   },
   betPills: {
@@ -546,32 +605,39 @@ const s: Record<string, CSSProperties> = {
     gap: '6px',
   },
   betPill: {
-    padding: '6px 12px',
-    fontSize: '13px',
+    padding: '8px 16px',
+    fontSize: '14px',
     fontWeight: 700,
     fontFamily: "'JetBrains Mono', monospace",
     color: theme.text.secondary,
-    background: 'rgba(153, 69, 255, 0.06)',
-    border: '1px solid rgba(153, 69, 255, 0.12)',
+    background: 'rgba(119, 23, 255, 0.06)',
+    border: '1px solid rgba(119, 23, 255, 0.12)',
     borderRadius: '6px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
   betPillActive: {
-    background: 'rgba(153, 69, 255, 0.2)',
-    borderColor: 'rgba(153, 69, 255, 0.5)',
+    background: 'rgba(119, 23, 255, 0.2)',
+    borderColor: 'rgba(119, 23, 255, 0.5)',
     color: '#c084fc',
-    boxShadow: '0 0 10px rgba(153, 69, 255, 0.2)',
+    boxShadow: '0 0 10px rgba(119, 23, 255, 0.2)',
   },
-  customBetRow: {
+  quickBetRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '6px',
   },
-  customBetLabel: {
-    fontSize: '13px',
-    fontWeight: 600,
-    color: theme.text.muted,
+  quickBetBtn: {
+    padding: '7px 12px',
+    background: theme.bg.elevated,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    fontSize: '14px',
+    fontWeight: 700,
+    color: theme.accent.violet,
+    transition: 'all 0.12s ease',
     flexShrink: 0,
   },
   customBetInputWrap: {
@@ -599,11 +665,11 @@ const s: Record<string, CSSProperties> = {
   },
   customBetBtn: {
     padding: '5px 10px',
-    background: 'rgba(153, 69, 255, 0.12)',
-    border: '1px solid rgba(153, 69, 255, 0.2)',
+    background: 'rgba(119, 23, 255, 0.12)',
+    border: '1px solid rgba(119, 23, 255, 0.2)',
     borderRadius: '5px',
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '13px',
     fontWeight: 700,
     color: '#c084fc',
@@ -615,22 +681,23 @@ const s: Record<string, CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '12px',
+    gap: '8px',
+    flexShrink: 0,
   },
   instruction: {
     margin: 0,
-    fontSize: '16px',
+    fontSize: '18px',
     fontWeight: 700,
     color: theme.text.secondary,
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase',
-    letterSpacing: '1px',
+    letterSpacing: '1.5px',
   },
   dirRow: {
     display: 'flex',
-    gap: '12px',
+    gap: '14px',
     width: '100%',
-    maxWidth: '500px',
+    maxWidth: '700px',
   },
   dirBtn: {
     flex: 1,
@@ -638,8 +705,8 @@ const s: Record<string, CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '6px',
-    padding: '18px 8px',
-    fontFamily: "'Rajdhani', sans-serif",
+    padding: '16px 12px',
+    fontFamily: "inherit",
     border: 'none',
     background: 'transparent',
   },
@@ -647,13 +714,13 @@ const s: Record<string, CSSProperties> = {
     fontSize: '24px',
   },
   dirLabel: {
-    fontSize: '16px',
+    fontSize: '18px',
     fontWeight: 800,
     color: theme.text.primary,
     letterSpacing: '1px',
   },
   dirPayout: {
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: 700,
     color: theme.text.muted,
     fontFamily: "'JetBrains Mono', monospace",
@@ -680,8 +747,8 @@ const s: Record<string, CSSProperties> = {
     fontSize: '72px',
     fontWeight: 900,
     color: '#fff',
-    fontFamily: "'Orbitron', sans-serif",
-    textShadow: '0 0 30px rgba(153, 69, 255, 0.6)',
+    fontFamily: "inherit",
+    textShadow: '0 0 30px rgba(119, 23, 255, 0.6)',
   },
   countdownLabel: {
     fontSize: '20px',
@@ -696,6 +763,7 @@ const s: Record<string, CSSProperties> = {
     flexDirection: 'column',
     alignItems: 'center',
     gap: '8px',
+    flexShrink: 0,
   },
   revealBar: {
     width: '100%',
@@ -707,7 +775,7 @@ const s: Record<string, CSSProperties> = {
   },
   revealFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #9945FF, #c084fc)',
+    background: 'linear-gradient(90deg, #7717ff, #c084fc)',
     borderRadius: '3px',
     transition: 'width 0.3s',
   },
@@ -723,7 +791,8 @@ const s: Record<string, CSSProperties> = {
   resultPanel: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '10px',
+    flexShrink: 0,
   },
   resultBadge: {
     display: 'flex',
@@ -770,7 +839,7 @@ const s: Record<string, CSSProperties> = {
     padding: '12px',
     fontSize: '15px',
     fontWeight: 700,
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase',
     letterSpacing: '1px',
   },
@@ -783,6 +852,6 @@ const s: Record<string, CSSProperties> = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: 600,
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "inherit",
   },
 };

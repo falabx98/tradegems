@@ -74,7 +74,7 @@ function ConfettiCanvas({ active }: { active: boolean }) {
     const W = canvas.width = canvas.offsetWidth;
     const H = canvas.height = canvas.offsetHeight;
 
-    const colors = ['#34d399', '#14F195', '#9945FF', '#c084fc', '#fbbf24', '#5b8def', '#fff'];
+    const colors = ['#34d399', '#14F195', '#7717ff', '#c084fc', '#fbbf24', '#5b8def', '#fff'];
 
     // Burst particles
     for (let i = 0; i < 120; i++) {
@@ -241,8 +241,14 @@ export function ResultScreen() {
               color: resultColor,
               opacity: revealed ? 1 : 0,
               transition: 'opacity 0.4s ease 0.3s',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              justifyContent: 'center',
             }} className="mono">
-              {profit >= 0 ? '+' : ''}{formatSol(profit)} SOL ({profit >= 0 ? '+' : ''}{profitPercent}%)
+              <img src="/sol-coin.png" alt="SOL" style={{ width: '28px', height: '28px' }} />
+              {profit >= 0 ? '+' : ''}{formatSol(profit)} SOL
+              <span style={{ fontSize: '16px', color: resultColor, opacity: 0.8 }}>({profit >= 0 ? '+' : ''}{profitPercent}%)</span>
             </div>
           </div>
 
@@ -478,9 +484,9 @@ const s: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100%',
+    minHeight: '100%',
     padding: '16px',
-    overflow: 'auto',
+    boxSizing: 'border-box',
   },
   columns: {
     display: 'grid',
@@ -515,7 +521,7 @@ const s: Record<string, React.CSSProperties> = {
     padding: '6px 18px',
     borderRadius: '20px',
     letterSpacing: '1.5px',
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
@@ -530,8 +536,8 @@ const s: Record<string, React.CSSProperties> = {
     zIndex: 3,
   },
   heroPnl: {
-    fontSize: '20px',
-    fontWeight: 600,
+    fontSize: '26px',
+    fontWeight: 800,
     marginTop: '4px',
     position: 'relative' as const,
     zIndex: 3,
@@ -563,7 +569,7 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
@@ -621,7 +627,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   xpBarFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #9945FF, #c084fc)',
+    background: 'linear-gradient(90deg, #7717ff, #c084fc)',
     borderRadius: '2px',
     transition: 'width 0.8s ease',
   },
@@ -636,7 +642,7 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: 700,
     color: '#fff',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
   },
   primaryBtnSub: {
     fontSize: '13px',
@@ -651,7 +657,7 @@ const s: Record<string, React.CSSProperties> = {
     border: `1px solid ${theme.border.subtle}`,
     borderRadius: '8px',
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '14px',
     fontWeight: 600,
     color: theme.text.muted,

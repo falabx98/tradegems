@@ -38,6 +38,7 @@ interface TournamentPlayer {
   username: string;
   level: number;
   vipTier: string;
+  avatarUrl: string | null;
   joinedAt: number;
   /** Per-round multipliers: index 0 = round 1, etc. null = not yet reported */
   roundMultipliers: (number | null)[];
@@ -222,7 +223,78 @@ async function settleTournament(room: TournamentRoom) {
       }
     }
 
+    // Award XP to all participants: base 20 + 10 per round + 30 bonus for winners
+    try {
+      const { UserService } = await import('../modules/user/user.service.js');
+      const userService = new UserService();
+      for (const player of room.players) {
+        const isWinner = winners.some(w => w.id === player.id);
+        const xp = 20 + (ROUNDS_PER_TOURNAMENT * 10) + (isWinner ? 30 : 0);
+        await userService.addXP(player.id, xp, 'tournament');
+      }
+    } catch (xpErr) {
+      console.error(`[Tournament] XP award failed for room ${room.id}:`, xpErr);
+    }
+
     console.log(`[Tournament] Room ${room.id} settled — winner(s): ${winners.map(w => w.username).join(', ')} — payout: ${winnerPayout} lamports each`);
+
+    // Update user_profiles stats + activity feed for each participant
+    try {
+      const { getDb } = await import('../config/database.js');
+      const { activityFeedItems, users: usersTable } = await import('@tradingarena/db');
+      const { sql: sqlTag } = await import('drizzle-orm');
+      const statsDb = getDb();
+
+      for (const player of room.players) {
+        const isWinner = winners.some(w => w.id === player.id);
+        const payout = isWinner ? winnerPayout : 0;
+        const bestMulti = Math.max(...(player.roundMultipliers?.filter((m): m is number => m !== null && m !== undefined) || [0]));
+
+        // Update user_profiles
+        try {
+          await statsDb.execute(sqlTag`
+            UPDATE user_profiles
+            SET rounds_played = rounds_played + ${ROUNDS_PER_TOURNAMENT},
+                total_wagered = total_wagered + ${room.buyIn},
+                total_won = total_won + ${payout},
+                win_rate = CASE
+                  WHEN (total_wagered + ${room.buyIn}) > 0
+                  THEN (total_won + ${payout})::numeric / (total_wagered + ${room.buyIn})::numeric
+                  ELSE 0
+                END,
+                best_multiplier = GREATEST(best_multiplier, ${bestMulti}),
+                current_streak = CASE WHEN ${payout} > ${room.buyIn} THEN current_streak + 1 ELSE 0 END,
+                best_streak = GREATEST(best_streak, CASE WHEN ${payout} > ${room.buyIn} THEN current_streak + 1 ELSE 0 END),
+                updated_at = now()
+            WHERE user_id = ${player.id}
+          `);
+        } catch {
+          // Non-critical
+        }
+
+        // Insert activity feed item
+        try {
+          await statsDb.insert(activityFeedItems).values({
+            feedType: 'tournament_result',
+            userId: player.id,
+            payload: {
+              username: player.username,
+              level: 1,
+              vipTier: 'bronze',
+              betAmount: room.buyIn,
+              payout,
+              isWinner,
+              rank: standings.findIndex(s => s.id === player.id) + 1,
+              playerCount: room.players.length,
+            },
+          });
+        } catch {
+          // Non-critical
+        }
+      }
+    } catch (statsErr) {
+      console.error(`[Tournament] Stats/feed update failed for room ${room.id}:`, statsErr);
+    }
 
     // Persist tournament to database
     try {
@@ -303,23 +375,25 @@ function startTournamentLoop() {
             } else {
               // L2 fix: Stale room (waiting expired without enough players) — refund & cleanup
               console.log(`[Tournament] Room ${room.id} expired with ${room.players.length} players — refunding`);
-              for (const player of room.players) {
-                (async () => {
-                  try {
-                    const { WalletService } = await import('../modules/wallet/wallet.service.js');
-                    await new WalletService().settlePayout(
+              room.state = 'closed';
+              (async () => {
+                try {
+                  const { WalletService } = await import('../modules/wallet/wallet.service.js');
+                  const walletSvc = new WalletService();
+                  await Promise.all(room.players.map(player =>
+                    walletSvc.settlePayout(
                       player.id, room.buyIn, room.fee,
                       room.buyIn + room.fee, // Full refund
                       'SOL',
                       { type: 'battle' as const, id: `tournament-${room.id}-expired-refund` },
-                    );
-                  } catch (err) {
-                    console.error(`[Tournament] Expired refund failed for ${player.id}:`, err);
-                  }
-                })();
-              }
-              room.state = 'closed';
-              setTimeout(() => rooms.delete(room.id), 2_000);
+                    ).catch(err => console.error(`[Tournament] Expired refund failed for ${player.id}:`, err))
+                  ));
+                  console.log(`[Tournament] Room ${room.id} refunds complete`);
+                } catch (err) {
+                  console.error(`[Tournament] Room ${room.id} refund batch error:`, err);
+                }
+                setTimeout(() => rooms.delete(room.id), 2_000);
+              })();
             }
             break;
 
@@ -379,6 +453,7 @@ function buildRoomState(room: TournamentRoom, userId?: string) {
       username: p.username,
       level: p.level,
       vipTier: p.vipTier,
+      avatarUrl: p.avatarUrl,
       joinedAt: p.joinedAt,
       roundMultipliers: (room.state === 'round_results' || room.state === 'final_results')
         ? p.roundMultipliers
@@ -548,16 +623,21 @@ export async function battleRoutes(server: FastifyInstance) {
     let username = 'Player';
     let level = 1;
     let vipTier = 'bronze';
+    let avatarUrl: string | null = null;
 
     try {
       const db = (await import('../config/database.js')).getDb();
-      const { users } = await import('@tradingarena/db');
+      const { users, userProfiles } = await import('@tradingarena/db');
       const { eq } = await import('drizzle-orm');
       const dbUser = await db.select().from(users).where(eq(users.id, user.userId)).then((r: any[]) => r[0]);
       if (dbUser) {
         username = dbUser.username;
         level = dbUser.level || 1;
         vipTier = dbUser.vipTier || 'bronze';
+      }
+      const profile = await db.select().from(userProfiles).where(eq(userProfiles.userId, user.userId)).then((r: any[]) => r[0]);
+      if (profile) {
+        avatarUrl = profile.avatarUrl || null;
       }
     } catch {
       // Fallback to defaults
@@ -587,6 +667,7 @@ export async function battleRoutes(server: FastifyInstance) {
       username,
       level,
       vipTier,
+      avatarUrl,
       joinedAt: Date.now(),
       roundMultipliers: [],
     };

@@ -15,6 +15,7 @@ import {
   playRoundEnd,
 } from '../../utils/sounds';
 import { MedalIcon, TrophyIcon, UserIcon, CheckIcon } from '../ui/GameIcons';
+import { isPhotoAvatar, getAvatarGradient, getInitials } from '../../utils/avatars';
 
 const ROUND_DURATION = 15;
 const BUYIN_LABELS: Record<number, string> = {
@@ -221,13 +222,31 @@ export function BattleScreen() {
 
   // ─── Render Helpers ───────────────────────────────────────────────────────
 
-  const renderAvatar = (player: any) => {
-    const initial = player.username.charAt(0).toUpperCase();
-    const colors = ['#9945FF', '#14F195', '#FF6B35', '#00D4FF', '#FFD93D', '#FF4B8C'];
-    const color = colors[player.username.length % colors.length];
+  const renderAvatar = (player: any, size = 40) => {
+    if (isPhotoAvatar(player.avatarUrl)) {
+      return (
+        <img
+          src={player.avatarUrl}
+          alt={player.username}
+          style={{
+            width: `${size}px`,
+            height: `${size}px`,
+            borderRadius: '50%',
+            objectFit: 'cover' as const,
+            border: '2px solid rgba(119, 23, 255, 0.4)',
+          }}
+        />
+      );
+    }
     return (
-      <div style={{ ...styles.avatar, background: color }}>
-        <span style={styles.avatarText}>{initial}</span>
+      <div style={{
+        ...styles.avatar,
+        width: `${size}px`,
+        height: `${size}px`,
+        fontSize: `${Math.round(size * 0.4)}px`,
+        background: getAvatarGradient(null, player.username),
+      }}>
+        <span style={styles.avatarText}>{getInitials(player.username)}</span>
       </div>
     );
   };
@@ -303,72 +322,80 @@ export function BattleScreen() {
     const maxPlayers = roomState?.maxPlayers || 8;
     const buyIn = roomState?.buyIn || 0;
     const hasCountdown = roomState?.countdownStartedAt !== null;
+    const minNeeded = Math.max(0, 2 - players.length);
 
     return (
-      <div style={styles.container}>
-        <div style={styles.header}>
-          <TrophyIcon size={24} color="#FFD700" />
-          <span style={styles.headerTitle}>Waiting Room</span>
+      <div style={{ ...styles.container, alignItems: 'center', justifyContent: 'center' }}>
+        {/* Central Waiting Card */}
+        <div style={styles.waitingCard}>
+          <TrophyIcon size={36} color="#FFD700" />
+          <div style={styles.waitingTitle}>Waiting Room</div>
           <div style={styles.roomBadge}>{tournamentRoomId}</div>
-        </div>
 
-        <div style={styles.waitingInfo}>
-          <div style={styles.buyInDisplay} className="mono">
-            {formatSol(buyIn)} SOL Buy-in
-          </div>
-          <div style={styles.potDisplay} className="mono">
-            Pot: {formatSol(roomState?.grossPool || 0)} SOL
-          </div>
-        </div>
-
-        {hasCountdown && (
-          <div style={styles.countdownBar}>
-            <div style={styles.countdownLabel}>Starting in</div>
-            <div style={styles.countdownValue} className="mono">{countdown}s</div>
-            <div style={{
-              ...styles.countdownProgress,
-              width: `${Math.max(0, (countdown / 15) * 100)}%`,
-            }} />
-          </div>
-        )}
-
-        {!hasCountdown && (
-          <div style={styles.waitingNotice}>
-            Waiting for {4 - players.length} more player{4 - players.length !== 1 ? 's' : ''}...
-          </div>
-        )}
-
-        {/* Player Grid */}
-        <div style={styles.playerGrid}>
-          {players.map((p: any) => (
-            <div key={p.id} style={{
-              ...styles.playerCard,
-              ...(p.id === roomState?.myPlayerId ? styles.playerCardYou : {}),
-            }}>
-              {p.id === roomState?.myPlayerId && <div style={styles.youBadge}>YOU</div>}
-              {renderAvatar(p)}
-              <div style={styles.playerName}>{p.username}</div>
-              <div style={styles.playerMeta}>
-                Lv{p.level}
+          {/* Buy-in & Pot */}
+          <div style={styles.waitingStatsRow}>
+            <div style={styles.waitingStat}>
+              <span style={styles.waitingStatLabel}>Buy-in</span>
+              <div style={styles.waitingStatValue} className="mono">
+                <img src="/sol-coin.png" alt="SOL" style={{ width: '20px', height: '20px' }} />
+                {formatSol(buyIn)} SOL
               </div>
             </div>
-          ))}
-          {Array.from({ length: Math.max(0, maxPlayers - players.length) }).map((_, i) => (
-            <div key={`empty-${i}`} style={styles.emptySlot}>
-              <UserIcon size={26} color="#555570" />
-              <div style={styles.emptyText}>Waiting...</div>
+            <div style={styles.waitingStat}>
+              <span style={styles.waitingStatLabel}>Pot</span>
+              <div style={{ ...styles.waitingStatValue, color: '#14F195' }} className="mono">
+                <img src="/sol-coin.png" alt="SOL" style={{ width: '20px', height: '20px' }} />
+                {formatSol(roomState?.grossPool || 0)} SOL
+              </div>
             </div>
-          ))}
-        </div>
+          </div>
 
-        <div style={styles.actions}>
-          <button onClick={handleLeave} className="nav-btn" style={styles.backButton}>
+          {/* Countdown or Waiting */}
+          {hasCountdown ? (
+            <div style={styles.countdownBar}>
+              <div style={styles.countdownLabel}>Starting in</div>
+              <div style={styles.countdownValue} className="mono">{countdown}s</div>
+              <div style={{
+                ...styles.countdownProgress,
+                width: `${Math.max(0, (countdown / 15) * 100)}%`,
+              }} />
+            </div>
+          ) : (
+            <div style={styles.waitingNotice}>
+              {minNeeded > 0
+                ? `Waiting for ${minNeeded} more player${minNeeded !== 1 ? 's' : ''}...`
+                : 'Starting soon...'}
+            </div>
+          )}
+
+          {/* Player Slots — centered grid */}
+          <div style={styles.playerGrid}>
+            {players.map((p: any) => (
+              <div key={p.id} style={{
+                ...styles.playerCard,
+                ...(p.id === roomState?.myPlayerId ? styles.playerCardYou : {}),
+              }}>
+                {p.id === roomState?.myPlayerId && <div style={styles.youBadge}>YOU</div>}
+                {renderAvatar(p, 44)}
+                <div style={styles.playerName}>{p.username}</div>
+                <div style={styles.playerMeta}>Lv{p.level}</div>
+              </div>
+            ))}
+            {Array.from({ length: Math.max(0, maxPlayers - players.length) }).map((_, i) => (
+              <div key={`empty-${i}`} style={styles.emptySlot}>
+                <UserIcon size={28} color="#555570" />
+                <div style={styles.emptyText}>Waiting...</div>
+              </div>
+            ))}
+          </div>
+
+          <div style={styles.playerCount}>
+            {players.length}/{maxPlayers} Players
+          </div>
+
+          <button onClick={handleLeave} className="nav-btn" style={styles.leaveBtn}>
             Leave Room
           </button>
-        </div>
-
-        <div style={styles.playerCount}>
-          {players.length}/{maxPlayers} Players
         </div>
       </div>
     );
@@ -576,8 +603,9 @@ export function BattleScreen() {
           <div style={styles.winnerScore} className="mono">
             Score: {winner?.cumulativeScore?.toFixed(2) || '0'}
           </div>
-          <div style={styles.winnerPayout} className="mono">
-            {formatSol(winner?.payout || 0)} SOL
+          <div style={{ ...styles.winnerPayout, display: 'flex', alignItems: 'center', gap: '8px' }} className="mono">
+            <img src="/sol-coin.png" alt="SOL" style={{ width: '32px', height: '32px' }} />
+            +{formatSol(winner?.payout || 0)} SOL
           </div>
         </div>
 
@@ -622,17 +650,24 @@ export function BattleScreen() {
         <div style={styles.poolSummary}>
           <div style={styles.poolRow}>
             <span>Total Pool</span>
-            <span className="mono">{formatSol(roomState.grossPool)} SOL</span>
+            <span className="mono" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px' }} />
+              {formatSol(roomState.grossPool)} SOL
+            </span>
           </div>
           <div style={styles.poolRow}>
             <span>Rake ({(feeRate * 100).toFixed(0)}%)</span>
-            <span className="mono" style={{ color: '#FF4B4B' }}>
+            <span className="mono" style={{ color: '#FF4B4B', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px' }} />
               -{formatSol(roomState.grossPool - roomState.netPool)} SOL
             </span>
           </div>
           <div style={{ ...styles.poolRow, fontWeight: 700 }}>
             <span>Winner Payout</span>
-            <span className="mono" style={{ color: '#14F195' }}>{formatSol(roomState.netPool)} SOL</span>
+            <span className="mono" style={{ color: '#14F195', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <img src="/sol-coin.png" alt="SOL" style={{ width: '18px', height: '18px' }} />
+              {formatSol(roomState.netPool)} SOL
+            </span>
           </div>
         </div>
 
@@ -673,9 +708,8 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100%',
+    minHeight: '100%',
     background: theme.bg.primary,
-    overflow: 'auto',
   },
 
   // Header
@@ -690,14 +724,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: theme.text.primary,
     flex: 1,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
   roomBadge: {
     padding: '4px 10px',
     borderRadius: '20px',
-    background: 'rgba(153, 69, 255, 0.15)',
+    background: 'rgba(119, 23, 255, 0.15)',
     color: '#c084fc',
     fontSize: '12px',
     fontWeight: 600,
@@ -746,7 +780,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '20px',
     fontWeight: 900,
     color: '#fff',
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
   },
   tierLabel: {
     fontSize: '13px',
@@ -792,34 +826,80 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '15px',
     fontWeight: 500,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textAlign: 'center' as const,
   },
 
-  // Waiting
-  waitingInfo: {
+  // Waiting — centered card
+  waitingCard: {
     display: 'flex',
-    justifyContent: 'space-between',
-    padding: '8px 20px',
-    fontSize: '15px',
-    color: theme.text.secondary,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '16px',
+    padding: '32px 28px',
+    maxWidth: '700px',
+    width: '100%',
+    background: theme.bg.tertiary,
+    borderRadius: '16px',
+    border: '1px solid rgba(119, 23, 255, 0.2)',
+    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
   },
-  buyInDisplay: {
-    fontSize: '16px',
-    fontWeight: 700,
+  waitingTitle: {
+    fontSize: '22px',
+    fontWeight: 800,
+    color: theme.text.primary,
+    fontFamily: "inherit",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1.5px',
+  },
+  waitingStatsRow: {
+    display: 'flex',
+    gap: '24px',
+    width: '100%',
+    justifyContent: 'center',
+  },
+  waitingStat: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '4px',
+    padding: '12px 24px',
+    borderRadius: '12px',
+    background: 'rgba(119, 23, 255, 0.08)',
+    border: '1px solid rgba(119, 23, 255, 0.15)',
+  },
+  waitingStatLabel: {
+    fontSize: '12px',
+    fontWeight: 600,
+    color: theme.text.muted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
+  },
+  waitingStatValue: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '20px',
+    fontWeight: 800,
     color: '#c084fc',
-  },
-  potDisplay: {
-    fontSize: '16px',
-    fontWeight: 700,
-    color: '#14F195',
   },
   waitingNotice: {
     textAlign: 'center' as const,
-    padding: '12px 20px',
+    padding: '8px 20px',
     fontSize: '15px',
     color: '#c084fc',
     fontWeight: 600,
+  },
+  leaveBtn: {
+    padding: '10px 32px',
+    borderRadius: '10px',
+    border: '1px solid rgba(248, 113, 113, 0.3)',
+    background: 'rgba(248, 113, 113, 0.08)',
+    color: '#f87171',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
   },
 
   // Countdown
@@ -833,23 +913,23 @@ const styles: Record<string, React.CSSProperties> = {
     overflow: 'hidden',
   },
   countdownLabel: { fontSize: '13px', color: theme.text.muted, marginBottom: '4px' },
-  countdownValue: { fontSize: '34px', fontWeight: 900, color: '#c084fc', fontFamily: "'Orbitron', sans-serif" },
+  countdownValue: { fontSize: '34px', fontWeight: 900, color: '#c084fc', fontFamily: "inherit" },
   countdownProgress: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     height: '3px',
-    background: 'linear-gradient(90deg, #9945FF, #14F195)',
+    background: 'linear-gradient(90deg, #7717ff, #14F195)',
     transition: 'width 0.2s linear',
   },
 
   // Player grid
   playerGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))',
     gap: '8px',
     padding: '8px 20px',
-    flex: 1,
+    width: '100%',
   },
   playerCard: {
     position: 'relative',
@@ -863,8 +943,8 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${theme.border.subtle}`,
   },
   playerCardYou: {
-    border: '1px solid rgba(153, 69, 255, 0.4)',
-    background: 'rgba(153, 69, 255, 0.08)',
+    border: '1px solid rgba(119, 23, 255, 0.4)',
+    background: 'rgba(119, 23, 255, 0.08)',
   },
   youBadge: {
     position: 'absolute',
@@ -873,7 +953,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '10px',
     fontWeight: 700,
     color: '#c084fc',
-    background: 'rgba(153, 69, 255, 0.2)',
+    background: 'rgba(119, 23, 255, 0.2)',
     padding: '1px 5px',
     borderRadius: '4px',
   },
@@ -922,7 +1002,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '10px 14px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
     background: 'rgba(32, 24, 48, 0.95)',
     color: theme.text.primary,
     fontSize: '16px',
@@ -941,7 +1021,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressBarFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #9945FF, #14F195)',
+    background: 'linear-gradient(90deg, #7717ff, #14F195)',
     transition: 'width 0.1s linear',
     borderRadius: '2px',
   },
@@ -977,7 +1057,7 @@ const styles: Record<string, React.CSSProperties> = {
   hudRound: {
     padding: '2px 8px',
     borderRadius: '6px',
-    background: 'rgba(153, 69, 255, 0.2)',
+    background: 'rgba(119, 23, 255, 0.2)',
     color: '#c084fc',
     fontSize: '12px',
     fontWeight: 700,
@@ -1006,8 +1086,8 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '2px',
   },
   rankRowMe: {
-    background: 'rgba(153, 69, 255, 0.08)',
-    border: '1px solid rgba(153, 69, 255, 0.15)',
+    background: 'rgba(119, 23, 255, 0.08)',
+    border: '1px solid rgba(119, 23, 255, 0.15)',
   },
   rankEmoji: { width: '24px', textAlign: 'center' as const, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   rankName: { flex: 1, fontSize: '14px', fontWeight: 600 },
@@ -1016,7 +1096,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '10px',
     fontWeight: 700,
     color: '#c084fc',
-    background: 'rgba(153, 69, 255, 0.2)',
+    background: 'rgba(119, 23, 255, 0.2)',
     padding: '1px 4px',
     borderRadius: '3px',
     marginLeft: '4px',
@@ -1081,17 +1161,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '28px',
     fontWeight: 900,
     color: '#FFD700',
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '2px',
   },
   winnerScore: {
-    fontSize: '18px',
+    fontSize: '20px',
     fontWeight: 700,
-    color: theme.text.secondary,
+    color: '#c084fc',
   },
   winnerPayout: {
-    fontSize: '32px',
+    fontSize: '36px',
     fontWeight: 900,
     color: '#14F195',
   },
@@ -1101,7 +1181,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: theme.text.primary,
     marginBottom: '8px',
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
@@ -1143,7 +1223,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '24px',
     fontWeight: 700,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },

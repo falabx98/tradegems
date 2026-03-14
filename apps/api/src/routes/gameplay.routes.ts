@@ -5,7 +5,7 @@ import { RoundService } from '../modules/round/round.service.js';
 import { requireAuth, requireAdmin, getAuthUser } from '../middleware/auth.js';
 
 const placeBetSchema = z.object({
-  amount: z.number().int().positive().min(1_000_000).max(10_000_000_000), // 0.001 SOL to 10 SOL in lamports
+  amount: z.number().int().positive().min(1_000_000), // min 0.001 SOL in lamports, no max
   riskTier: z.enum(['conservative', 'balanced', 'aggressive']),
   idempotencyKey: z.string().min(1).max(128),
 });

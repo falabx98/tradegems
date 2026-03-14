@@ -156,13 +156,27 @@ export function SoloSetupScreen() {
               );
             })}
           </div>
-          <div style={styles.customBetRow}>
-            <span style={styles.customBetLabel}>Custom</span>
+          {/* Quick bet modifiers */}
+          <div style={styles.quickBetRow}>
+            <button
+              onClick={() => {
+                const half = Math.max(minBetLamports, Math.floor(betAmount / 2));
+                setBetAmount(half);
+                setCustomBet('');
+              }}
+              disabled={betAmount <= minBetLamports}
+              style={{
+                ...styles.quickBetBtn,
+                opacity: betAmount <= minBetLamports ? 0.35 : 1,
+              }}
+            >
+              ½
+            </button>
             <div style={styles.customBetInputWrap}>
               <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', flexShrink: 0 }} />
               <input
                 type="number"
-                placeholder="0.00"
+                placeholder="Custom"
                 value={customBet}
                 onChange={(e) => setCustomBet(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleCustomBet(); }}
@@ -185,6 +199,23 @@ export function SoloSetupScreen() {
                 Set
               </button>
             </div>
+            <button
+              onClick={() => {
+                const doubled = betAmount * 2;
+                const doubleFee = Math.floor(doubled * feeRate);
+                if (doubled + doubleFee <= profile.balance) {
+                  setBetAmount(doubled);
+                  setCustomBet('');
+                }
+              }}
+              disabled={betAmount * 2 + Math.floor(betAmount * 2 * feeRate) > profile.balance}
+              style={{
+                ...styles.quickBetBtn,
+                opacity: betAmount * 2 + Math.floor(betAmount * 2 * feeRate) > profile.balance ? 0.35 : 1,
+              }}
+            >
+              2×
+            </button>
           </div>
         </div>
 
@@ -337,9 +368,9 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100%',
+    minHeight: '100%',
     padding: '16px',
-    overflow: 'auto',
+    boxSizing: 'border-box',
   },
 
   header: {
@@ -365,7 +396,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '20px',
     fontWeight: 700,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
     textAlign: 'center' as const,
@@ -400,7 +431,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
@@ -417,7 +448,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '1px',
-    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.25), rgba(20, 241, 149, 0.25))',
+    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.25), rgba(20, 241, 149, 0.25))',
   },
   betChip: {
     padding: '10px 4px',
@@ -433,21 +464,28 @@ const styles: Record<string, React.CSSProperties> = {
   },
   betChipActive: {
     color: '#c084fc',
-    background: 'rgba(153, 69, 255, 0.08)',
+    background: 'rgba(119, 23, 255, 0.08)',
   },
 
-  // Custom Bet
-  customBetRow: {
+  // Quick Bet Row
+  quickBetRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '6px',
     padding: '8px 12px',
     borderTop: `1px solid ${theme.border.subtle}`,
   },
-  customBetLabel: {
-    fontSize: '13px',
-    fontWeight: 600,
-    color: theme.text.muted,
+  quickBetBtn: {
+    padding: '7px 12px',
+    background: theme.bg.elevated,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    fontSize: '14px',
+    fontWeight: 700,
+    color: theme.accent.violet,
+    transition: 'all 0.12s ease',
     flexShrink: 0,
   },
   customBetInputWrap: {
@@ -475,11 +513,11 @@ const styles: Record<string, React.CSSProperties> = {
   },
   customBetBtn: {
     padding: '5px 10px',
-    background: 'rgba(153, 69, 255, 0.12)',
-    border: '1px solid rgba(153, 69, 255, 0.2)',
+    background: 'rgba(119, 23, 255, 0.12)',
+    border: '1px solid rgba(119, 23, 255, 0.2)',
     borderRadius: '5px',
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '13px',
     fontWeight: 700,
     color: '#c084fc',
@@ -502,7 +540,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: 'none',
     borderBottom: `1px solid ${theme.border.subtle}`,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     transition: 'all 0.15s ease',
     textAlign: 'left',
   },
@@ -562,7 +600,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '17px',
     fontWeight: 700,
     color: '#fff',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
   },

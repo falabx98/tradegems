@@ -61,12 +61,12 @@ export function HistoryScreen() {
               {[...Array(6)].map((_, i) => (
                 <div key={i} style={{
                   display: 'flex', gap: '12px', padding: '10px 0',
-                  borderBottom: '1px solid rgba(153, 69, 255, 0.06)',
+                  borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
                 }}>
-                  <div style={{ width: '60px', height: '14px', borderRadius: '4px', background: 'rgba(153, 69, 255, 0.08)', animation: 'pulse 1.5s infinite' }} />
-                  <div style={{ width: '50px', height: '14px', borderRadius: '4px', background: 'rgba(153, 69, 255, 0.06)', animation: 'pulse 1.5s infinite', animationDelay: '0.2s' }} />
+                  <div style={{ width: '60px', height: '14px', borderRadius: '4px', background: 'rgba(119, 23, 255, 0.08)', animation: 'pulse 1.5s infinite' }} />
+                  <div style={{ width: '50px', height: '14px', borderRadius: '4px', background: 'rgba(119, 23, 255, 0.06)', animation: 'pulse 1.5s infinite', animationDelay: '0.2s' }} />
                   <div style={{ flex: 1 }} />
-                  <div style={{ width: '70px', height: '14px', borderRadius: '4px', background: 'rgba(153, 69, 255, 0.06)', animation: 'pulse 1.5s infinite', animationDelay: '0.4s' }} />
+                  <div style={{ width: '70px', height: '14px', borderRadius: '4px', background: 'rgba(119, 23, 255, 0.06)', animation: 'pulse 1.5s infinite', animationDelay: '0.4s' }} />
                 </div>
               ))}
             </div>
@@ -123,7 +123,7 @@ export function HistoryScreen() {
                   <span style={{
                     ...styles.td, width: '50px', textAlign: 'right',
                     color: theme.accent.purple,
-                    textShadow: '0 0 8px rgba(153, 69, 255, 0.4)',
+                    textShadow: '0 0 8px rgba(119, 23, 255, 0.4)',
                   }} className="mono">
                     +{r.xpAwarded}
                   </span>
@@ -148,14 +148,14 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '16px',
     padding: '16px',
-    height: '100%',
-    overflow: 'hidden',
+    minHeight: '100%',
+    boxSizing: 'border-box',
   },
   panel: {
     background: 'rgba(28, 20, 42, 0.85)',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(153, 69, 255, 0.18)',
+    border: '1px solid rgba(119, 23, 255, 0.18)',
     borderRadius: '14px',
     overflow: 'hidden',
     flex: 1,
@@ -168,7 +168,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 14px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
     background: 'rgba(32, 24, 48, 0.95)',
   },
   panelTitle: {
@@ -176,7 +176,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
@@ -184,16 +184,16 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 700,
     color: '#c084fc',
-    background: 'rgba(153, 69, 255, 0.18)',
-    border: '1px solid rgba(153, 69, 255, 0.2)',
+    background: 'rgba(119, 23, 255, 0.18)',
+    border: '1px solid rgba(119, 23, 255, 0.2)',
     padding: '2px 10px',
     borderRadius: '20px',
-    boxShadow: '0 0 8px rgba(153, 69, 255, 0.15)',
+    boxShadow: '0 0 8px rgba(119, 23, 255, 0.15)',
   },
   tableHeader: {
     display: 'flex',
     padding: '8px 12px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
     background: 'rgba(32, 24, 48, 0.95)',
     minWidth: '580px',
   },
@@ -211,7 +211,7 @@ const styles: Record<string, React.CSSProperties> = {
   tableRow: {
     display: 'flex',
     padding: '8px 12px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.06)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
     alignItems: 'center',
     minWidth: '580px',
     transition: 'background-color 0.15s ease, transform 0.1s ease',

@@ -101,6 +101,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       walletAddress: null,
       isAuthenticated: false,
     });
+    // Reset game state to prevent data leaking to next user
+    const { resetRound } = await import('./gameStore').then(m => m.useGameStore.getState());
+    resetRound();
   },
 
   checkAuth: async () => {
@@ -110,15 +113,20 @@ export const useAuthStore = create<AuthState>((set) => ({
       return;
     }
     try {
+      // apiFetch auto-refreshes on 401, so if this succeeds the session is valid
       const me = await api.getMe();
       set({
         userId: me.id,
         username: me.username,
         isAuthenticated: true,
       });
-    } catch {
-      setAccessToken(null);
-      set({ isAuthenticated: false });
+    } catch (err: any) {
+      // Only clear auth if it's truly a session error (not a network issue)
+      if (err?.status === 401 || err?.code === 'SESSION_EXPIRED') {
+        setAccessToken(null);
+        set({ isAuthenticated: false });
+      }
+      // For network errors, keep the token — user might just be offline
     }
   },
 

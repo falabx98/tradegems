@@ -17,12 +17,15 @@ export const SCREEN_TO_PATH: Record<string, string> = {
   leaderboard: '/leaderboard',
   rewards: '/rewards',
   settings: '/settings',
-  battle: '/tournament',
   prediction: '/predictions',
   fairness: '/fairness',
   season: '/season',
   admin: '/admin',
   profile: '/player',
+  'trading-sim': '/trading-sim',
+  lottery: '/lottery',
+  candleflip: '/candleflip',
+  'rug-game': '/rug-game',
 };
 
 export const PATH_TO_SCREEN: Record<string, string> = Object.fromEntries(

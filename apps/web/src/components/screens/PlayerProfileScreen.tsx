@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { useAuthStore } from '../../stores/authStore';
 import { theme } from '../../styles/theme';
-import { apiFetch } from '../../utils/api';
-import { formatSol } from '../../utils/sol';
+import { api, apiFetch } from '../../utils/api';
+import { formatSol, lamportsToSol, solToLamports } from '../../utils/sol';
 
 // ─── Module-level state for the profile target ──────────────────────────────
 
@@ -34,10 +35,18 @@ interface PublicProfile {
 export function PlayerProfileScreen() {
   const isMobile = useIsMobile();
   const go = useAppNavigate();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Tip modal state
+  const [showTipModal, setShowTipModal] = useState(false);
+  const [tipAmount, setTipAmount] = useState('');
+  const [tipMessage, setTipMessage] = useState('');
+  const [tipSending, setTipSending] = useState(false);
+  const [tipResult, setTipResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     const playerId = getProfileTarget();
@@ -97,7 +106,7 @@ export function PlayerProfileScreen() {
 
   const statsData = [
     { label: 'Rounds Played', value: profile.roundsPlayed.toLocaleString() },
-    { label: 'Win Rate', value: `${parseFloat(profile.winRate).toFixed(1)}%` },
+    { label: 'Win Rate', value: `${(parseFloat(profile.winRate) * 100).toFixed(1)}%` },
     { label: 'Best Multiplier', value: `${parseFloat(profile.bestMultiplier).toFixed(2)}x` },
     { label: 'Total Wagered', value: `${formatSol(profile.totalWagered)} SOL` },
     { label: 'Total Won', value: `${formatSol(profile.totalWon)} SOL` },
@@ -182,13 +191,120 @@ export function PlayerProfileScreen() {
         </div>
 
         {/* Send Tip Button */}
-        <button onClick={() => go('wallet')} style={styles.tipBtn}>
+        <button onClick={() => {
+          if (!isAuthenticated) { go('lobby'); return; }
+          setShowTipModal(true);
+          setTipResult(null);
+          setTipAmount('');
+          setTipMessage('');
+        }} style={styles.tipBtn}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
           </svg>
           Send Tip
         </button>
       </div>
+
+      {/* Tip Modal */}
+      {showTipModal && profile && (
+        <div style={styles.modalOverlay} onClick={() => !tipSending && setShowTipModal(false)}>
+          <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <span style={styles.modalTitle}>Send Tip</span>
+              <button onClick={() => !tipSending && setShowTipModal(false)} style={styles.modalClose}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <span style={styles.modalSubtitle}>
+              Sending to <strong style={{ color: '#c084fc' }}>@{profile.username}</strong>
+            </span>
+
+            {tipResult ? (
+              <div style={{
+                padding: '16px',
+                borderRadius: '10px',
+                background: tipResult.success ? 'rgba(20, 241, 149, 0.1)' : 'rgba(255, 69, 58, 0.1)',
+                border: `1px solid ${tipResult.success ? 'rgba(20, 241, 149, 0.3)' : 'rgba(255, 69, 58, 0.3)'}`,
+                textAlign: 'center',
+              }}>
+                <span style={{
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: tipResult.success ? '#14F195' : '#ff453a',
+                }}>{tipResult.message}</span>
+              </div>
+            ) : (
+              <>
+                <div style={styles.inputGroup}>
+                  <label style={styles.inputLabel}>Amount (SOL)</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0.001"
+                    placeholder="0.01"
+                    value={tipAmount}
+                    onChange={(e) => setTipAmount(e.target.value)}
+                    style={styles.input}
+                  />
+                  <div style={styles.quickAmounts}>
+                    {['0.01', '0.05', '0.1', '0.5'].map((amt) => (
+                      <button key={amt} onClick={() => setTipAmount(amt)} style={{
+                        ...styles.quickBtn,
+                        ...(tipAmount === amt ? { background: 'rgba(119, 23, 255, 0.2)', color: '#c084fc' } : {}),
+                      }}>{amt}</button>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={styles.inputGroup}>
+                  <label style={styles.inputLabel}>Message (optional)</label>
+                  <input
+                    type="text"
+                    maxLength={200}
+                    placeholder="Nice play!"
+                    value={tipMessage}
+                    onChange={(e) => setTipMessage(e.target.value)}
+                    style={styles.input}
+                  />
+                </div>
+
+                <button
+                  onClick={async () => {
+                    const solVal = parseFloat(tipAmount);
+                    if (!solVal || solVal < 0.001) {
+                      setTipResult({ success: false, message: 'Minimum tip is 0.001 SOL' });
+                      return;
+                    }
+                    setTipSending(true);
+                    try {
+                      await api.sendTip({
+                        recipientUsername: profile.username,
+                        amount: solToLamports(solVal),
+                        message: tipMessage || undefined,
+                      });
+                      setTipResult({ success: true, message: `Sent ${solVal} SOL to @${profile.username}!` });
+                    } catch (err: any) {
+                      setTipResult({ success: false, message: err?.message || 'Failed to send tip' });
+                    } finally {
+                      setTipSending(false);
+                    }
+                  }}
+                  disabled={tipSending || !tipAmount}
+                  style={{
+                    ...styles.sendBtn,
+                    ...(tipSending || !tipAmount ? { opacity: 0.5, cursor: 'not-allowed' } : {}),
+                  }}
+                >
+                  {tipSending ? 'Sending...' : `Send ${tipAmount ? parseFloat(tipAmount) + ' SOL' : 'Tip'}`}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -199,9 +315,9 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100%',
+    minHeight: '100%',
     padding: '16px',
-    overflow: 'auto',
+    boxSizing: 'border-box',
   },
 
   centerWrap: {
@@ -224,14 +340,14 @@ const styles: Record<string, React.CSSProperties> = {
   backBtnLarge: {
     marginTop: '8px',
     padding: '10px 24px',
-    background: 'rgba(153, 69, 255, 0.15)',
-    border: '1px solid rgba(153, 69, 255, 0.3)',
+    background: 'rgba(119, 23, 255, 0.15)',
+    border: '1px solid rgba(119, 23, 255, 0.3)',
     borderRadius: '8px',
     color: '#c084fc',
     fontSize: '14px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
   },
@@ -260,7 +376,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '20px',
     fontWeight: 700,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase',
     letterSpacing: '1px',
     textAlign: 'center',
@@ -283,8 +399,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '12px',
     padding: '24px 20px',
-    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.12), rgba(20, 241, 149, 0.06))',
-    border: '1px solid rgba(153, 69, 255, 0.2)',
+    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.12), rgba(20, 241, 149, 0.06))',
+    border: '1px solid rgba(119, 23, 255, 0.2)',
     borderRadius: '14px',
     boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   },
@@ -295,24 +411,24 @@ const styles: Record<string, React.CSSProperties> = {
     width: '80px',
     height: '80px',
     borderRadius: '50%',
-    border: '3px solid rgba(153, 69, 255, 0.3)',
+    border: '3px solid rgba(119, 23, 255, 0.3)',
     objectFit: 'cover',
   },
   avatarFallback: {
     width: '80px',
     height: '80px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #9945FF, #14F195)',
+    background: 'linear-gradient(135deg, #7717ff, #14F195)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: '3px solid rgba(153, 69, 255, 0.3)',
+    border: '3px solid rgba(119, 23, 255, 0.3)',
   },
   avatarInitial: {
     fontSize: '32px',
     fontWeight: 800,
     color: '#fff',
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
   },
   levelBadge: {
     position: 'absolute',
@@ -321,12 +437,12 @@ const styles: Record<string, React.CSSProperties> = {
     width: '28px',
     height: '28px',
     borderRadius: '50%',
-    background: '#9945FF',
+    background: '#7717ff',
     border: '2px solid #0e0a16',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 0 8px rgba(153, 69, 255, 0.5)',
+    boxShadow: '0 0 8px rgba(119, 23, 255, 0.5)',
   },
   levelBadgeText: {
     fontSize: '12px',
@@ -345,7 +461,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '22px',
     fontWeight: 800,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     letterSpacing: '1px',
   },
   usernameLabel: {
@@ -367,7 +483,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontWeight: 700,
     letterSpacing: '1px',
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
   },
 
   streakBadge: {
@@ -380,7 +496,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     fontWeight: 700,
     color: '#fbbf24',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
   },
@@ -412,7 +528,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '18px',
     fontWeight: 800,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     letterSpacing: '0.5px',
   },
 
@@ -423,16 +539,123 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     gap: '8px',
     padding: '14px',
-    background: 'linear-gradient(135deg, rgba(153, 69, 255, 0.2), rgba(20, 241, 149, 0.1))',
-    border: '1px solid rgba(153, 69, 255, 0.3)',
+    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.2), rgba(20, 241, 149, 0.1))',
+    border: '1px solid rgba(119, 23, 255, 0.3)',
     borderRadius: '10px',
     color: '#c084fc',
     fontSize: '15px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '1px',
     transition: 'all 0.15s ease',
+  },
+
+  // Tip Modal
+  modalOverlay: {
+    position: 'fixed',
+    inset: 0,
+    background: 'rgba(0, 0, 0, 0.7)',
+    backdropFilter: 'blur(4px)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+    padding: '16px',
+  },
+  modalCard: {
+    width: '100%',
+    maxWidth: '380px',
+    background: theme.bg.primary,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: '16px',
+    padding: '24px',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '16px',
+    boxShadow: '0 8px 40px rgba(0, 0, 0, 0.5)',
+  },
+  modalHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: 800,
+    color: theme.text.primary,
+    fontFamily: "inherit",
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
+  },
+  modalClose: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
+    border: 'none',
+    background: 'rgba(255, 255, 255, 0.06)',
+    color: theme.text.muted,
+    cursor: 'pointer',
+  },
+  modalSubtitle: {
+    fontSize: '14px',
+    color: theme.text.muted,
+  },
+  inputGroup: {
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '6px',
+  },
+  inputLabel: {
+    fontSize: '12px',
+    fontWeight: 600,
+    color: theme.text.muted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+  },
+  input: {
+    padding: '10px 14px',
+    background: theme.bg.secondary,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: '8px',
+    color: theme.text.primary,
+    fontSize: '15px',
+    fontWeight: 600,
+    fontFamily: "'JetBrains Mono', monospace",
+    outline: 'none',
+  },
+  quickAmounts: {
+    display: 'flex',
+    gap: '6px',
+    marginTop: '4px',
+  },
+  quickBtn: {
+    flex: 1,
+    padding: '6px 0',
+    background: 'rgba(255, 255, 255, 0.04)',
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: '6px',
+    color: theme.text.secondary,
+    fontSize: '13px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: "'JetBrains Mono', monospace",
+  },
+  sendBtn: {
+    padding: '14px',
+    background: 'linear-gradient(135deg, #7717ff, #14F195)',
+    border: 'none',
+    borderRadius: '10px',
+    color: '#fff',
+    fontSize: '15px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '1px',
   },
 };

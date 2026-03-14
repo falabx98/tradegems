@@ -94,10 +94,38 @@ export async function adminRoutes(server: FastifyInstance) {
 
     const profile = await db.query.userProfiles.findFirst({ where: eq(userProfiles.userId, id) });
     const [bal] = await db.select().from(balances).where(eq(balances.userId, id));
-    const recentBets = await db.select().from(bets).where(eq(bets.userId, id)).orderBy(desc(bets.createdAt)).limit(10);
+    const recentBets = await db.select().from(bets).where(eq(bets.userId, id)).orderBy(desc(bets.createdAt)).limit(20);
+
+    // Get bet results with round mode for each bet
+    const recentResults = await db.execute(sql`
+      SELECT br.final_multiplier, br.payout_amount, br.result_type, br.xp_awarded, br.created_at,
+             b.amount as bet_amount, r.mode as game_mode
+      FROM bet_results br
+      JOIN bets b ON b.id = br.bet_id
+      JOIN rounds r ON r.id = br.round_id
+      WHERE br.user_id = ${id}
+      ORDER BY br.created_at DESC LIMIT 20
+    `) as unknown as Array<Record<string, unknown>>;
+
+    // Get prediction rounds
+    const predictions = await db.execute(sql`
+      SELECT direction, result, bet_amount, payout, multiplier, created_at
+      FROM prediction_rounds
+      WHERE user_id = ${id}
+      ORDER BY created_at DESC LIMIT 20
+    `) as unknown as Array<Record<string, unknown>>;
+
+    // Get ledger entries (deposits, withdrawals, bonuses)
+    const ledgerEntries = await db.execute(sql`
+      SELECT entry_type, amount, balance_after, reference_type, created_at
+      FROM balance_ledger_entries
+      WHERE user_id = ${id}
+      ORDER BY created_at DESC LIMIT 30
+    `) as unknown as Array<Record<string, unknown>>;
 
     return {
       ...user,
+      avatarUrl: profile?.avatarUrl ?? null,
       availableAmount: bal?.availableAmount ?? 0,
       lockedAmount: bal?.lockedAmount ?? 0,
       pendingAmount: bal?.pendingAmount ?? 0,
@@ -107,6 +135,9 @@ export async function adminRoutes(server: FastifyInstance) {
       bestMultiplier: profile?.bestMultiplier ?? '1.0',
       winRate: profile?.winRate ?? '0.0',
       recentBets,
+      recentResults,
+      predictions,
+      ledgerEntries,
     };
   });
 

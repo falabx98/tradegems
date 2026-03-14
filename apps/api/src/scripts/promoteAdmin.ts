@@ -2,7 +2,8 @@ import 'dotenv/config';
 import postgres from 'postgres';
 
 async function main() {
-  const dbUrl = process.env.DATABASE_URL || 'postgresql://postgres:KMgUGZNVFRLiAMlkTGaVbtvWZSEvBuSm@turntable.proxy.rlwy.net:45790/railway';
+  const dbUrl = process.env.DATABASE_URL;
+  if (!dbUrl) { console.error('DATABASE_URL is required'); process.exit(1); }
   const sql = postgres(dbUrl);
 
   const userId = '56eabf86-965f-4aa4-8223-123fb043c17d'; // xfalabx

@@ -22,10 +22,10 @@ const COLORS: Record<ToastType, { bg: string; border: string; text: string; icon
     icon: '#f87171',
   },
   info: {
-    bg: 'rgba(153, 69, 255, 0.08)',
-    border: 'rgba(153, 69, 255, 0.25)',
+    bg: 'rgba(119, 23, 255, 0.08)',
+    border: 'rgba(119, 23, 255, 0.25)',
     text: '#c084fc',
-    icon: '#9945FF',
+    icon: '#7717ff',
   },
   warning: {
     bg: 'rgba(251, 191, 36, 0.08)',
@@ -127,7 +127,7 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     fontSize: '14px',
     fontWeight: 700,
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "inherit",
     letterSpacing: '0.3px',
   },
   message: {

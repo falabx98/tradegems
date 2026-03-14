@@ -16,10 +16,11 @@ import {
 } from '../engine/engineConfig';
 import type { EngineConfig } from '../engine/engineConfig';
 import { api } from '../utils/api';
+import { toast } from './toastStore';
 
 interface GameState {
   // Current view
-  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'battle' | 'prediction' | 'fairness' | 'season' | 'admin' | 'profile';
+  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'prediction' | 'fairness' | 'season' | 'admin' | 'profile' | 'trading-sim' | 'lottery' | 'candleflip' | 'rug-game';
   mode: GameMode;
 
   // Round state
@@ -49,17 +50,18 @@ interface GameState {
   // Result
   result: RoundResult | null;
 
-  // Tournament state
-  tournamentRoomId: string | null;
-  tournamentState: any | null;
-  tournamentRoundConfig: RoundConfig | null;
-
   // Player profile
   profile: PlayerProfile;
 
   // Chat
   chatOpen: boolean;
   unreadChat: number;
+
+  // Tournament (stub — feature not yet implemented)
+  tournamentRoomId: string | null;
+  joinTournament: (buyIn: number) => Promise<void>;
+  leaveTournament: () => Promise<void>;
+  resetTournament: () => void;
 
   // Actions
   setScreen: (screen: GameState['screen']) => void;
@@ -75,10 +77,6 @@ interface GameState {
   resetRound: () => void;
   playAgain: () => void;
   syncProfile: () => Promise<void>;
-  joinTournament: (buyIn: number) => Promise<void>;
-  leaveTournament: () => Promise<void>;
-  enterBattle: () => void;
-  resetTournament: () => void;
   toggleChat: () => void;
   clearUnreadChat: () => void;
   incrementUnreadChat: (count: number) => void;
@@ -120,12 +118,15 @@ export const useGameStore = create<GameState>((set, get) => ({
   nearMissNodeIds: new Set(),
   engineConfig: DEFAULT_ENGINE_CONFIG,
   result: null,
-  tournamentRoomId: null,
-  tournamentState: null,
-  tournamentRoundConfig: null,
   profile: DEFAULT_PROFILE,
   chatOpen: false,
   unreadChat: 0,
+
+  // Tournament stubs
+  tournamentRoomId: null,
+  joinTournament: async (_buyIn: number) => { throw new Error('Tournaments coming soon'); },
+  leaveTournament: async () => { set({ tournamentRoomId: null }); },
+  resetTournament: () => { set({ tournamentRoomId: null }); },
 
   setScreen: (screen) => set({ screen }),
   setMode: (mode) => set({ mode }),
@@ -135,15 +136,12 @@ export const useGameStore = create<GameState>((set, get) => ({
   startRound: () => {
     const state = get();
 
-    // Guard: never start a solo round while in battle mode
-    if (state.screen === 'battle') return;
-
     // Generate round locally (deterministic engine)
     const config = generateRound(undefined, state.engineConfig);
 
     // Deduct betAmount + fee from local balance immediately
     // M1 fix: use cached server config fee rate (fetched on app load)
-    const feeRate = (globalThis as any).__serverFeeRate ?? 0.05;
+    const feeRate = (globalThis as any).__serverFeeRate ?? 0.03;
     const fee = Math.floor(state.betAmount * feeRate);
     const totalCost = state.betAmount + fee;
     const profile = { ...state.profile };
@@ -181,8 +179,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         });
 
         set({ serverRoundId: roundId, betPlaced: true });
-      } catch (err) {
-        console.warn('Server bet placement failed (playing locally):', err);
+      } catch (err: any) {
+        console.warn('Server bet placement failed:', err);
+        toast.error('Bet Failed', err?.message || 'Server bet placement failed. Balance will be corrected.');
         // Sync profile to correct local balance after failed bet placement
         get().syncProfile();
       }
@@ -274,8 +273,8 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Resolve on server in background and sync real balance
     (async () => {
       const { serverRoundId, betPlaced } = get();
-      if (serverRoundId && betPlaced) {
-        try {
+      try {
+        if (serverRoundId && betPlaced) {
           // Resolve solo round server-side (uses server's seed — source of truth)
           await api.resolveSoloRound(serverRoundId);
 
@@ -297,13 +296,13 @@ export const useGameStore = create<GameState>((set, get) => ({
           } catch {
             // Non-critical — local result still displayed
           }
-
-        } catch (err) {
-          console.warn('Server round resolution failed:', err);
-        } finally {
-          // Always sync real profile from server (balance, stats, etc.)
-          await get().syncProfile();
         }
+      } catch (err: any) {
+        console.warn('Server round resolution failed:', err);
+        toast.warning('Sync Issue', 'Round result may differ from server. Balance will be corrected.');
+      } finally {
+        // Always sync real profile from server — corrects balance whether bet succeeded or not
+        await get().syncProfile();
       }
     })();
   },
@@ -341,48 +340,6 @@ export const useGameStore = create<GameState>((set, get) => ({
       screen: 'setup',
       serverRoundId: null,
       betPlaced: false,
-    });
-  },
-
-  joinTournament: async (buyIn: number) => {
-    try {
-      const res = await api.joinTournament(buyIn);
-      set({
-        tournamentRoomId: res.roomId,
-        tournamentState: res,
-      });
-    } catch (err) {
-      console.error('Failed to join tournament:', err);
-      throw err;
-    }
-  },
-
-  leaveTournament: async () => {
-    const state = get();
-    if (state.tournamentRoomId) {
-      try {
-        await api.leaveTournament(state.tournamentRoomId);
-      } catch (err) {
-        console.error('Failed to leave tournament:', err);
-      }
-    }
-    set({
-      tournamentRoomId: null,
-      tournamentState: null,
-      tournamentRoundConfig: null,
-    });
-  },
-
-  enterBattle: () => {
-    set({ screen: 'battle' });
-  },
-
-  resetTournament: () => {
-    set({
-      tournamentRoomId: null,
-      tournamentState: null,
-      tournamentRoundConfig: null,
-      screen: 'lobby',
     });
   },
 

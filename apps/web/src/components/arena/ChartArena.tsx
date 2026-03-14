@@ -151,7 +151,7 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, _ph
   const cx = w / 2;
   const cy = h / 2;
   const radGrad = ctx.createRadialGradient(cx, cy * 0.7, 0, cx, cy, Math.max(w, h) * 0.7);
-  radGrad.addColorStop(0, 'rgba(153, 69, 255, 0.07)');
+  radGrad.addColorStop(0, 'rgba(119, 23, 255, 0.07)');
   radGrad.addColorStop(0.4, 'rgba(80, 40, 180, 0.03)');
   radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = radGrad;
@@ -160,16 +160,16 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, _ph
   // Animated horizontal scan beam (purple, slow)
   const scanY = ((elapsed * 0.12) % 1) * h;
   const scanGrad = ctx.createLinearGradient(0, scanY - 50, 0, scanY + 50);
-  scanGrad.addColorStop(0, 'rgba(153, 69, 255, 0)');
-  scanGrad.addColorStop(0.4, 'rgba(153, 69, 255, 0.045)');
-  scanGrad.addColorStop(0.5, 'rgba(153, 69, 255, 0.06)');
-  scanGrad.addColorStop(0.6, 'rgba(153, 69, 255, 0.045)');
-  scanGrad.addColorStop(1, 'rgba(153, 69, 255, 0)');
+  scanGrad.addColorStop(0, 'rgba(119, 23, 255, 0)');
+  scanGrad.addColorStop(0.4, 'rgba(119, 23, 255, 0.045)');
+  scanGrad.addColorStop(0.5, 'rgba(119, 23, 255, 0.06)');
+  scanGrad.addColorStop(0.6, 'rgba(119, 23, 255, 0.045)');
+  scanGrad.addColorStop(1, 'rgba(119, 23, 255, 0)');
   ctx.fillStyle = scanGrad;
   ctx.fillRect(0, scanY - 50, w, 100);
 
   // Scan line (thin bright line at center of beam)
-  ctx.strokeStyle = 'rgba(153, 69, 255, 0.08)';
+  ctx.strokeStyle = 'rgba(119, 23, 255, 0.08)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, scanY);
@@ -209,7 +209,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
     const pulse = Math.sin(time * 0.8 + i * 0.5) * 0.3 + 0.7;
     const alpha = (0.045 + (1 - distFromCenter) * 0.035) * pulse;
 
-    ctx.strokeStyle = `rgba(153, 69, 255, ${alpha})`;
+    ctx.strokeStyle = `rgba(119, 23, 255, ${alpha})`;
     ctx.lineWidth = i === hLines / 2 ? 1.0 : 0.6;
     ctx.beginPath();
     ctx.moveTo(area.x, y);
@@ -231,7 +231,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
     const basePulse = Math.sin(time * 0.6 + i * 0.4) * 0.25 + 0.75;
     const alpha = (0.035 + proximity * 0.06) * basePulse;
 
-    ctx.strokeStyle = `rgba(153, 69, 255, ${alpha})`;
+    ctx.strokeStyle = `rgba(119, 23, 255, ${alpha})`;
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(x, area.y);
@@ -254,7 +254,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
 
       ctx.beginPath();
       ctx.arc(x, y, dotSize, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(153, 69, 255, ${dotAlpha})`;
+      ctx.fillStyle = `rgba(119, 23, 255, ${dotAlpha})`;
       ctx.fill();
     }
   }
@@ -275,20 +275,20 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
     ctx.arc(px, py, pSize, 0, Math.PI * 2);
     ctx.fillStyle = p % 3 === 0
       ? `rgba(20, 241, 149, ${pAlpha})`
-      : `rgba(153, 69, 255, ${pAlpha})`;
+      : `rgba(119, 23, 255, ${pAlpha})`;
     ctx.fill();
   }
 
   // ─── Edge glow borders ────────────────────────────────────
   // Top edge glow
   const topGrad = ctx.createLinearGradient(area.x, area.y, area.x, area.y + 40);
-  topGrad.addColorStop(0, 'rgba(153, 69, 255, 0.10)');
-  topGrad.addColorStop(1, 'rgba(153, 69, 255, 0)');
+  topGrad.addColorStop(0, 'rgba(119, 23, 255, 0.10)');
+  topGrad.addColorStop(1, 'rgba(119, 23, 255, 0)');
   ctx.fillStyle = topGrad;
   ctx.fillRect(area.x, area.y, area.w, 40);
 
   // Top border line
-  ctx.strokeStyle = `rgba(153, 69, 255, ${0.08 + Math.sin(time * 1.5) * 0.04})`;
+  ctx.strokeStyle = `rgba(119, 23, 255, ${0.08 + Math.sin(time * 1.5) * 0.04})`;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(area.x, area.y);
@@ -297,13 +297,13 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
 
   // Bottom edge glow
   const botGrad = ctx.createLinearGradient(area.x, area.y + area.h - 40, area.x, area.y + area.h);
-  botGrad.addColorStop(0, 'rgba(153, 69, 255, 0)');
-  botGrad.addColorStop(1, 'rgba(153, 69, 255, 0.08)');
+  botGrad.addColorStop(0, 'rgba(119, 23, 255, 0)');
+  botGrad.addColorStop(1, 'rgba(119, 23, 255, 0.08)');
   ctx.fillStyle = botGrad;
   ctx.fillRect(area.x, area.y + area.h - 40, area.w, 40);
 
   // Bottom border line
-  ctx.strokeStyle = `rgba(153, 69, 255, ${0.06 + Math.sin(time * 1.5 + 1) * 0.03})`;
+  ctx.strokeStyle = `rgba(119, 23, 255, ${0.06 + Math.sin(time * 1.5 + 1) * 0.03})`;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(area.x, area.y + area.h);
@@ -312,22 +312,22 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
 
   // Left edge glow
   const leftGrad = ctx.createLinearGradient(area.x, area.y, area.x + 25, area.y);
-  leftGrad.addColorStop(0, 'rgba(153, 69, 255, 0.06)');
-  leftGrad.addColorStop(1, 'rgba(153, 69, 255, 0)');
+  leftGrad.addColorStop(0, 'rgba(119, 23, 255, 0.06)');
+  leftGrad.addColorStop(1, 'rgba(119, 23, 255, 0)');
   ctx.fillStyle = leftGrad;
   ctx.fillRect(area.x, area.y, 25, area.h);
 
   // Right edge glow
   const rightGrad = ctx.createLinearGradient(area.x + area.w - 25, area.y, area.x + area.w, area.y);
-  rightGrad.addColorStop(0, 'rgba(153, 69, 255, 0)');
-  rightGrad.addColorStop(1, 'rgba(153, 69, 255, 0.04)');
+  rightGrad.addColorStop(0, 'rgba(119, 23, 255, 0)');
+  rightGrad.addColorStop(1, 'rgba(119, 23, 255, 0.04)');
   ctx.fillStyle = rightGrad;
   ctx.fillRect(area.x + area.w - 25, area.y, 25, area.h);
 
   // ─── Corner accents (futuristic bracket corners) ──────────
   const cornerLen = 20;
   const cornerAlpha = 0.15 + Math.sin(time * 2) * 0.05;
-  ctx.strokeStyle = `rgba(153, 69, 255, ${cornerAlpha})`;
+  ctx.strokeStyle = `rgba(119, 23, 255, ${cornerAlpha})`;
   ctx.lineWidth = 1.5;
 
   // Top-left
@@ -400,24 +400,24 @@ function drawChartPath(ctx: CanvasRenderingContext2D, config: RoundConfig, area:
   ctx.closePath();
 
   const fillGrad = ctx.createLinearGradient(area.x, 0, area.x + area.w, 0);
-  fillGrad.addColorStop(0, 'rgba(153, 69, 255, 0.08)');
+  fillGrad.addColorStop(0, 'rgba(119, 23, 255, 0.08)');
   fillGrad.addColorStop(0.5, 'rgba(140, 120, 255, 0.06)');
-  fillGrad.addColorStop(1, 'rgba(153, 69, 255, 0.04)');
+  fillGrad.addColorStop(1, 'rgba(119, 23, 255, 0.04)');
 
   const fillVertGrad = ctx.createLinearGradient(0, area.y, 0, area.y + area.h);
-  fillVertGrad.addColorStop(0, 'rgba(153, 69, 255, 0.10)');
-  fillVertGrad.addColorStop(1, 'rgba(153, 69, 255, 0)');
+  fillVertGrad.addColorStop(0, 'rgba(119, 23, 255, 0.10)');
+  fillVertGrad.addColorStop(1, 'rgba(119, 23, 255, 0)');
   ctx.fillStyle = fillVertGrad;
   ctx.fill();
 
   // Main line with blue→purple gradient
   const lineGrad = ctx.createLinearGradient(area.x, 0, area.x + area.w, 0);
-  lineGrad.addColorStop(0, '#9945FF');
+  lineGrad.addColorStop(0, '#7717ff');
   lineGrad.addColorStop(0.5, '#8b7bff');
-  lineGrad.addColorStop(1, '#9945FF');
+  lineGrad.addColorStop(1, '#7717ff');
 
   ctx.save();
-  ctx.shadowColor = 'rgba(153, 69, 255, 0.25)';
+  ctx.shadowColor = 'rgba(119, 23, 255, 0.25)';
   ctx.shadowBlur = 6;
 
   ctx.beginPath();
@@ -975,18 +975,18 @@ function drawLeadingPoint(ctx: CanvasRenderingContext2D, config: RoundConfig, ar
 
   // Large outer glow
   ctx.save();
-  ctx.shadowColor = '#9945FF';
+  ctx.shadowColor = '#7717ff';
   ctx.shadowBlur = 8;
 
   ctx.beginPath();
   ctx.arc(x, y, 10, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(153, 69, 255, 0.15)';
+  ctx.fillStyle = 'rgba(119, 23, 255, 0.15)';
   ctx.fill();
 
   // Inner bright point
   ctx.beginPath();
   ctx.arc(x, y, 4.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#9945FF';
+  ctx.fillStyle = '#7717ff';
   ctx.fill();
   ctx.restore();
 
@@ -1000,7 +1000,7 @@ function drawLeadingPoint(ctx: CanvasRenderingContext2D, config: RoundConfig, ar
   ctx.beginPath();
   ctx.moveTo(area.x, y);
   ctx.lineTo(x - 14, y);
-  ctx.strokeStyle = 'rgba(153, 69, 255, 0.06)';
+  ctx.strokeStyle = 'rgba(119, 23, 255, 0.06)';
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 3]);
   ctx.stroke();
@@ -1011,12 +1011,12 @@ function drawLeadingPoint(ctx: CanvasRenderingContext2D, config: RoundConfig, ar
   const badgeW = 38;
   const badgeH = 18;
 
-  ctx.fillStyle = 'rgba(153, 69, 255, 0.15)';
+  ctx.fillStyle = 'rgba(119, 23, 255, 0.15)';
   ctx.beginPath();
   ctx.roundRect(area.x - badgeW - 4, y - badgeH / 2, badgeW, badgeH, 3);
   ctx.fill();
 
-  ctx.fillStyle = '#9945FF';
+  ctx.fillStyle = '#7717ff';
   ctx.font = '600 10px "JetBrains Mono", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1042,7 +1042,7 @@ function drawTimeScale(ctx: CanvasRenderingContext2D, area: Area, duration: numb
   for (let t = 0; t <= 15; t += 3) {
     const x = area.x + (t / duration) * area.w;
     const isPast = t <= elapsed;
-    ctx.fillStyle = isPast ? 'rgba(153, 69, 255, 0.25)' : 'rgba(255,255,255,0.12)';
+    ctx.fillStyle = isPast ? 'rgba(119, 23, 255, 0.25)' : 'rgba(255,255,255,0.12)';
     ctx.fillText(`${t}s`, x, area.y + area.h + 20);
   }
 
@@ -1052,7 +1052,7 @@ function drawTimeScale(ctx: CanvasRenderingContext2D, area: Area, duration: numb
     ctx.beginPath();
     ctx.moveTo(px, area.y + area.h + 2);
     ctx.lineTo(px, area.y + area.h + 8);
-    ctx.strokeStyle = '#9945FF';
+    ctx.strokeStyle = '#7717ff';
     ctx.lineWidth = 2;
     ctx.stroke();
   }

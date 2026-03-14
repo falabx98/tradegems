@@ -41,6 +41,17 @@ export function errorHandler(
     });
   }
 
+  // Zod validation errors
+  if (error.name === 'ZodError') {
+    return reply.status(400).send({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: (error as any).issues?.[0]?.message || 'Request validation failed',
+        details: (error as any).issues,
+      },
+    });
+  }
+
   // Unexpected errors
   logger.error({ err: error }, 'Unhandled error');
   return reply.status(500).send({

@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { api } from '../utils/api';
 import { theme } from '../styles/theme';
+import { getAvatarGradient, getInitials } from '../utils/avatars';
 
 interface ActivityItem {
   id: number;
@@ -46,7 +47,6 @@ export function ActivityFeed() {
       const newItems = (res.data || []) as ActivityItem[];
       if (newItems.length > 0) {
         if (after) {
-          // Append new items to the front, deduplicate by id
           setItems(prev => {
             const merged = [...newItems, ...prev];
             const seen = new Set<number>();
@@ -68,14 +68,10 @@ export function ActivityFeed() {
   };
 
   useEffect(() => {
-    // Initial fetch
     fetchFeed();
-
-    // Poll every 5 seconds
     intervalRef.current = setInterval(() => {
       fetchFeed(lastIdRef.current);
     }, 5000);
-
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
@@ -84,24 +80,38 @@ export function ActivityFeed() {
   return (
     <div style={styles.panel}>
       <div style={styles.panelHeader}>
-        <span style={styles.panelTitle}>Recent Plays</span>
-        {items.length > 0 && <span style={styles.liveBadge}>LIVE</span>}
+        <span style={styles.panelTitle}>Live Bets</span>
+        {items.length > 0 && (
+          <span style={styles.liveBadge}>
+            <span className="dot-pulse" style={styles.liveDot} />
+            LIVE
+          </span>
+        )}
       </div>
       <div style={styles.feedList}>
         {items.length === 0 ? (
           <div style={styles.emptyState}>
-            No recent activity
+            <span style={{ opacity: 0.6 }}>Waiting for bets...</span>
           </div>
         ) : (
           items.map(item => {
             const isWin = item.payload.payout > item.payload.betAmount;
-            const multiplier = item.payload.multiplier;
+            const multiplier = item.payload.multiplier ?? 0;
             const profit = item.payload.payout - item.payload.betAmount;
             const feedType = item.feedType === 'prediction_result' ? 'PRED' : 'SOLO';
             const badgeColor = feedType === 'PRED' ? theme.accent.purple : theme.accent.blue;
 
             return (
               <div key={item.id} style={styles.feedRow}>
+                {/* Avatar */}
+                <div style={{
+                  width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+                  background: getAvatarGradient(null, item.payload.username),
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '10px', fontWeight: 700, color: '#fff',
+                }}>
+                  {getInitials(item.payload.username)}
+                </div>
                 <span style={{
                   ...styles.typeBadge,
                   background: `${badgeColor}20`,
@@ -126,7 +136,7 @@ export function ActivityFeed() {
                   }}
                   className="mono"
                 >
-                  {isWin ? '+' : ''}{formatSolAmount(profit)} SOL
+                  {isWin ? '+' : ''}{formatSolAmount(profit)}
                 </span>
                 <span style={styles.feedTime}>{timeAgo(item.createdAt)}</span>
               </div>
@@ -138,15 +148,12 @@ export function ActivityFeed() {
   );
 }
 
-// --- Styles ---
-
 const styles: Record<string, React.CSSProperties> = {
   panel: {
     background: theme.bg.secondary,
     border: `1px solid ${theme.border.subtle}`,
     borderRadius: '8px',
     overflow: 'hidden',
-    flex: 1,
   },
   panelHeader: {
     display: 'flex',
@@ -157,21 +164,31 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.bg.tertiary,
   },
   panelTitle: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: 'inherit',
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
   liveBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
     fontSize: '11px',
     fontWeight: 600,
     color: theme.success,
-    padding: '2px 6px',
+    padding: '2px 8px',
     background: `${theme.success}15`,
     borderRadius: '4px',
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: '50%',
+    background: theme.success,
+    display: 'inline-block',
   },
   feedList: {
     display: 'flex',
@@ -189,7 +206,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '7px 12px',
+    padding: '6px 12px',
     borderBottom: `1px solid ${theme.border.subtle}`,
   },
   typeBadge: {
@@ -199,10 +216,10 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '4px',
     letterSpacing: '0.5px',
     flexShrink: 0,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: 'inherit',
   },
   feedUser: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 500,
     color: theme.text.secondary,
     flex: 1,
@@ -211,21 +228,21 @@ const styles: Record<string, React.CSSProperties> = {
     whiteSpace: 'nowrap',
   },
   feedMult: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 700,
-    minWidth: '50px',
+    minWidth: '46px',
     textAlign: 'right',
   },
   feedAmount: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 600,
-    minWidth: '80px',
+    minWidth: '60px',
     textAlign: 'right',
   },
   feedTime: {
-    fontSize: '12px',
+    fontSize: '11px',
     color: theme.text.muted,
-    minWidth: '28px',
+    minWidth: '24px',
     textAlign: 'right',
   },
 };

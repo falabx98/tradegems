@@ -34,6 +34,7 @@ export const users = pgTable('users', {
   xpCurrent: bigint('xp_current', { mode: 'number' }).notNull().default(0),
   xpToNext: bigint('xp_to_next', { mode: 'number' }).notNull().default(100),
   bonusClaimed: boolean('bonus_claimed').notNull().default(false),
+  avatarUrl: text('avatar_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -115,6 +116,9 @@ export const balances = pgTable('balances', {
 }, (table) => [
   // composite PK emulated via unique index
   uniqueIndex('balances_pk').on(table.userId, table.asset),
+  check('non_negative_available', sql`${table.availableAmount} >= 0`),
+  check('non_negative_locked', sql`${table.lockedAmount} >= 0`),
+  check('non_negative_pending', sql`${table.pendingAmount} >= 0`),
 ]);
 
 export const balanceLedgerEntries = pgTable('balance_ledger_entries', {
@@ -615,3 +619,151 @@ export const bonusCodeRedemptions = pgTable('bonus_code_redemptions', {
   index('idx_redemptions_user').on(table.userId),
   index('idx_redemptions_code').on(table.bonusCodeId),
 ]);
+
+// ============================================================
+// LOTTERY / JACKPOT
+// ============================================================
+
+export const lotteryDraws = pgTable('lottery_draws', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  drawNumber: serial('draw_number').notNull(),
+  status: text('status').notNull().default('open'), // 'open' | 'closed' | 'drawing' | 'completed'
+  drawDate: timestamp('draw_date', { withTimezone: true }).notNull(),
+  standardPrice: bigint('standard_price', { mode: 'number' }).notNull().default(100_000_000), // 0.10 SOL
+  powerPrice: bigint('power_price', { mode: 'number' }).notNull().default(500_000_000), // 0.50 SOL
+  totalTickets: integer('total_tickets').notNull().default(0),
+  prizePool: bigint('prize_pool', { mode: 'number' }).notNull().default(0),
+  rolloverPool: bigint('rollover_pool', { mode: 'number' }).notNull().default(0),
+  winningNumbers: jsonb('winning_numbers'), // array of 5 ints (1-36)
+  winningGemBall: integer('winning_gem_ball'), // 1-9
+  drawSeed: text('draw_seed'),
+  seedCommitment: text('seed_commitment'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  drawnAt: timestamp('drawn_at', { withTimezone: true }),
+}, (table) => [
+  index('idx_lottery_draws_status').on(table.status),
+  index('idx_lottery_draws_number').on(table.drawNumber),
+  index('idx_lottery_draws_date').on(table.drawDate),
+]);
+
+export const lotteryTickets = pgTable('lottery_tickets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  drawId: uuid('draw_id').notNull().references(() => lotteryDraws.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  entryType: text('entry_type').notNull().default('standard'), // 'standard' | 'power'
+  numbers: jsonb('numbers').notNull(), // array of 5 sorted ints (1-36)
+  gemBall: integer('gem_ball').notNull(), // 1-9
+  cost: bigint('cost', { mode: 'number' }).notNull(),
+  purchasedAt: timestamp('purchased_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_lottery_tickets_draw').on(table.drawId),
+  index('idx_lottery_tickets_user').on(table.userId),
+  index('idx_lottery_tickets_draw_user').on(table.drawId, table.userId),
+]);
+
+export const lotteryWinners = pgTable('lottery_winners', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  drawId: uuid('draw_id').notNull().references(() => lotteryDraws.id),
+  ticketId: uuid('ticket_id').notNull().references(() => lotteryTickets.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  tier: integer('tier').notNull(), // 1-9 (1 = jackpot)
+  matchedNumbers: integer('matched_numbers').notNull(),
+  matchedGemBall: boolean('matched_gem_ball').notNull(),
+  prizeAmount: bigint('prize_amount', { mode: 'number' }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_lottery_winners_draw').on(table.drawId),
+  index('idx_lottery_winners_user').on(table.userId),
+  index('idx_lottery_winners_tier').on(table.drawId, table.tier),
+]);
+
+// ============================================================
+// TRADING SIMULATOR PvP
+// ============================================================
+
+export const tradingSimRooms = pgTable('trading_sim_rooms', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  entryFee: bigint('entry_fee', { mode: 'number' }).notNull(),
+  maxPlayers: integer('max_players').notNull().default(4),
+  currentPlayers: integer('current_players').notNull().default(0),
+  status: text('status').notNull().default('waiting'), // 'waiting' | 'active' | 'finished'
+  chartData: jsonb('chart_data'), // pre-generated OHLCV candles
+  duration: integer('duration').notNull().default(60), // seconds
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  winnerId: uuid('winner_id').references(() => users.id),
+  prizePool: bigint('prize_pool', { mode: 'number' }).notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_trading_sim_rooms_status').on(table.status),
+]);
+
+export const tradingSimParticipants = pgTable('trading_sim_participants', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  roomId: uuid('room_id').notNull().references(() => tradingSimRooms.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  startBalance: integer('start_balance').notNull().default(10000),
+  finalBalance: integer('final_balance'),
+  finalPnl: integer('final_pnl'),
+  rank: integer('rank'),
+  joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_trading_sim_participants_room').on(table.roomId),
+  index('idx_trading_sim_participants_user').on(table.userId),
+]);
+
+export const tradingSimTrades = pgTable('trading_sim_trades', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  roomId: uuid('room_id').notNull().references(() => tradingSimRooms.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  tradeType: text('trade_type').notNull(), // 'buy' | 'sell'
+  price: numeric('price', { precision: 12, scale: 4 }).notNull(),
+  quantity: integer('quantity').notNull(),
+  timestamp: integer('timestamp').notNull(), // seconds into the round
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_trading_sim_trades_room').on(table.roomId),
+  index('idx_trading_sim_trades_user').on(table.userId),
+]);
+
+// ─── Candleflip ──────────────────────────────────────────────
+
+export const candleflipGames = pgTable('candleflip_games', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  creatorId: uuid('creator_id').notNull().references(() => users.id),
+  opponentId: uuid('opponent_id').references(() => users.id),
+  betAmount: bigint('bet_amount', { mode: 'number' }).notNull(),
+  creatorPick: text('creator_pick').notNull(), // 'bullish' | 'bearish'
+  status: text('status').notNull().default('open'), // 'open' | 'playing' | 'finished' | 'cancelled'
+  result: text('result'), // 'bullish' | 'bearish'
+  resultMultiplier: numeric('result_multiplier', { precision: 8, scale: 4 }),
+  winnerId: uuid('winner_id').references(() => users.id),
+  prizeAmount: bigint('prize_amount', { mode: 'number' }),
+  seed: text('seed'),
+  seedHash: text('seed_hash'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+}, (table) => [
+  index('idx_candleflip_status').on(table.status),
+  index('idx_candleflip_creator').on(table.creatorId),
+]);
+
+// ─── Rug Game (Standard) ─────────────────────────────────────
+
+export const rugGames = pgTable('rug_games', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  betAmount: bigint('bet_amount', { mode: 'number' }).notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  status: text('status').notNull().default('active'), // 'active' | 'cashed_out' | 'rugged'
+  rugMultiplier: numeric('rug_multiplier', { precision: 8, scale: 4 }).notNull(), // the hidden crash point
+  cashOutMultiplier: numeric('cash_out_multiplier', { precision: 8, scale: 4 }),
+  payout: bigint('payout', { mode: 'number' }),
+  seed: text('seed'),
+  seedHash: text('seed_hash'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+}, (table) => [
+  index('idx_rug_games_user').on(table.userId),
+  index('idx_rug_games_status').on(table.status),
+]);
+

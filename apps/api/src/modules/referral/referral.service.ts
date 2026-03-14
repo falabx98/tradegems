@@ -3,6 +3,7 @@ import { nanoid } from 'nanoid';
 import { referralCodes, referrals, referralEarnings, users } from '@tradingarena/db';
 import { getDb } from '../../config/database.js';
 import { getRedis } from '../../config/redis.js';
+import { AppError } from '../../middleware/errorHandler.js';
 
 const REFERRAL_COMMISSION_RATE = 0.20; // 20% of platform fee goes to referrer
 
@@ -22,6 +23,28 @@ export class ReferralService {
     const code = nanoid(8).toUpperCase();
     await this.db.insert(referralCodes).values({ userId, code });
     return code;
+  }
+
+  // ─── Update referral code to a custom one ────────────────
+
+  async updateCode(userId: string, newCode: string): Promise<{ success: boolean; code: string }> {
+    // Ensure user has an existing code
+    await this.getOrCreateCode(userId);
+
+    // Check if the new code is already taken by someone else
+    const taken = await this.db.query.referralCodes.findFirst({
+      where: eq(referralCodes.code, newCode),
+    });
+    if (taken && taken.userId !== userId) {
+      throw new AppError(409, 'CODE_TAKEN', 'This referral code is already taken. Choose a different one.');
+    }
+
+    // Update the code
+    await this.db.update(referralCodes)
+      .set({ code: newCode })
+      .where(eq(referralCodes.userId, userId));
+
+    return { success: true, code: newCode };
   }
 
   // ─── Link referred user to referrer ───────────────────────

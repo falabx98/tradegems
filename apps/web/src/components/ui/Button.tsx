@@ -13,7 +13,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   primary: {
-    background: '#9945FF',
+    background: '#7717ff',
     color: '#fff',
     border: 'none',
     fontWeight: 600,
@@ -62,7 +62,7 @@ export function Button({
         alignItems: 'center',
         justifyContent: 'center',
         gap: '8px',
-        fontFamily: 'Rajdhani, sans-serif',
+        fontFamily: 'inherit',
         transition: 'all 0.15s ease',
         width: fullWidth ? '100%' : undefined,
         opacity: props.disabled ? 0.5 : 1,

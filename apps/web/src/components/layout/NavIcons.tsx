@@ -130,6 +130,12 @@ export function NavIcon({ name, size = 18, color = 'currentColor' }: NavIconProp
           <line x1="13" y1="15" x2="17" y2="15" />
         </svg>
       );
+    case 'diamond':
+      return (
+        <svg {...props}>
+          <path d="M6 3h12l4 6-10 13L2 9z" />
+        </svg>
+      );
     default:
       return null;
   }

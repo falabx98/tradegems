@@ -135,15 +135,17 @@ export async function chatRoutes(server: FastifyInstance) {
       return reply.status(400).send({ error: { code: 'SPAM_DETECTED', message: 'Please don\'t spam the same message.' } });
     }
 
-    // Get username, level, and avatar from DB
+    // Get username, level, role, and avatar from DB
     let username = 'Anonymous';
     let avatar: string | null = null;
     let level = 1;
+    let role = 'player';
     try {
       const dbUser = await db
         .select({
           username: users.username,
           level: users.level,
+          role: users.role,
         })
         .from(users)
         .where(eq(users.id, user.userId))
@@ -151,6 +153,7 @@ export async function chatRoutes(server: FastifyInstance) {
       if (dbUser) {
         username = dbUser.username;
         level = dbUser.level;
+        role = dbUser.role;
       }
 
       const profile = await db
@@ -163,10 +166,13 @@ export async function chatRoutes(server: FastifyInstance) {
       }
     } catch {}
 
+    // Superadmin messages appear as "Support"
+    const displayUsername = (role === 'superadmin' || role === 'admin') ? 'Support' : username;
+
     // Insert message with avatar and level
     const [msg] = await db.insert(chatMessages).values({
       userId: user.userId,
-      username,
+      username: displayUsername,
       message: body.message,
       channel: body.channel,
       avatar,

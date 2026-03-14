@@ -12,7 +12,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string(),
   REDIS_URL: z.string().default('redis://localhost:6379'),
   JWT_SECRET: z.string().min(32),
-  JWT_ACCESS_EXPIRY: z.string().default('15m'),
+  JWT_ACCESS_EXPIRY: z.string().default('1h'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
   PLATFORM_FEE_RATE: z.coerce.number().default(0.03),
   SOLANA_RPC_URL: z.string().default('https://api.devnet.solana.com'),
@@ -24,6 +24,7 @@ const envSchema = z.object({
   DEPOSIT_SWEEP_INTERVAL_MS: z.coerce.number().default(60_000), // 1 min
   DEPOSIT_MIN_SWEEP_LAMPORTS: z.coerce.number().default(5000), // min balance to trigger sweep
   CORS_ORIGINS: z.string().optional(),
+  ADMIN_SETUP_KEY: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

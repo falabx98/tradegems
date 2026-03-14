@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, or, ilike } from 'drizzle-orm';
 import * as argon2 from 'argon2';
 import { nanoid } from 'nanoid';
 import crypto from 'node:crypto';
@@ -15,7 +15,7 @@ interface RegisterInput {
 }
 
 interface LoginInput {
-  email: string;
+  email: string; // Can be email OR username
   password: string;
 }
 
@@ -83,12 +83,22 @@ export class AuthService {
   }
 
   async login(input: LoginInput): Promise<{ userId: string; role: string }> {
+    // Allow login by email OR username (case-insensitive)
+    const identifier = input.email.trim();
+    const isEmail = identifier.includes('@');
+
     const user = await this.db.query.users.findFirst({
-      where: eq(users.email, input.email),
+      where: isEmail
+        ? ilike(users.email, identifier)
+        : ilike(users.username, identifier),
     });
 
-    if (!user || !user.passwordHash) {
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+    if (!user) {
+      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email/username or password');
+    }
+
+    if (!user.passwordHash) {
+      throw new AppError(401, 'WALLET_ONLY', 'This account was created with a wallet. Please sign in using Phantom wallet, or set a password in Settings.');
     }
 
     if (user.status !== 'active') {
@@ -97,7 +107,7 @@ export class AuthService {
 
     const valid = await argon2.verify(user.passwordHash, input.password);
     if (!valid) {
-      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+      throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email/username or password');
     }
 
     return { userId: user.id, role: user.role };
@@ -162,6 +172,36 @@ export class AuthService {
     } catch {
       // Non-critical — auth middleware will check DB on cache miss
     }
+  }
+
+  // ─── Set password for wallet-only users ─────────────────
+
+  async setPassword(userId: string, data: { email?: string; password: string }) {
+    const user = await this.db.query.users.findFirst({
+      where: eq(users.id, userId),
+    });
+    if (!user) throw new AppError(404, 'NOT_FOUND', 'User not found');
+
+    // If providing email, check it's not taken
+    if (data.email) {
+      const emailTaken = await this.db.query.users.findFirst({
+        where: eq(users.email, data.email),
+      });
+      if (emailTaken && emailTaken.id !== userId) {
+        throw new AppError(409, 'EMAIL_TAKEN', 'Email already registered');
+      }
+    }
+
+    const passwordHash = await argon2.hash(data.password);
+
+    const updatePayload: Record<string, unknown> = { passwordHash };
+    if (data.email) updatePayload.email = data.email;
+
+    await this.db.update(users)
+      .set(updatePayload)
+      .where(eq(users.id, userId));
+
+    return { success: true };
   }
 
   // ─── Wallet Auth ─────────────────────────────────────────

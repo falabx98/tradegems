@@ -1,15 +1,160 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" prefix="og: https://ogp.me/ns#">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Primary SEO Meta Tags -->
+    <title>TradeGems | Solana PvP Trading Battle Arena - Play & Earn Crypto</title>
+    <meta name="title" content="TradeGems | Solana PvP Trading Battle Arena - Play & Earn Crypto" />
+    <meta name="description" content="TradeGems is the #1 Solana PvP trading battle arena. Compete in real-time crypto trading games, predict markets, join tournaments, and earn SOL rewards. Play now with your Phantom wallet." />
+    <meta name="keywords" content="Solana gaming, PvP trading, crypto battle arena, play to earn, Solana games, trading simulator, crypto tournaments, Phantom wallet games, SOL rewards, DeFi gaming, web3 gaming, blockchain gaming, crypto predictions, trading competition" />
+    <meta name="author" content="TradeGems" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="googlebot" content="index, follow" />
+    <link rel="canonical" href="https://tradegems.app/" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://tradegems.app/" />
+    <meta property="og:title" content="TradeGems | Solana PvP Trading Battle Arena" />
+    <meta property="og:description" content="Compete in real-time PvP trading battles on Solana. Predict markets, join tournaments, and earn SOL rewards. The ultimate crypto gaming arena." />
+    <meta property="og:image" content="https://tradegems.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="TradeGems - Solana PvP Trading Battle Arena" />
+    <meta property="og:site_name" content="TradeGems" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://tradegems.app/" />
+    <meta name="twitter:title" content="TradeGems | Solana PvP Trading Battle Arena" />
+    <meta name="twitter:description" content="Compete in real-time PvP trading battles on Solana. Predict markets, join tournaments, and earn SOL rewards." />
+    <meta name="twitter:image" content="https://tradegems.app/og-image.png" />
+    <meta name="twitter:image:alt" content="TradeGems - Solana PvP Trading Battle Arena" />
+
+    <!-- Favicon & Icons -->
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <title>TradeGems | Trading Battle Arena</title>
+    <link rel="apple-touch-icon" href="/logo.png" />
+    <meta name="theme-color" content="#0a0b0f" />
+    <meta name="msapplication-TileColor" content="#0a0b0f" />
+
+    <!-- PWA / Mobile -->
+    <meta name="application-name" content="TradeGems" />
+    <meta name="apple-mobile-web-app-title" content="TradeGems" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Structured Data: WebApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "TradeGems",
+      "url": "https://tradegems.app",
+      "description": "Solana PvP trading battle arena. Compete in real-time crypto trading games, predict markets, join tournaments, and earn SOL rewards.",
+      "applicationCategory": "GameApplication",
+      "operatingSystem": "Web",
+      "browserRequirements": "Requires JavaScript, Phantom Wallet",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "TradeGems",
+        "url": "https://tradegems.app"
+      },
+      "screenshot": "https://tradegems.app/og-image.png",
+      "featureList": [
+        "PvP Trading Battles",
+        "Market Predictions",
+        "Tournaments",
+        "SOL Rewards",
+        "Referral Program",
+        "Leaderboards"
+      ]
+    }
+    </script>
+
+    <!-- Structured Data: FAQPage (boosts search visibility) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is TradeGems?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "TradeGems is a Solana-based PvP trading battle arena where players compete in real-time trading games, predict crypto markets, and earn SOL rewards. Connect your Phantom wallet to start playing instantly."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I start playing on TradeGems?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Simply connect your Phantom wallet, deposit SOL, and choose a game mode: Solo rounds, PvP Tournaments, or Market Predictions. Each game has different buy-in tiers from 0.1 SOL to 2 SOL."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is TradeGems free to play?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "TradeGems is free to sign up and explore. Games require a SOL buy-in which goes into the prize pool. New players receive a welcome bonus to get started."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What blockchain does TradeGems use?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "TradeGems runs on the Solana blockchain, offering fast transactions and low fees. Players use SOL tokens for all in-game transactions and rewards."
+          }
+        }
+      ]
+    }
+    </script>
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://api-production-85a0.up.railway.app" crossorigin />
+    <link rel="dns-prefetch" href="https://api-production-85a0.up.railway.app" />
+
     <style>
       body { margin: 0; background: #0a0b0f; }
     </style>
   </head>
   <body>
+    <!-- Noscript fallback for crawlers -->
+    <noscript>
+      <div style="padding: 40px; text-align: center; color: #fff; background: #0a0b0f; min-height: 100vh;">
+        <h1>TradeGems - Solana PvP Trading Battle Arena</h1>
+        <p>TradeGems is the ultimate Solana PvP trading battle arena. Compete in real-time trading games, predict crypto markets, join tournaments, and earn SOL rewards.</p>
+        <h2>Game Modes</h2>
+        <ul style="list-style: none; padding: 0;">
+          <li><strong>Solo Rounds</strong> - Test your trading skills against the market</li>
+          <li><strong>PvP Tournaments</strong> - Battle other traders head-to-head</li>
+          <li><strong>Market Predictions</strong> - Predict if crypto prices go up or down</li>
+        </ul>
+        <h2>Features</h2>
+        <ul style="list-style: none; padding: 0;">
+          <li>Phantom Wallet Integration</li>
+          <li>Instant SOL Deposits & Withdrawals</li>
+          <li>Provably Fair Games</li>
+          <li>Leaderboards & Seasons</li>
+          <li>Referral Rewards Program</li>
+          <li>Daily Rewards</li>
+        </ul>
+        <p>Connect your Phantom wallet to start playing at <a href="https://tradegems.app" style="color: #f59e0b;">tradegems.app</a></p>
+      </div>
+    </noscript>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

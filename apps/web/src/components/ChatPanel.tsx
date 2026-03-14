@@ -18,7 +18,7 @@ interface ChatMessage {
 }
 
 // SVG Icons
-function ChatIcon({ size = 18, color = '#9945FF' }: { size?: number; color?: string }) {
+function ChatIcon({ size = 18, color = '#7717ff' }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -82,11 +82,11 @@ const emojiStyles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     fontSize: '12px',
     fontWeight: 700,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     letterSpacing: '0.5px',
     padding: '7px 4px',
-    background: 'rgba(153, 69, 255, 0.08)',
-    border: '1px solid rgba(153, 69, 255, 0.15)',
+    background: 'rgba(119, 23, 255, 0.08)',
+    border: '1px solid rgba(119, 23, 255, 0.15)',
     borderRadius: '6px',
     color: '#c084fc',
     cursor: 'pointer',
@@ -297,6 +297,7 @@ export function ChatPanel() {
 
           {messages.map((msg) => {
             const isOwn = msg.userId === userId;
+            const isSupport = msg.username === 'Support';
             const hasPhoto = isPhotoAvatar(msg.avatar);
             const gradient = getAvatarGradient(null, msg.username);
             const level = msg.level || (isOwn ? profile.level : 1);
@@ -306,11 +307,20 @@ export function ChatPanel() {
                 key={msg.id}
                 style={{
                   ...styles.messageItem,
-                  ...(isOwn ? styles.messageItemOwn : {}),
+                  ...(isOwn && !isSupport ? styles.messageItemOwn : {}),
+                  ...(isSupport ? { background: 'rgba(20, 184, 166, 0.08)', borderLeft: '3px solid #14b8a6' } : {}),
                 }}
               >
                 {/* Avatar */}
-                {hasPhoto ? (
+                {isSupport ? (
+                  <div style={{
+                    ...styles.avatar,
+                    background: 'linear-gradient(135deg, #14b8a6, #0d9488)',
+                    fontSize: '14px',
+                  }}>
+                    S
+                  </div>
+                ) : hasPhoto ? (
                   <img
                     src={msg.avatar!}
                     alt={msg.username}
@@ -332,11 +342,24 @@ export function ChatPanel() {
                   <div style={styles.messageHeader}>
                     <span style={{
                       ...styles.username,
-                      ...(isOwn ? { color: theme.accent.green } : {}),
+                      ...(isSupport ? { color: '#14b8a6' } : isOwn ? { color: theme.accent.green } : {}),
                     }}>
                       {msg.username}
                     </span>
-                    <span style={styles.levelBadge}>{level}</span>
+                    {isSupport ? (
+                      <span style={{
+                        fontFamily: "inherit",
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        color: '#fff',
+                        background: '#14b8a6',
+                        borderRadius: '4px',
+                        padding: '1px 6px',
+                        letterSpacing: '0.5px',
+                      }}>STAFF</span>
+                    ) : (
+                      <span style={styles.levelBadge}>{level}</span>
+                    )}
                     <span style={styles.timestamp}>{formatTimestamp(msg.createdAt)}</span>
                   </div>
                   <div style={styles.messageText}>{msg.message}</div>
@@ -365,33 +388,30 @@ export function ChatPanel() {
           <div style={styles.inputBar}>
             <button
               style={styles.emojiToggle}
-              onClick={() => setShowEmojis((v) => !v)}
-              title="Quick reactions"
+              onClick={() => setShowEmojis(!showEmojis)}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={showEmojis ? '#c084fc' : '#8888a0'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" />
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={showEmojis ? theme.accent.purple : theme.text.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+                <line x1="9" y1="9" x2="9.01" y2="9" />
+                <line x1="15" y1="9" x2="15.01" y2="9" />
               </svg>
             </button>
             <input
               ref={inputRef}
-              type="text"
+              style={styles.input}
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type message..."
+              placeholder="Type a message..."
               maxLength={200}
-              style={styles.input}
-              disabled={isSending}
             />
             <button
+              style={{ ...styles.sendBtn, opacity: newMessage.trim() ? 1 : 0.4 }}
               onClick={handleSend}
-              disabled={!newMessage.trim() || isSending}
-              style={{
-                ...styles.sendBtn,
-                opacity: !newMessage.trim() || isSending ? 0.4 : 1,
-              }}
+              disabled={isSending || !newMessage.trim()}
             >
-              <SendIcon size={18} />
+              <SendIcon size={16} />
             </button>
           </div>
         ) : (
@@ -447,7 +467,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '6px',
   },
   headerTitle: {
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     fontSize: '13px',
     fontWeight: 700,
     color: theme.text.primary,
@@ -494,14 +514,14 @@ const styles: Record<string, React.CSSProperties> = {
     opacity: 0.4,
   },
   emptyText: {
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '18px',
     fontWeight: 600,
     color: theme.text.secondary,
     margin: 0,
   },
   emptySubtext: {
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '15px',
     color: theme.text.muted,
     margin: 0,
@@ -510,11 +530,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: '10px',
     padding: '10px 14px',
-    borderBottom: `1px solid rgba(153, 69, 255, 0.06)`,
+    borderBottom: `1px solid rgba(119, 23, 255, 0.06)`,
     transition: 'background 0.15s',
   },
   messageItemOwn: {
-    background: 'rgba(153, 69, 255, 0.06)',
+    background: 'rgba(119, 23, 255, 0.06)',
   },
   avatar: {
     width: '36px',
@@ -523,7 +543,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     fontSize: '16px',
     fontWeight: 700,
     color: '#fff',
@@ -547,7 +567,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '2px',
   },
   username: {
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '16px',
     fontWeight: 700,
     color: theme.text.primary,
@@ -557,7 +577,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     fontWeight: 700,
     color: '#fff',
-    background: 'rgba(153, 69, 255, 0.5)',
+    background: 'rgba(119, 23, 255, 0.5)',
     borderRadius: '4px',
     padding: '1px 5px',
     lineHeight: '14px',
@@ -569,7 +589,7 @@ const styles: Record<string, React.CSSProperties> = {
     marginLeft: 'auto',
   },
   messageText: {
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '15px',
     fontWeight: 500,
     color: theme.text.secondary,
@@ -582,7 +602,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderTop: `1px solid rgba(248, 113, 113, 0.3)`,
     color: theme.danger,
     fontSize: '14px',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontWeight: 600,
     textAlign: 'center' as const,
     flexShrink: 0,
@@ -602,7 +622,7 @@ const styles: Record<string, React.CSSProperties> = {
     border: `1px solid ${theme.border.subtle}`,
     borderRadius: '20px',
     color: theme.text.primary,
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '16px',
     fontWeight: 500,
     outline: 'none',
@@ -631,7 +651,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 2px 8px rgba(153, 69, 255, 0.4)',
+    boxShadow: '0 2px 8px rgba(119, 23, 255, 0.4)',
     transition: 'opacity 0.2s',
     flexShrink: 0,
   },
@@ -639,7 +659,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '16px',
     textAlign: 'center' as const,
     color: theme.text.secondary,
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '16px',
     fontWeight: 600,
     borderTop: `1px solid ${theme.border.subtle}`,

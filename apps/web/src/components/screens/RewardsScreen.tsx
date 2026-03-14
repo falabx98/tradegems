@@ -14,6 +14,7 @@ interface Mission {
   target: number;
   reward: number;
   completed: boolean;
+  claimed: boolean;
 }
 
 interface Achievement {
@@ -80,6 +81,10 @@ export function RewardsScreen() {
     referredUsers: Array<{ username: string; joinedAt: string; totalWagered: number; yourEarnings: number }>;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [editingCode, setEditingCode] = useState(false);
+  const [customCode, setCustomCode] = useState('');
+  const [savingCode, setSavingCode] = useState(false);
+  const [codeMsg, setCodeMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -273,10 +278,10 @@ export function RewardsScreen() {
                         <div style={{
                           ...styles.progressFill,
                           width: `${Math.min((m.progress / m.target) * 100, 100)}%`,
-                          background: m.completed ? theme.success : '#9945FF',
+                          background: m.completed ? theme.success : '#7717ff',
                           boxShadow: m.completed
                             ? '0 0 8px rgba(52, 211, 153, 0.3)'
-                            : '0 0 8px rgba(153, 69, 255, 0.3)',
+                            : '0 0 8px rgba(119, 23, 255, 0.3)',
                         }} />
                       </div>
                       <div style={styles.progressLabel} className="mono">
@@ -289,7 +294,7 @@ export function RewardsScreen() {
                         <img src="/sol-coin.png" alt="SOL" style={{ width: 22, height: 22, marginRight: 4, verticalAlign: 'middle' }} />
                         {formatReward(m.reward)}
                       </span>
-                      {m.completed && (
+                      {m.completed && !m.claimed && (
                         <button
                           style={{
                             ...styles.claimBtn,
@@ -300,6 +305,9 @@ export function RewardsScreen() {
                         >
                           {claiming === m.id ? 'Claiming...' : 'Claim'}
                         </button>
+                      )}
+                      {m.completed && m.claimed && (
+                        <span style={{ fontSize: 13, color: '#34d399', fontWeight: 600 }}>Claimed ✓</span>
                       )}
                     </div>
                   </div>
@@ -427,19 +435,88 @@ export function RewardsScreen() {
                   {/* Referral Code Card */}
                   <div style={affStyles.codeCard} className="gradient-border">
                     <div style={{ fontSize: '13px', color: theme.text.muted }}>Your referral code</div>
-                    <div style={affStyles.codeRow}>
-                      <span className="mono" style={affStyles.code}>{referralStats.referralCode}</span>
-                      <button
-                        style={affStyles.copyBtn}
-                        onClick={() => {
-                          navigator.clipboard.writeText(referralStats.referralCode);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 2000);
-                        }}
-                      >
-                        {copied ? 'Copied!' : 'Copy'}
-                      </button>
-                    </div>
+                    {!editingCode ? (
+                      <>
+                        <div style={affStyles.codeRow}>
+                          <span className="mono" style={affStyles.code}>{referralStats.referralCode}</span>
+                          <button
+                            style={affStyles.copyBtn}
+                            onClick={() => {
+                              navigator.clipboard.writeText(referralStats.referralCode);
+                              setCopied(true);
+                              setTimeout(() => setCopied(false), 2000);
+                            }}
+                          >
+                            {copied ? 'Copied!' : 'Copy'}
+                          </button>
+                          <button
+                            style={{ ...affStyles.copyBtn, background: 'rgba(119, 23, 255, 0.15)', color: '#c084fc', border: '1px solid rgba(119, 23, 255, 0.3)' }}
+                            onClick={() => { setEditingCode(true); setCustomCode(referralStats.referralCode); setCodeMsg(null); }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '6px' }}>
+                          <input
+                            type="text"
+                            value={customCode}
+                            onChange={(e) => setCustomCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))}
+                            maxLength={20}
+                            placeholder="Your custom code"
+                            style={{
+                              flex: 1,
+                              padding: '8px 12px',
+                              background: 'rgba(15, 10, 25, 0.6)',
+                              border: '1px solid rgba(119, 23, 255, 0.3)',
+                              borderRadius: '8px',
+                              color: '#fff',
+                              fontSize: '16px',
+                              fontFamily: 'monospace',
+                              fontWeight: 700,
+                              letterSpacing: '2px',
+                              outline: 'none',
+                            }}
+                          />
+                          <button
+                            style={{ ...affStyles.copyBtn, background: 'rgba(20, 241, 149, 0.15)', color: '#14F195', border: '1px solid rgba(20, 241, 149, 0.3)' }}
+                            disabled={savingCode || customCode.length < 3}
+                            onClick={async () => {
+                              setSavingCode(true);
+                              setCodeMsg(null);
+                              try {
+                                const res = await api.updateReferralCode(customCode);
+                                setReferralStats({ ...referralStats, referralCode: res.code });
+                                setEditingCode(false);
+                                setCodeMsg({ type: 'success', text: 'Referral code updated!' });
+                              } catch (err: any) {
+                                setCodeMsg({ type: 'error', text: err?.message || 'Failed to update code' });
+                              } finally {
+                                setSavingCode(false);
+                              }
+                            }}
+                          >
+                            {savingCode ? '...' : 'Save'}
+                          </button>
+                          <button
+                            style={{ ...affStyles.copyBtn, background: 'rgba(248, 113, 113, 0.1)', color: '#f87171', border: '1px solid rgba(248, 113, 113, 0.2)' }}
+                            onClick={() => { setEditingCode(false); setCodeMsg(null); }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <div style={{ fontSize: '11px', color: theme.text.muted, marginTop: '4px' }}>
+                          3-20 characters. Letters, numbers, hyphens and underscores only.
+                        </div>
+                      </>
+                    )}
+                    {codeMsg && (
+                      <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '6px', color: codeMsg.type === 'success' ? '#14F195' : '#f87171' }}>
+                        {codeMsg.text}
+                      </div>
+                    )}
                     <div style={{ fontSize: '12px', color: theme.text.muted, marginTop: '4px' }}>
                       Share this code — you earn 20% of platform fees from your referrals' bets
                     </div>
@@ -723,8 +800,8 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '12px',
     padding: '16px',
-    height: '100%',
-    overflow: 'hidden',
+    minHeight: '100%',
+    boxSizing: 'border-box',
   },
   tabBar: {
     display: 'flex',
@@ -746,22 +823,22 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     transition: 'all 0.15s',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
   },
   tabActive: {
-    background: 'rgba(153, 69, 255, 0.15)',
+    background: 'rgba(119, 23, 255, 0.15)',
     border: 'none',
     color: '#c084fc',
-    boxShadow: '0 0 12px rgba(153, 69, 255, 0.3)',
+    boxShadow: '0 0 12px rgba(119, 23, 255, 0.3)',
   },
   panel: {
     background: 'rgba(28, 20, 42, 0.85)',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(153, 69, 255, 0.18)',
+    border: '1px solid rgba(119, 23, 255, 0.18)',
     borderRadius: '14px',
     overflow: 'hidden',
     flex: 1,
@@ -774,7 +851,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 14px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
     background: 'rgba(32, 24, 48, 0.95)',
   },
   panelTitle: {
@@ -782,7 +859,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: theme.text.secondary,
     flex: 1,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
@@ -809,7 +886,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     padding: '14px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.06)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
     gap: '16px',
     transition: 'background-color 0.15s ease',
   },
@@ -881,7 +958,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.3px',
     boxShadow: '0 3px 0 #0ec47a, 0 4px 8px rgba(20, 241, 149, 0.3)',
@@ -894,7 +971,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '12px',
     padding: '12px 14px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.06)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
     transition: 'background-color 0.15s ease',
   },
   achieveIcon: {
@@ -959,7 +1036,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '24px',
     background: 'rgba(28, 20, 42, 0.85)',
     backdropFilter: 'blur(16px)',
-    border: '1px solid rgba(153, 69, 255, 0.15)',
+    border: '1px solid rgba(119, 23, 255, 0.15)',
     borderRadius: '14px',
     boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
     position: 'relative',
@@ -990,7 +1067,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '6px',
     marginTop: '16px',
     paddingTop: '16px',
-    borderTop: '1px solid rgba(153, 69, 255, 0.18)',
+    borderTop: '1px solid rgba(119, 23, 255, 0.18)',
     width: '100%',
   },
   claimableLabel: {
@@ -1013,7 +1090,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
     boxShadow: '0 4px 0 #0ec47a, 0 6px 12px rgba(20, 241, 149, 0.3)',
@@ -1048,9 +1125,9 @@ const styles: Record<string, React.CSSProperties> = {
     border: '1px solid transparent',
   },
   tierRowActive: {
-    border: '1px solid rgba(153, 69, 255, 0.2)',
-    boxShadow: '0 0 8px rgba(153, 69, 255, 0.15)',
-    background: 'rgba(153, 69, 255, 0.08)',
+    border: '1px solid rgba(119, 23, 255, 0.2)',
+    boxShadow: '0 0 8px rgba(119, 23, 255, 0.15)',
+    background: 'rgba(119, 23, 255, 0.08)',
   },
 };
 
@@ -1112,9 +1189,9 @@ const dbStyles: Record<string, React.CSSProperties> = {
   nextTierBox: {
     marginTop: '12px',
     padding: '12px',
-    background: 'rgba(153, 69, 255, 0.06)',
+    background: 'rgba(119, 23, 255, 0.06)',
     borderRadius: '8px',
-    border: '1px solid rgba(153, 69, 255, 0.12)',
+    border: '1px solid rgba(119, 23, 255, 0.12)',
   },
   historyRow: {
     display: 'flex',
@@ -1138,7 +1215,7 @@ const affStyles: Record<string, React.CSSProperties> = {
     padding: '20px',
     background: 'rgba(28, 20, 42, 0.85)',
     borderRadius: '14px',
-    border: '1px solid rgba(153, 69, 255, 0.15)',
+    border: '1px solid rgba(119, 23, 255, 0.15)',
     boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   },
   codeRow: {
@@ -1155,8 +1232,8 @@ const affStyles: Record<string, React.CSSProperties> = {
   },
   copyBtn: {
     padding: '6px 14px',
-    background: 'rgba(153, 69, 255, 0.1)',
-    border: '1px solid rgba(153, 69, 255, 0.25)',
+    background: 'rgba(119, 23, 255, 0.1)',
+    border: '1px solid rgba(119, 23, 255, 0.25)',
     borderRadius: '8px',
     color: '#c084fc',
     fontSize: '13px',
@@ -1179,7 +1256,7 @@ const affStyles: Record<string, React.CSSProperties> = {
     padding: '14px 8px',
     background: 'rgba(28, 20, 42, 0.6)',
     borderRadius: '10px',
-    border: '1px solid rgba(153, 69, 255, 0.08)',
+    border: '1px solid rgba(119, 23, 255, 0.08)',
   },
   statLabel: {
     fontSize: '12px',

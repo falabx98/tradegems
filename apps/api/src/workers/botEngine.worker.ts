@@ -1,7 +1,9 @@
+import crypto from 'node:crypto';
 import { getDb } from '../config/database.js';
-import { users, userProfiles, chatMessages, activityFeedItems, rounds, bets, betResults, predictionRounds } from '@tradingarena/db';
-import { eq, sql } from 'drizzle-orm';
+import { users, userProfiles, chatMessages, activityFeedItems, rounds, bets, betResults, predictionRounds, candleflipGames, rugGames, tradingSimRooms, tradingSimParticipants } from '@tradingarena/db';
+import { eq, sql, and, inArray } from 'drizzle-orm';
 import { trackOnline } from '../routes/chat.routes.js';
+import { generateSimulatedChart } from '../utils/chartGenerator.js';
 
 // ─── Types ──────────────────────────────────────────────────
 interface BotUser {
@@ -12,21 +14,63 @@ interface BotUser {
   avatarUrl: string | null;
 }
 
+interface PendingRugGame {
+  gameId: string;
+  bot: BotUser;
+  betAmount: number;
+  rugMultiplier: number;
+  seed: string;
+  resolveAt: number; // timestamp ms
+}
+
+interface PendingCandleflip {
+  gameId: string;
+  bot1: BotUser;
+  bot2: BotUser;
+  betAmount: number;
+  creatorPick: 'bullish' | 'bearish';
+  seed: string;
+  joinAt: number; // timestamp ms
+}
+
+interface PendingSimJoin {
+  roomId: string;
+  botId: string;
+  joinAt: number; // timestamp ms
+}
+
+interface PendingSimRoom {
+  roomId: string;
+  createdAt: number;
+  autoStartAt: number; // auto-start if no real players after this time
+}
+
 // ─── State ──────────────────────────────────────────────────
 let botUsers: BotUser[] = [];
 let engineTimer: ReturnType<typeof setInterval> | null = null;
+
+// Pending lifecycle arrays
+const pendingRugGames: PendingRugGame[] = [];
+const pendingCandleflips: PendingCandleflip[] = [];
+const pendingSimJoins: PendingSimJoin[] = [];
+const pendingSimRooms: PendingSimRoom[] = [];
 
 // Last-run timestamps
 let lastSoloPlayAt = 0;
 let lastChatAt = 0;
 let lastPredictionAt = 0;
 let lastOnlineTrackAt = 0;
+let lastCandleflipAt = 0;
+let lastRugGameAt = 0;
+let lastSimMaintenanceAt = 0;
 
 // Randomized cooldowns (ms)
 let soloCooldown = randomBetween(5000, 15000);
 let chatCooldown = randomBetween(10000, 30000);
 let predictionCooldown = randomBetween(15000, 45000);
 const onlineCooldown = 60000;
+let candleflipCooldown = randomBetween(15000, 30000);
+let rugGameCooldown = randomBetween(10000, 20000);
 
 // ─── Chat Messages Pool (120+ messages) ─────────────────────
 
@@ -215,7 +259,7 @@ function generateMultiplier(): number {
   return randomFloat(8.0, 15.0);
 }
 
-// ─── Simulation Functions ───────────────────────────────────
+// ─── Solo Play (unchanged — instant) ─────────────────────────
 
 async function simulateSoloPlay(bot: BotUser): Promise<void> {
   try {
@@ -380,12 +424,422 @@ async function simulatePrediction(bot: BotUser): Promise<void> {
   }
 }
 
+// ─── Rug Game — Phase 1: Create Active Game ──────────────────
+
+async function createActiveRugGame(bot: BotUser): Promise<void> {
+  try {
+    const db = getDb();
+    const gameId = crypto.randomUUID();
+    const betAmounts = [10_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000, 1_000_000_000];
+    const betAmount = pickRandom(betAmounts);
+
+    // Provably fair seed
+    const seed = crypto.randomBytes(32).toString('hex');
+    const seedHash = crypto.createHash('sha256').update(seed).digest('hex');
+
+    // Generate crash point (same algorithm as service)
+    const hash = crypto.createHash('sha256')
+      .update(seed + ':' + gameId)
+      .digest('hex');
+    const h = parseInt(hash.slice(0, 13), 16);
+    let rugMultiplier: number;
+    if (h % 25 === 0) {
+      rugMultiplier = 1.00;
+    } else {
+      const e = Math.pow(2, 52);
+      const raw = e / (e - (h % e));
+      rugMultiplier = Math.min(parseFloat((Math.max(1.00, raw * 0.96)).toFixed(2)), 100.00);
+    }
+
+    const now = new Date();
+
+    // Insert as ACTIVE game (not finished yet)
+    await db.insert(rugGames).values({
+      id: gameId,
+      userId: bot.id,
+      betAmount,
+      status: 'active',
+      rugMultiplier: rugMultiplier.toFixed(4),
+      cashOutMultiplier: null,
+      payout: 0,
+      seed,
+      seedHash,
+      createdAt: now,
+      resolvedAt: null,
+    });
+
+    // Schedule resolution in 8-15 seconds
+    pendingRugGames.push({
+      gameId,
+      bot,
+      betAmount,
+      rugMultiplier,
+      seed,
+      resolveAt: Date.now() + randomBetween(8000, 15000),
+    });
+
+    console.log(`[BotEngine] Rug game ${gameId} created (active) for ${bot.username}, crashes at ${rugMultiplier.toFixed(2)}x`);
+  } catch (err) {
+    console.error(`[BotEngine] Rug game create error for ${bot.username}:`, err);
+  }
+}
+
+// ─── Rug Game — Phase 2: Resolve Pending Games ──────────────
+
+async function resolvePendingRugGames(): Promise<void> {
+  const now = Date.now();
+  const toResolve = pendingRugGames.filter(g => now >= g.resolveAt);
+
+  for (const pending of toResolve) {
+    try {
+      const db = getDb();
+      const { gameId, bot, betAmount, rugMultiplier } = pending;
+
+      // Bot decides whether to cash out or get rugged
+      const cashOutChance = 0.4 + (bot.level / 100) * 0.3;
+      const didCashOut = Math.random() < cashOutChance && rugMultiplier > 1.05;
+
+      let status: string;
+      let cashOutMultiplier: string | null = null;
+      let payout: number = 0;
+
+      if (didCashOut) {
+        const maxCashOut = Math.min(rugMultiplier * 0.95, rugMultiplier - 0.01);
+        const cashOut = 1.01 + Math.random() * (maxCashOut - 1.01);
+        cashOutMultiplier = cashOut.toFixed(4);
+        const fee = Math.floor(betAmount * 0.04);
+        payout = Math.max(0, Math.floor(betAmount * cashOut) - fee);
+        status = 'cashed_out';
+      } else {
+        status = 'rugged';
+      }
+
+      // Update game to resolved
+      await db.update(rugGames)
+        .set({
+          status,
+          cashOutMultiplier,
+          payout,
+          resolvedAt: new Date(),
+        })
+        .where(eq(rugGames.id, gameId));
+
+      // Activity feed
+      await db.insert(activityFeedItems).values({
+        feedType: 'rug_game_result',
+        userId: bot.id,
+        payload: {
+          username: bot.username,
+          level: bot.level,
+          vipTier: bot.vipTier,
+          betAmount,
+          status,
+          rugMultiplier,
+          cashOutMultiplier: cashOutMultiplier ? parseFloat(cashOutMultiplier) : null,
+          payout,
+          isWin: status === 'cashed_out',
+        },
+      });
+
+      console.log(`[BotEngine] Rug game ${gameId} resolved: ${status} (${bot.username})`);
+    } catch (err) {
+      console.error(`[BotEngine] Rug game resolve error:`, err);
+    }
+
+    // Remove from pending
+    const idx = pendingRugGames.indexOf(pending);
+    if (idx >= 0) pendingRugGames.splice(idx, 1);
+  }
+}
+
+// ─── Candleflip — Phase 1: Create Open Lobby ────────────────
+
+async function createCandleflipLobby(bot1: BotUser, bot2: BotUser): Promise<void> {
+  try {
+    const db = getDb();
+    const gameId = crypto.randomUUID();
+    const betAmounts = [10_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000];
+    const betAmount = pickRandom(betAmounts);
+    const creatorPick = Math.random() > 0.5 ? 'bullish' : 'bearish';
+
+    // Provably fair seed
+    const seed = crypto.randomBytes(32).toString('hex');
+    const seedHash = crypto.createHash('sha256').update(seed).digest('hex');
+
+    const now = new Date();
+
+    // Insert as OPEN lobby
+    await db.insert(candleflipGames).values({
+      id: gameId,
+      creatorId: bot1.id,
+      opponentId: null,
+      betAmount,
+      creatorPick,
+      status: 'open',
+      seed,
+      seedHash,
+      createdAt: now,
+    });
+
+    // Schedule bot2 join in 5-15 seconds
+    pendingCandleflips.push({
+      gameId,
+      bot1,
+      bot2,
+      betAmount,
+      creatorPick,
+      seed,
+      joinAt: Date.now() + randomBetween(5000, 15000),
+    });
+
+    console.log(`[BotEngine] Candleflip lobby ${gameId} created by ${bot1.username}, ${bot2.username} joins in ~10s`);
+  } catch (err) {
+    console.error(`[BotEngine] Candleflip lobby create error:`, err);
+  }
+}
+
+// ─── Candleflip — Phase 2: Bot2 Joins Pending Lobbies ────────
+
+async function resolvePendingCandleflips(): Promise<void> {
+  const now = Date.now();
+  const toJoin = pendingCandleflips.filter(g => now >= g.joinAt);
+
+  for (const pending of toJoin) {
+    try {
+      const db = getDb();
+      const { gameId, bot1, bot2, betAmount, creatorPick, seed } = pending;
+
+      // Check if game is still open (a real player may have joined)
+      const game = await db.query.candleflipGames.findFirst({
+        where: eq(candleflipGames.id, gameId),
+      });
+
+      if (!game || game.status !== 'open') {
+        console.log(`[BotEngine] Candleflip ${gameId} already joined by real player, skipping`);
+      } else {
+        // Generate result
+        const resultHash = crypto.createHash('sha256')
+          .update(seed + ':' + gameId)
+          .digest('hex');
+        const resultValue = parseInt(resultHash.slice(0, 8), 16);
+        const multiplier = 0.50 + (resultValue / 0xFFFFFFFF);
+        const result = multiplier >= 1.0 ? 'bullish' : 'bearish';
+
+        const winnerId = creatorPick === result ? bot1.id : bot2.id;
+        const totalPool = betAmount * 2;
+        const houseFee = Math.floor(totalPool * 0.05);
+        const prizeAmount = totalPool - houseFee;
+
+        // Update game: bot2 joins and resolve
+        await db.update(candleflipGames)
+          .set({
+            opponentId: bot2.id,
+            status: 'finished',
+            result,
+            resultMultiplier: multiplier.toFixed(4),
+            winnerId,
+            prizeAmount,
+            resolvedAt: new Date(),
+          })
+          .where(eq(candleflipGames.id, gameId));
+
+        // Activity feed
+        const winnerBot = winnerId === bot1.id ? bot1 : bot2;
+        await db.insert(activityFeedItems).values({
+          feedType: 'candleflip_result',
+          userId: winnerId,
+          payload: {
+            username: winnerBot.username,
+            level: winnerBot.level,
+            vipTier: winnerBot.vipTier,
+            betAmount,
+            result,
+            prizeAmount,
+            isWin: true,
+          },
+        });
+
+        console.log(`[BotEngine] Candleflip ${gameId} resolved: ${result} (winner: ${winnerBot.username})`);
+      }
+    } catch (err) {
+      console.error(`[BotEngine] Candleflip resolve error:`, err);
+    }
+
+    // Remove from pending
+    const idx = pendingCandleflips.indexOf(pending);
+    if (idx >= 0) pendingCandleflips.splice(idx, 1);
+  }
+}
+
+// ─── Trading Sim — Room Maintenance ──────────────────────────
+
+const MIN_WAITING_ROOMS = 3;
+const SIM_ENTRY_FEES = [100_000_000, 250_000_000, 500_000_000]; // 0.1, 0.25, 0.5 SOL
+
+async function maintainTradingSimRooms(): Promise<void> {
+  try {
+    const db = getDb();
+
+    // Count current waiting rooms
+    const waitingRooms = await db
+      .select({ id: tradingSimRooms.id, currentPlayers: tradingSimRooms.currentPlayers, createdAt: tradingSimRooms.createdAt })
+      .from(tradingSimRooms)
+      .where(eq(tradingSimRooms.status, 'waiting'));
+
+    const needed = MIN_WAITING_ROOMS - waitingRooms.length;
+
+    // Create new bot rooms if needed
+    for (let i = 0; i < needed; i++) {
+      const bot = pickRandom(botUsers);
+      const entryFee = pickRandom(SIM_ENTRY_FEES);
+      const roomId = crypto.randomUUID();
+      const maxPlayers = pickRandom([2, 3, 4]);
+
+      await db.insert(tradingSimRooms).values({
+        id: roomId,
+        entryFee,
+        maxPlayers,
+        currentPlayers: 1,
+        status: 'waiting',
+        prizePool: entryFee,
+        duration: 60,
+      });
+
+      // Add bot as first participant
+      await db.insert(tradingSimParticipants).values({
+        roomId,
+        userId: bot.id,
+        startBalance: 10_000,
+      });
+
+      // Schedule additional bot joins (staggered)
+      const botJoinCount = randomBetween(1, maxPlayers - 1);
+      const joinBots = pickRandomN(botUsers.filter(b => b.id !== bot.id), botJoinCount);
+      for (let j = 0; j < joinBots.length; j++) {
+        pendingSimJoins.push({
+          roomId,
+          botId: joinBots[j].id,
+          joinAt: Date.now() + randomBetween(15000 + j * 10000, 45000 + j * 15000),
+        });
+      }
+
+      // Track for auto-start
+      pendingSimRooms.push({
+        roomId,
+        createdAt: Date.now(),
+        autoStartAt: Date.now() + randomBetween(60000, 90000),
+      });
+
+      console.log(`[BotEngine] Trading sim room ${roomId} created (${(entryFee / 1e9).toFixed(2)} SOL, max ${maxPlayers}p)`);
+    }
+  } catch (err) {
+    console.error(`[BotEngine] Trading sim maintenance error:`, err);
+  }
+}
+
+async function processPendingSimJoins(): Promise<void> {
+  const now = Date.now();
+  const toJoin = pendingSimJoins.filter(j => now >= j.joinAt);
+
+  for (const pending of toJoin) {
+    try {
+      const db = getDb();
+      const { roomId, botId } = pending;
+
+      // Check room is still waiting and not full
+      const room = await db.query.tradingSimRooms.findFirst({
+        where: eq(tradingSimRooms.id, roomId),
+      });
+
+      if (!room || room.status !== 'waiting' || room.currentPlayers >= room.maxPlayers) {
+        // Room already started or full, skip
+      } else {
+        // Check if bot already joined
+        const existing = await db.query.tradingSimParticipants.findFirst({
+          where: and(
+            eq(tradingSimParticipants.roomId, roomId),
+            eq(tradingSimParticipants.userId, botId),
+          ),
+        });
+
+        if (!existing) {
+          await db.insert(tradingSimParticipants).values({
+            roomId,
+            userId: botId,
+            startBalance: 10_000,
+          });
+
+          await db.update(tradingSimRooms)
+            .set({
+              currentPlayers: sql`${tradingSimRooms.currentPlayers} + 1`,
+              prizePool: sql`${tradingSimRooms.prizePool} + ${room.entryFee}`,
+            })
+            .where(eq(tradingSimRooms.id, roomId));
+
+          console.log(`[BotEngine] Bot joined trading sim room ${roomId}`);
+        }
+      }
+    } catch (err) {
+      console.error(`[BotEngine] Trading sim join error:`, err);
+    }
+
+    // Remove from pending
+    const idx = pendingSimJoins.indexOf(pending);
+    if (idx >= 0) pendingSimJoins.splice(idx, 1);
+  }
+}
+
+async function autoStartPendingSimRooms(): Promise<void> {
+  const now = Date.now();
+  const toStart = pendingSimRooms.filter(r => now >= r.autoStartAt);
+
+  for (const pending of toStart) {
+    try {
+      const db = getDb();
+      const { roomId } = pending;
+
+      const room = await db.query.tradingSimRooms.findFirst({
+        where: eq(tradingSimRooms.id, roomId),
+      });
+
+      if (room && room.status === 'waiting' && room.currentPlayers >= 2) {
+        // Auto-start: generate chart and set active
+        const chartData = generateSimulatedChart(room.duration, 1);
+
+        await db.update(tradingSimRooms)
+          .set({
+            status: 'active',
+            chartData,
+            startedAt: new Date(),
+          })
+          .where(eq(tradingSimRooms.id, roomId));
+
+        console.log(`[BotEngine] Trading sim room ${roomId} auto-started (${room.currentPlayers} players)`);
+      }
+    } catch (err) {
+      console.error(`[BotEngine] Trading sim auto-start error:`, err);
+    }
+
+    // Remove from pending
+    const idx = pendingSimRooms.indexOf(pending);
+    if (idx >= 0) pendingSimRooms.splice(idx, 1);
+  }
+}
+
 // ─── Main Engine Tick ───────────────────────────────────────
 
 async function engineTick(): Promise<void> {
   if (botUsers.length === 0) return;
 
   const now = Date.now();
+
+  // ── Resolve pending games first ──
+  await resolvePendingRugGames();
+  await resolvePendingCandleflips();
+  await processPendingSimJoins();
+  await autoStartPendingSimRooms();
+
+  // ── Create new games on cooldown ──
 
   // Solo plays (cooldown 5-15s)
   if (now - lastSoloPlayAt >= soloCooldown) {
@@ -399,15 +853,6 @@ async function engineTick(): Promise<void> {
     }
   }
 
-  // Chat messages (cooldown 10-30s)
-  if (now - lastChatAt >= chatCooldown) {
-    lastChatAt = now;
-    chatCooldown = randomBetween(10000, 30000);
-
-    const bot = pickRandom(botUsers);
-    simulateChatMessage(bot).catch(() => {});
-  }
-
   // Predictions (cooldown 15-45s)
   if (now - lastPredictionAt >= predictionCooldown) {
     lastPredictionAt = now;
@@ -415,6 +860,35 @@ async function engineTick(): Promise<void> {
 
     const bot = pickRandom(botUsers);
     simulatePrediction(bot).catch(() => {});
+  }
+
+  // Candleflip lobbies (cooldown 15-30s) — creates OPEN lobby, resolved later
+  if (now - lastCandleflipAt >= candleflipCooldown) {
+    lastCandleflipAt = now;
+    candleflipCooldown = randomBetween(15000, 30000);
+
+    const [bot1, bot2] = pickRandomN(botUsers, 2);
+    if (bot1 && bot2) {
+      createCandleflipLobby(bot1, bot2).catch(() => {});
+    }
+  }
+
+  // Rug Game (cooldown 10-20s) — creates ACTIVE game, resolved later
+  if (now - lastRugGameAt >= rugGameCooldown) {
+    lastRugGameAt = now;
+    rugGameCooldown = randomBetween(10000, 20000);
+
+    const count = randomBetween(1, 2);
+    const selectedBots = pickRandomN(botUsers, count);
+    for (const bot of selectedBots) {
+      createActiveRugGame(bot).catch(() => {});
+    }
+  }
+
+  // Trading Sim room maintenance (every 30s)
+  if (now - lastSimMaintenanceAt >= 30000) {
+    lastSimMaintenanceAt = now;
+    maintainTradingSimRooms().catch(() => {});
   }
 
   // Online presence tracking (cooldown 60s)
@@ -426,6 +900,49 @@ async function engineTick(): Promise<void> {
     for (const bot of onlineBots) {
       trackOnline(bot.id);
     }
+  }
+}
+
+// ─── Startup Recovery ───────────────────────────────────────
+
+async function recoverOrphanedBotGames(): Promise<void> {
+  if (botUsers.length === 0) return;
+  const db = getDb();
+  const botIds = botUsers.map(b => b.id);
+  const thirtySecsAgo = new Date(Date.now() - 30_000);
+
+  try {
+    // Resolve orphaned active rug games
+    const orphanedRug = await db
+      .update(rugGames)
+      .set({ status: 'rugged', resolvedAt: new Date() })
+      .where(and(
+        eq(rugGames.status, 'active'),
+        inArray(rugGames.userId, botIds),
+        sql`${rugGames.createdAt} < ${thirtySecsAgo}`,
+      ))
+      .returning({ id: rugGames.id });
+
+    if (orphanedRug.length > 0) {
+      console.log(`[BotEngine] Recovered ${orphanedRug.length} orphaned rug games`);
+    }
+
+    // Cancel orphaned open candleflip lobbies
+    const orphanedFlip = await db
+      .update(candleflipGames)
+      .set({ status: 'cancelled' })
+      .where(and(
+        eq(candleflipGames.status, 'open'),
+        inArray(candleflipGames.creatorId, botIds),
+        sql`${candleflipGames.createdAt} < ${thirtySecsAgo}`,
+      ))
+      .returning({ id: candleflipGames.id });
+
+    if (orphanedFlip.length > 0) {
+      console.log(`[BotEngine] Cancelled ${orphanedFlip.length} orphaned candleflip lobbies`);
+    }
+  } catch (err) {
+    console.error('[BotEngine] Recovery error:', err);
   }
 }
 
@@ -472,12 +989,18 @@ export async function startBotEngine(): Promise<void> {
     return;
   }
 
+  // Recover orphaned bot games from previous run
+  await recoverOrphanedBotGames();
+
   // Initialize timestamps
   const now = Date.now();
   lastSoloPlayAt = now;
   lastChatAt = now;
   lastPredictionAt = now;
   lastOnlineTrackAt = now;
+  lastCandleflipAt = now;
+  lastRugGameAt = now;
+  lastSimMaintenanceAt = 0; // Run immediately on first tick
 
   // Track initial online bots immediately
   const initialOnline = pickRandomN(botUsers, randomBetween(15, 40));
@@ -492,7 +1015,26 @@ export async function startBotEngine(): Promise<void> {
     });
   }, 5000);
 
-  console.log('[BotEngine] Bot engine started successfully');
+  // Cleanup stale rounds every 60 seconds (cancel entry_open rounds older than 10 min with no bets)
+  setInterval(async () => {
+    try {
+      const { getDb } = await import('../config/database.js');
+      const { sql } = await import('drizzle-orm');
+      const cleanupDb = getDb();
+      const result = await cleanupDb.execute(sql`
+        UPDATE rounds SET status = 'cancelled'
+        WHERE status = 'entry_open'
+        AND created_at < NOW() - INTERVAL '10 minutes'
+        AND id NOT IN (SELECT DISTINCT round_id FROM bets)
+      `);
+      const count = (result as any)?.rowCount || 0;
+      if (count > 0) console.log(`[BotEngine] Cleaned up ${count} stale rounds`);
+    } catch (err) {
+      console.error('[BotEngine] Stale round cleanup error:', err);
+    }
+  }, 60_000);
+
+  console.log('[BotEngine] Bot engine started successfully (lifecycle mode)');
 }
 
 export function stopBotEngine(): void {

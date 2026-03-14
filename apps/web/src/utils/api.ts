@@ -1,22 +1,44 @@
 // ─── API Client ──────────────────────────────────────────────────────────────
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+export const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 let accessToken: string | null = null;
 let refreshPromise: Promise<void> | null = null;
+let _refreshTimer: ReturnType<typeof setTimeout> | null = null;
+let _onSessionExpired: (() => void) | null = null;
+
+export function setSessionExpiredCallback(cb: () => void) {
+  _onSessionExpired = cb;
+}
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
   if (token) {
     localStorage.setItem('accessToken', token);
+    // Schedule proactive refresh 5 min before expiry (token lasts 1h)
+    scheduleTokenRefresh();
   } else {
     localStorage.removeItem('accessToken');
+    if (_refreshTimer) { clearTimeout(_refreshTimer); _refreshTimer = null; }
   }
+}
+
+function scheduleTokenRefresh() {
+  if (_refreshTimer) clearTimeout(_refreshTimer);
+  // Refresh 5 minutes before the 1-hour expiry = 55 min
+  _refreshTimer = setTimeout(async () => {
+    try {
+      await refreshToken();
+    } catch {
+      // Will be caught on next API call
+    }
+  }, 55 * 60 * 1000);
 }
 
 export function getAccessToken(): string | null {
   if (!accessToken) {
     accessToken = localStorage.getItem('accessToken');
+    if (accessToken) scheduleTokenRefresh();
   }
   return accessToken;
 }
@@ -86,7 +108,9 @@ export async function apiFetch<T = unknown>(
         credentials: 'include',
       });
     } catch {
-      // Refresh failed, redirect to login
+      // Refresh failed — force logout and clear token
+      setAccessToken(null);
+      _onSessionExpired?.();
       throw new ApiError(401, 'SESSION_EXPIRED', 'Session expired');
     }
   }
@@ -118,7 +142,7 @@ export async function getServerConfig() {
     _configFetchedAt = now;
     return data;
   } catch {
-    return _serverConfig ?? { feeRate: 0.05, minBetLamports: 1_000_000, maxBetLamports: 10_000_000_000 };
+    return _serverConfig ?? { feeRate: 0.03, minBetLamports: 1_000_000, maxBetLamports: 10_000_000_000 };
   }
 }
 
@@ -140,6 +164,20 @@ export const api = {
 
   logout: () =>
     apiFetch('/v1/auth/logout', { method: 'POST' }),
+
+  // Auth - Set Password
+  setPassword: (data: { email?: string; password: string }) =>
+    apiFetch<{ success: boolean }>('/v1/auth/set-password', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  // Referral - Update Code
+  updateReferralCode: (code: string) =>
+    apiFetch<{ success: boolean; code: string }>('/v1/referrals/code', {
+      method: 'PATCH',
+      body: JSON.stringify({ code }),
+    }),
 
   // User
   getMe: () =>
@@ -263,10 +301,10 @@ export const api = {
 
   // Rewards
   getMissions: () =>
-    apiFetch<{ data: Array<{ id: string; title: string; description: string; progress: number; target: number; reward: number; completed: boolean }> }>('/v1/rewards/missions'),
+    apiFetch<{ data: Array<{ id: string; title: string; description: string; progress: number; target: number; reward: number; completed: boolean; claimed: boolean }> }>('/v1/rewards/missions'),
 
   claimMission: (id: string) =>
-    apiFetch<{ success: boolean; message?: string }>(`/v1/rewards/missions/${id}/claim`, { method: 'POST' }),
+    apiFetch<{ success: boolean; message?: string; amount?: number }>(`/v1/rewards/missions/${id}/claim`, { method: 'POST' }),
 
   getAchievements: () =>
     apiFetch<{ data: Array<{ id: string; title: string; description: string; unlockedAt: string | null }> }>('/v1/rewards/achievements'),
@@ -296,67 +334,6 @@ export const api = {
       nextAvailableAt?: string;
       reward?: { id: string; rarity: string; amountLamports: number; level: number; vipTier: string };
     }>('/v1/rewards/daily-box/claim', { method: 'POST' }),
-
-  // Tournaments
-  getTournamentRooms: () =>
-    apiFetch<{
-      tiers: Array<{
-        buyIn: number;
-        label: string;
-        rooms: Array<{ roomId: string; buyIn: number; playerCount: number; maxPlayers: number; countdownStartedAt: number | null; phaseEndsAt: number; createdAt: number }>;
-        openCount: number;
-      }>;
-      buyInOptions: number[];
-    }>('/v1/battles/rooms'),
-
-  joinTournament: (buyIn: number) =>
-    apiFetch<{
-      success: boolean;
-      roomId: string;
-      state: string;
-      players: any[];
-      playerCount: number;
-      buyIn: number;
-      grossPool: number;
-      netPool: number;
-    }>('/v1/battles/join', {
-      method: 'POST',
-      body: JSON.stringify({ buyIn }),
-    }),
-
-  getTournamentRoom: (roomId: string) =>
-    apiFetch<{
-      roomId: string;
-      buyIn: number;
-      fee: number;
-      state: 'waiting' | 'round_active' | 'round_results' | 'final_results' | 'closed';
-      currentRound: number;
-      totalRounds: number;
-      phaseStartedAt: number;
-      phaseEndsAt: number;
-      countdownStartedAt: number | null;
-      players: any[];
-      playerCount: number;
-      maxPlayers: number;
-      minPlayers: number;
-      grossPool: number;
-      netPool: number;
-      elapsed: number | null;
-      myPlayerId: string | null;
-      roundConfig: any | null;
-      winner: { id: string; username: string; cumulativeScore: number; payout: number } | null;
-    }>(`/v1/battles/${roomId}`),
-
-  reportTournamentMultiplier: (roomId: string, round: number, finalMultiplier: number) =>
-    apiFetch('/v1/battles/' + roomId + '/report', {
-      method: 'POST',
-      body: JSON.stringify({ round, finalMultiplier }),
-    }),
-
-  leaveTournament: (roomId: string) =>
-    apiFetch('/v1/battles/' + roomId + '/leave', {
-      method: 'POST',
-    }),
 
   // Referrals / Affiliates
   getReferralCode: () =>
@@ -436,8 +413,14 @@ export const api = {
     }),
 
   // Predictions
-  savePredictionRound: (data: { direction: string; betAmount: number; result: string; payout: number; multiplier: number; pattern?: string }) =>
-    apiFetch<{ success: boolean; id: string }>('/v1/predictions/save', {
+  lockPrediction: (betAmount: number) =>
+    apiFetch<{ success: boolean; lockRef: string; fee: number }>('/v1/predictions/lock', {
+      method: 'POST',
+      body: JSON.stringify({ betAmount }),
+    }),
+
+  savePredictionRound: (data: { lockRef: string; direction: string; result: string; pattern?: string }) =>
+    apiFetch<{ success: boolean; id: string; payout: number; xpGained: number }>('/v1/predictions/save', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
@@ -452,13 +435,145 @@ export const api = {
   searchUsers: (q: string) =>
     apiFetch<{ data: Array<{ id: string; username: string; level: number; vipTier: string; avatarUrl: string | null; roundsPlayed: number }> }>(`/v1/users/search?q=${encodeURIComponent(q)}`),
 
-  // Tournament History
-  getTournamentHistory: (limit?: number) =>
-    apiFetch(`/v1/battles/history?limit=${limit || 20}`),
+  // Online count
+  getOnlineCount: () =>
+    apiFetch<{ onlineCount: number }>('/v1/chat/online'),
 
-  // Spectate
-  spectateTournament: (roomId: string) =>
-    apiFetch(`/v1/battles/${roomId}/spectate`),
+  // Lottery (Powerball-style)
+  getLotteryCurrentDraw: () =>
+    apiFetch<any>('/v1/lottery/current'),
+
+  getLotteryDraw: (id: string) =>
+    apiFetch<any>(`/v1/lottery/draw/${id}`),
+
+  getLotteryDrawByNumber: (num: number) =>
+    apiFetch<any>(`/v1/lottery/draw/number/${num}`),
+
+  getLotteryHistory: (limit?: number) =>
+    apiFetch<any[]>(`/v1/lottery/history?limit=${limit || 10}`),
+
+  getLotteryPrizes: (drawId: string) =>
+    apiFetch<any>(`/v1/lottery/prizes/${drawId}`),
+
+  buyLotteryTickets: (drawId: string, tickets: { entryType: string; numbers: number[]; gemBall: number }[]) =>
+    apiFetch<{ tickets: any[]; totalCost: string; ticketCount: number }>('/v1/lottery/buy', {
+      method: 'POST',
+      body: JSON.stringify({ drawId, tickets }),
+    }),
+
+  getMyLotteryTickets: (drawId?: string) =>
+    apiFetch<any[]>(drawId ? `/v1/lottery/my-tickets/${drawId}` : '/v1/lottery/my-tickets'),
+
+  autoFillLotteryNumbers: (count: number) =>
+    apiFetch<{ numbers: number[]; gemBall: number }[]>('/v1/lottery/auto-fill', {
+      method: 'POST',
+      body: JSON.stringify({ count }),
+    }),
+
+  // Trading Sim
+  getTradingSimRooms: () =>
+    apiFetch<{ rooms: any[] }>('/v1/trading-sim/rooms'),
+
+  getTradingSimRecent: (limit = 20) =>
+    apiFetch<{ rooms: any[] }>(`/v1/trading-sim/recent?limit=${limit}`),
+
+  createTradingSimRoom: (entryFee: number, maxPlayers: number) =>
+    apiFetch<{ room: any }>('/v1/trading-sim/create', {
+      method: 'POST',
+      body: JSON.stringify({ entryFee, maxPlayers }),
+    }),
+
+  joinTradingSimRoom: (roomId: string) =>
+    apiFetch<{ room: any }>('/v1/trading-sim/join', {
+      method: 'POST',
+      body: JSON.stringify({ roomId }),
+    }),
+
+  executeTradingSimTrade: (roomId: string, tradeType: string, quantity: number, price: number, timestamp: number) =>
+    apiFetch<{ success: boolean }>('/v1/trading-sim/trade', {
+      method: 'POST',
+      body: JSON.stringify({ roomId, tradeType, quantity, price, timestamp }),
+    }),
+
+  getTradingSimRoom: (roomId: string) =>
+    apiFetch<{ room: any }>(`/v1/trading-sim/room/${roomId}`),
+
+  startTradingSimRoom: (roomId: string) =>
+    apiFetch<{ room: any }>('/v1/trading-sim/start', {
+      method: 'POST',
+      body: JSON.stringify({ roomId }),
+    }),
+
+  // ─── Candleflip ─────────────────────────────────────────────
+
+  getCandleflipLobbies: () =>
+    apiFetch<{ lobbies: any[] }>('/v1/candleflip/lobbies'),
+
+  getCandleflipRecent: (limit = 20) =>
+    apiFetch<{ results: any[] }>(`/v1/candleflip/recent?limit=${limit}`),
+
+  getCandleflipGame: (gameId: string) =>
+    apiFetch<{ game: any }>(`/v1/candleflip/game/${gameId}`),
+
+  createCandleflipGame: (betAmount: number, pick: 'bullish' | 'bearish') =>
+    apiFetch<{ game: any }>('/v1/candleflip/create', {
+      method: 'POST',
+      body: JSON.stringify({ betAmount, pick }),
+    }),
+
+  joinCandleflipGame: (gameId: string) =>
+    apiFetch<{ game: any }>('/v1/candleflip/join', {
+      method: 'POST',
+      body: JSON.stringify({ gameId }),
+    }),
+
+  cancelCandleflipGame: (gameId: string) =>
+    apiFetch<{ success: boolean }>('/v1/candleflip/cancel', {
+      method: 'POST',
+      body: JSON.stringify({ gameId }),
+    }),
+
+  getCandleflipHistory: (limit = 20) =>
+    apiFetch<{ games: any[] }>(`/v1/candleflip/history?limit=${limit}`),
+
+  // ─── Rug Game ──────────────────────────────────────────────
+
+  startRugGame: (betAmount: number) =>
+    apiFetch<{ game: any }>('/v1/rug-game/start', {
+      method: 'POST',
+      body: JSON.stringify({ betAmount }),
+    }),
+
+  cashOutRugGame: (gameId: string, multiplier: number) =>
+    apiFetch<{ game: any }>('/v1/rug-game/cashout', {
+      method: 'POST',
+      body: JSON.stringify({ gameId, multiplier }),
+    }),
+
+  rugGameRuq: (gameId: string) =>
+    apiFetch<{ game: any }>('/v1/rug-game/rug', {
+      method: 'POST',
+      body: JSON.stringify({ gameId }),
+    }),
+
+  getRugGameRecent: (limit = 20) =>
+    apiFetch<{ games: any[] }>(`/v1/rug-game/recent?limit=${limit}`),
+
+  getRugGameLive: (limit = 10) =>
+    apiFetch<{ games: any[] }>(`/v1/rug-game/live?limit=${limit}`),
+
+  getRugGame: (gameId: string) =>
+    apiFetch<{ game: any }>(`/v1/rug-game/game/${gameId}`),
+
+  getActiveRugGame: () =>
+    apiFetch<{ game: any | null }>('/v1/rug-game/active'),
+
+  getRugGameHistory: (limit = 20) =>
+    apiFetch<{ games: any[] }>(`/v1/rug-game/history?limit=${limit}`),
+
+  // P&L History
+  getPnlHistory: () =>
+    apiFetch<{ data: Array<{ date: string; balance: number }> }>('/v1/wallet/pnl-history'),
 
   // Activity Feed
   getActivityFeed: (limit?: number, after?: string) => {
@@ -475,4 +590,13 @@ export const api = {
       }>;
     }>(`/v1/activity/feed?${params.toString()}`);
   },
+
+  // Tournament (stubs — feature not yet implemented)
+  getTournamentRoom: (_roomId: string): Promise<any> => {
+    throw new Error('Tournaments coming soon');
+  },
+  reportTournamentMultiplier: (_roomId: string, _round: number, _multiplier: number): Promise<any> => {
+    throw new Error('Tournaments coming soon');
+  },
+
 };

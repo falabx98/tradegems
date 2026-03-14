@@ -150,11 +150,11 @@ export class WalletService {
       WHERE user_id = ${userId}
         AND asset = ${asset}
         AND locked_amount >= ${totalLocked}
-    `);
+      RETURNING available_amount, locked_amount
+    `) as unknown as { available_amount: number; locked_amount: number }[];
 
-    // If no row was updated, the settlement failed (already processed or insufficient locked funds)
-    const rowsAffected = (result as any)?.rowCount ?? (result as any)?.length ?? 1;
-    if (rowsAffected === 0) {
+    // If no row was returned, the settlement failed (already processed or insufficient locked funds)
+    if (!result || result.length === 0) {
       throw new AppError(409, 'SETTLEMENT_FAILED', `Settlement skipped — insufficient locked funds for user ${userId}, ref ${ref.type}:${ref.id}`);
     }
 

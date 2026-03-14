@@ -52,7 +52,7 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <img src="/logo.png" alt="TradeGems" style={{ height: '52px', width: 'auto', objectFit: 'contain' }} />
           <span style={{
-            fontSize: '18px', fontWeight: 800, fontFamily: "'Orbitron', sans-serif",
+            fontSize: '18px', fontWeight: 800, fontFamily: "inherit",
             color: '#ffffff',
             letterSpacing: '1px',
           }}>
@@ -88,10 +88,12 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div className="auth-field">
-            <label>Email</label>
+            <label>{mode === 'login' ? 'Email or Username' : 'Email'}</label>
             <input
-              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com" required autoComplete="email"
+              type={mode === 'login' ? 'text' : 'email'}
+              value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder={mode === 'login' ? 'Email or username' : 'you@example.com'}
+              required autoComplete={mode === 'login' ? 'username' : 'email'}
             />
           </div>
 

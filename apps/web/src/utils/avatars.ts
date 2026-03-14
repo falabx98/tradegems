@@ -15,7 +15,7 @@ export function isPhotoAvatar(avatarUrl: string | null | undefined): boolean {
  * Generates a deterministic gradient from the username.
  */
 export function getAvatarGradient(_avatarId: string | null | undefined, username: string): string {
-  const colors = ['#9945FF', '#14F195', '#5b8def', '#f87171', '#fbbf24', '#34d399', '#c084fc', '#8b8bf5', '#ec4899', '#06b6d4', '#f97316', '#6366f1'];
+  const colors = ['#7717ff', '#14F195', '#5b8def', '#f87171', '#fbbf24', '#34d399', '#c084fc', '#8b8bf5', '#ec4899', '#06b6d4', '#f97316', '#6366f1'];
   let hash = 0;
   for (let i = 0; i < username.length; i++) {
     hash = username.charCodeAt(i) + ((hash << 5) - hash);

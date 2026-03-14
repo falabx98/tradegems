@@ -12,19 +12,22 @@ import { HistoryScreen } from './components/screens/HistoryScreen';
 import { LeaderboardScreen } from './components/screens/LeaderboardScreen';
 import { RewardsScreen } from './components/screens/RewardsScreen';
 import { SettingsScreen } from './components/screens/SettingsScreen';
-import { BattleScreen } from './components/screens/BattleScreen';
 import { SoloSetupScreen } from './components/screens/SoloSetupScreen';
 import { PredictionScreen } from './components/screens/PredictionScreen';
 import { FairnessScreen } from './components/screens/FairnessScreen';
 import { SeasonScreen } from './components/screens/SeasonScreen';
 import { AdminScreen } from './components/screens/AdminScreen';
 import { PlayerProfileScreen } from './components/screens/PlayerProfileScreen';
+import { TradingSimScreen } from './components/screens/TradingSimScreen';
+import { LotteryScreen } from './components/screens/LotteryScreen';
+import { CandleflipScreen } from './components/screens/CandleflipScreen';
+import { RugGameScreen } from './components/screens/RugGameScreen';
 import { OnboardingModal, useOnboarding } from './components/OnboardingModal';
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggle } from './components/layout/ChatToggle';
 import { ToastOverlay } from './components/ToastOverlay';
 import { PATH_TO_SCREEN, SCREEN_TO_PATH } from './hooks/useAppNavigate';
-import { getServerConfig, getAccessToken } from './utils/api';
+import { getServerConfig, getAccessToken, setSessionExpiredCallback } from './utils/api';
 import { connectWebSocket, disconnectWebSocket } from './utils/ws';
 import { requestNotificationPermission } from './utils/notifications';
 import './styles/global.css';
@@ -40,12 +43,16 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Check auth on mount
+  // Check auth on mount + register session expiry handler
   useEffect(() => {
     checkAuth().finally(() => setAuthChecked(true));
     // M1 fix: prefetch server config (fee rate, etc.) and cache globally
     getServerConfig().then(cfg => {
       (globalThis as any).__serverFeeRate = cfg.feeRate;
+    });
+    // Auto-logout when session expires (prevents 401 spam loop)
+    setSessionExpiredCallback(() => {
+      useAuthStore.getState().logout();
     });
   }, [checkAuth]);
 
@@ -86,10 +93,10 @@ export default function App() {
     );
   }
 
-  // Playing screen gets full immersion (no top bar / side nav)
+  // Playing screen — keep header visible per user requirement
   if (screen === 'playing') {
     return (
-      <AppLayout hideChrome>
+      <AppLayout>
         <PlayingScreen />
         <ToastOverlay />
       </AppLayout>
@@ -116,12 +123,15 @@ export default function App() {
       {screen === 'leaderboard' && <LeaderboardScreen />}
       {screen === 'rewards' && <RewardsScreen />}
       {screen === 'settings' && <SettingsScreen />}
-      {screen === 'battle' && <BattleScreen />}
       {screen === 'prediction' && <PredictionScreen />}
       {screen === 'fairness' && <FairnessScreen />}
       {screen === 'season' && <SeasonScreen />}
       {screen === 'admin' && <AdminScreen />}
       {screen === 'profile' && <PlayerProfileScreen />}
+      {screen === 'trading-sim' && <TradingSimScreen />}
+      {screen === 'lottery' && <LotteryScreen />}
+      {screen === 'candleflip' && <CandleflipScreen />}
+      {screen === 'rug-game' && <RugGameScreen />}
       {screen === 'auth' && (
         <AuthScreen onSuccess={() => {
           syncProfile();

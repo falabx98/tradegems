@@ -1,0 +1,24 @@
+{
+  "name": "TradeGems - Solana PvP Trading Battle Arena",
+  "short_name": "TradeGems",
+  "description": "Compete in real-time PvP trading battles on Solana. Predict markets, join tournaments, and earn SOL rewards.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0b0f",
+  "theme_color": "#0a0b0f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["games", "finance"]
+}

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
 import { ReferralService } from '../modules/referral/referral.service.js';
 
@@ -11,6 +12,16 @@ export async function referralRoutes(server: FastifyInstance) {
     const userId = getAuthUser(request).userId;
     const code = await referralService.getOrCreateCode(userId);
     return { code };
+  });
+
+  // PATCH /code — Update referral code to a custom one
+  server.patch('/code', { config: { rateLimit: { max: 5, timeWindow: '1 minute' } } }, async (request) => {
+    const userId = getAuthUser(request).userId;
+    const body = z.object({
+      code: z.string().min(3).max(20).regex(/^[a-zA-Z0-9_-]+$/, 'Code can only contain letters, numbers, hyphens and underscores'),
+    }).parse(request.body);
+    const result = await referralService.updateCode(userId, body.code.toUpperCase());
+    return result;
   });
 
   // GET /stats — Get referral stats + referred users list

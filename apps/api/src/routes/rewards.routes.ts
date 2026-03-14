@@ -92,25 +92,110 @@ export async function rewardsRoutes(server: FastifyInstance) {
     const rows = statsResult as unknown as Array<Record<string, unknown>>;
     const stats = rows[0] || { rounds_played: 0, total_wagered: 0, total_won: 0, best_multiplier: 0 };
     const rp = Number(stats.rounds_played);
-    const tw = Number(stats.total_wagered) / 100; // cents to dollars
+    const tw = Number(stats.total_wagered) / 1_000_000_000; // lamports to SOL
     const bm = Number(stats.best_multiplier);
+
+    // Check which missions have already been claimed
+    const claimedResult = await db.execute(sql`
+      SELECT reference_id FROM balance_ledger_entries
+      WHERE user_id = ${userId} AND entry_type = 'mission_claim'
+    `);
+    const claimedRows = claimedResult as unknown as Array<Record<string, unknown>>;
+    const claimedIds = new Set(claimedRows.map(r => String(r.reference_id)));
 
     // Generated missions based on user progress
     const missions = [
       { id: 'first-blood', title: 'First Blood', description: 'Complete your first round', progress: Math.min(rp, 1), target: 1, reward: 50, completed: rp >= 1 },
       { id: 'getting-started', title: 'Getting Started', description: 'Play 5 rounds', progress: Math.min(rp, 5), target: 5, reward: 100, completed: rp >= 5 },
-      { id: 'high-roller', title: 'High Roller', description: 'Wager $500 total', progress: Math.min(Math.floor(tw), 500), target: 500, reward: 250, completed: tw >= 500 },
+      { id: 'high-roller', title: 'High Roller', description: 'Wager 500 SOL total', progress: Math.min(Math.floor(tw), 500), target: 500, reward: 250, completed: tw >= 500 },
       { id: 'multiplier-hunter', title: 'Multiplier Hunter', description: 'Hit a 5x multiplier', progress: bm >= 5 ? 1 : 0, target: 1, reward: 500, completed: bm >= 5 },
       { id: 'marathon', title: 'Marathon', description: 'Play 50 rounds', progress: Math.min(rp, 50), target: 50, reward: 1000, completed: rp >= 50 },
-      { id: 'whale', title: 'Whale Status', description: 'Wager $5,000 total', progress: Math.min(Math.floor(tw), 5000), target: 5000, reward: 2500, completed: tw >= 5000 },
-    ];
+      { id: 'whale', title: 'Whale Status', description: 'Wager 5,000 SOL total', progress: Math.min(Math.floor(tw), 5000), target: 5000, reward: 2500, completed: tw >= 5000 },
+    ].map(m => ({ ...m, claimed: claimedIds.has(m.id) }));
 
     return { data: missions };
   });
 
+  // Mission rewards in lamports (reward field is display-only XP-like value, actual SOL credit here)
+  const MISSION_REWARDS_LAMPORTS: Record<string, number> = {
+    'first-blood': 50_000_000,      // 0.05 SOL
+    'getting-started': 100_000_000, // 0.1 SOL
+    'high-roller': 250_000_000,     // 0.25 SOL
+    'multiplier-hunter': 500_000_000, // 0.5 SOL
+    'marathon': 1_000_000_000,      // 1 SOL
+    'whale': 2_500_000_000,         // 2.5 SOL
+  };
+
   server.post('/missions/:id/claim', async (request) => {
-    // Missions auto-reward, no manual claim needed for now
-    return { success: true, message: 'Mission rewards are auto-applied' };
+    const userId = getAuthUser(request).userId;
+    const { id } = request.params as { id: string };
+
+    // Check if already claimed
+    const alreadyClaimed = await db.execute(sql`
+      SELECT id FROM balance_ledger_entries
+      WHERE user_id = ${userId} AND entry_type = 'mission_claim' AND reference_id = ${id}
+      LIMIT 1
+    `);
+    const alreadyRows = alreadyClaimed as unknown as Array<Record<string, unknown>>;
+    if (alreadyRows.length > 0) {
+      return { success: false, message: 'Mission already claimed' };
+    }
+
+    // Verify mission is actually completed
+    const statsResult = await db.execute(sql`
+      SELECT
+        COALESCE(rounds_played, 0) as rounds_played,
+        COALESCE(total_wagered, 0) as total_wagered,
+        COALESCE(best_multiplier, 0) as best_multiplier
+      FROM user_profiles
+      WHERE user_id = ${userId}
+    `);
+    const rows = statsResult as unknown as Array<Record<string, unknown>>;
+    const stats = rows[0] || { rounds_played: 0, total_wagered: 0, best_multiplier: 0 };
+    const rp = Number(stats.rounds_played);
+    const tw = Number(stats.total_wagered) / 100;
+    const bm = Number(stats.best_multiplier);
+
+    const completionMap: Record<string, boolean> = {
+      'first-blood': rp >= 1,
+      'getting-started': rp >= 5,
+      'high-roller': tw >= 500,
+      'multiplier-hunter': bm >= 5,
+      'marathon': rp >= 50,
+      'whale': tw >= 5000,
+    };
+
+    if (!completionMap[id]) {
+      return { success: false, message: 'Mission not yet completed' };
+    }
+
+    const rewardLamports = MISSION_REWARDS_LAMPORTS[id];
+    if (!rewardLamports) {
+      return { success: false, message: 'Unknown mission' };
+    }
+
+    // Credit reward to balance
+    await db.execute(sql`
+      UPDATE balances
+      SET available_amount = available_amount + ${rewardLamports}, updated_at = now()
+      WHERE user_id = ${userId} AND asset = 'SOL'
+    `);
+
+    // Get updated balance
+    const balResult = await db.execute(sql`
+      SELECT available_amount FROM balances
+      WHERE user_id = ${userId} AND asset = 'SOL'
+    `);
+    const balAfter = Number((balResult as unknown as Array<Record<string, unknown>>)[0]?.available_amount || 0);
+
+    // Record claim in ledger
+    await db.execute(sql`
+      INSERT INTO balance_ledger_entries
+        (user_id, asset, entry_type, amount, balance_after, reference_type, reference_id)
+      VALUES (${userId}, 'SOL', 'mission_claim', ${rewardLamports}, ${balAfter}, 'mission', ${id})
+    `);
+
+    return { success: true, message: `Claimed ${(rewardLamports / 1e9).toFixed(2)} SOL!`, amount: rewardLamports };
   });
 
   server.get('/achievements', async (request) => {
@@ -156,10 +241,15 @@ export async function rewardsRoutes(server: FastifyInstance) {
     const vipTier = String(userRows[0]?.vip_tier || 'bronze');
     const rate = RAKEBACK_RATES[vipTier] || 0.01;
 
-    // Calculate accumulated rakeback from total fees paid
+    // Calculate accumulated rakeback from total fees paid (solo + prediction + tournament)
     const feeResult = await db.execute(sql`
-      SELECT COALESCE(SUM(fee), 0) as total_fees
-      FROM bets WHERE user_id = ${userId} AND status = 'settled'
+      SELECT COALESCE(SUM(fee), 0) as total_fees FROM (
+        SELECT fee FROM bets WHERE user_id = ${userId} AND status = 'settled'
+        UNION ALL
+        SELECT (metadata->>'fee')::bigint as fee FROM prediction_rounds WHERE user_id = ${userId} AND metadata->>'fee' IS NOT NULL
+        UNION ALL
+        SELECT fee FROM tournament_participants tp JOIN tournaments t ON t.id = tp.tournament_id WHERE tp.user_id = ${userId}
+      ) all_fees
     `);
     const feeRows = feeResult as unknown as Array<Record<string, unknown>>;
     const totalFees = Number(feeRows[0]?.total_fees || 0);
@@ -194,23 +284,29 @@ export async function rewardsRoutes(server: FastifyInstance) {
     const vipTier = String(userRows[0]?.vip_tier || 'bronze');
     const rate = RAKEBACK_RATES[vipTier] || 0.01;
 
-    const feeResult = await db.execute(sql`
-      SELECT COALESCE(SUM(fee), 0) as total_fees
-      FROM bets WHERE user_id = ${userId} AND status = 'settled'
+    // Calculate accumulated rakeback from total fees paid (solo + prediction + tournament)
+    const feeResult2 = await db.execute(sql`
+      SELECT COALESCE(SUM(fee), 0) as total_fees FROM (
+        SELECT fee FROM bets WHERE user_id = ${userId} AND status = 'settled'
+        UNION ALL
+        SELECT (metadata->>'fee')::bigint as fee FROM prediction_rounds WHERE user_id = ${userId} AND metadata->>'fee' IS NOT NULL
+        UNION ALL
+        SELECT fee FROM tournament_participants tp JOIN tournaments t ON t.id = tp.tournament_id WHERE tp.user_id = ${userId}
+      ) all_fees
     `);
-    const feeRows = feeResult as unknown as Array<Record<string, unknown>>;
-    const totalFees = Number(feeRows[0]?.total_fees || 0);
-    const accumulated = Math.floor(totalFees * rate);
+    const feeRows2 = feeResult2 as unknown as Array<Record<string, unknown>>;
+    const totalFees2 = Number(feeRows2[0]?.total_fees || 0);
+    const accumulated2 = Math.floor(totalFees2 * rate);
 
     // Subtract what has already been claimed
-    const claimedResult = await db.execute(sql`
+    const claimedResult2 = await db.execute(sql`
       SELECT COALESCE(SUM(amount), 0) as total_claimed
       FROM balance_ledger_entries
       WHERE user_id = ${userId} AND asset = 'SOL' AND entry_type = 'rakeback_claim'
     `);
-    const claimedRows = claimedResult as unknown as Array<Record<string, unknown>>;
-    const totalClaimed = Number(claimedRows[0]?.total_claimed || 0);
-    const claimable = Math.max(0, accumulated - totalClaimed);
+    const claimedRows2 = claimedResult2 as unknown as Array<Record<string, unknown>>;
+    const totalClaimed2 = Number(claimedRows2[0]?.total_claimed || 0);
+    const claimable = Math.max(0, accumulated2 - totalClaimed2);
 
     if (claimable <= 0) {
       return { success: false, message: 'No rakeback to claim' };

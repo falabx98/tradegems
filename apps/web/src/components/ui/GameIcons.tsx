@@ -140,7 +140,7 @@ export function MedalIcon({ size = 20, rank, className, style }: IconProps & { r
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <circle cx="12" cy="14" r="7" fill={c} opacity="0.2" stroke={c} strokeWidth="1.5" />
-      <text x="12" y="17" textAnchor="middle" fill={c} fontSize="10" fontWeight="800" fontFamily="Orbitron, sans-serif">{rank}</text>
+      <text x="12" y="17" textAnchor="middle" fill={c} fontSize="10" fontWeight="800" fontFamily="Inter, sans-serif">{rank}</text>
       <path d="M8 2l4 6 4-6" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );

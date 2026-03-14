@@ -62,6 +62,8 @@ export function AdminScreen() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'treasury' | 'deposits' | 'withdrawals' | 'games' | 'bonuses' | 'logs'>('overview');
   const [statusLoading, setStatusLoading] = useState<string | null>(null);
+  const [selectedUser, setSelectedUser] = useState<any | null>(null);
+  const [selectedUserLoading, setSelectedUserLoading] = useState(false);
   // Deposits
   const [depositsList, setDepositsList] = useState<any[]>([]);
   const [depositsFilter, setDepositsFilter] = useState('');
@@ -97,8 +99,8 @@ export function AdminScreen() {
           setTreasury(treasuryData);
           setAuditLogs(logs.data);
         }
-      } catch {
-        /* not admin */
+      } catch (err) {
+        console.error('[AdminScreen] Access check failed:', err);
       }
       setLoading(false);
     })();
@@ -231,6 +233,18 @@ export function AdminScreen() {
       setBalanceForm({ amount: '', reason: '' });
       searchUsers();
     } catch {}
+  };
+
+  const loadUserDetail = async (userId: string) => {
+    setSelectedUserLoading(true);
+    try {
+      const res = await apiFetch<any>(`/v1/admin/users/${userId}`);
+      setSelectedUser(res);
+    } catch (err) {
+      console.error('Failed to load user detail:', err);
+    } finally {
+      setSelectedUserLoading(false);
+    }
   };
 
   // Loading state
@@ -435,6 +449,12 @@ export function AdminScreen() {
                           >
                             Credit
                           </button>
+                          <button
+                            onClick={() => loadUserDetail(user.id)}
+                            style={styles.actionBtnBlue}
+                          >
+                            View
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -449,6 +469,147 @@ export function AdminScreen() {
                 </tbody>
               </table>
             </div>
+
+            {/* User Detail Modal */}
+            {selectedUser && (
+              <div style={styles.modalOverlay} onClick={() => setSelectedUser(null)}>
+                <div style={{ ...styles.modalCard, maxWidth: '700px', maxHeight: '85vh', overflow: 'auto', width: '95%' }} onClick={(e) => e.stopPropagation()}>
+                  {selectedUserLoading ? (
+                    <div style={{ padding: '40px', textAlign: 'center' as const, color: theme.text.muted }}>Loading...</div>
+                  ) : (
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                        <div style={styles.modalTitle}>User Profile</div>
+                        <button onClick={() => setSelectedUser(null)} style={{ background: 'none', border: 'none', color: theme.text.muted, cursor: 'pointer', fontSize: '22px' }}>X</button>
+                      </div>
+
+                      {/* Basic Info */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px', background: theme.bg.tertiary, padding: '12px', borderRadius: '8px' }}>
+                        <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Username</span><br /><span style={{ color: theme.text.primary, fontWeight: 700 }}>{selectedUser.username}</span></div>
+                        <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Email</span><br /><span style={{ color: theme.text.primary }}>{selectedUser.email || 'N/A'}</span></div>
+                        <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Role</span><br /><span style={{ color: '#c084fc', fontWeight: 600 }}>{selectedUser.role}</span></div>
+                        <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Status</span><br /><span style={{ color: selectedUser.status === 'active' ? theme.success : theme.danger, fontWeight: 600 }}>{selectedUser.status}</span></div>
+                        <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Level / VIP</span><br /><span style={{ color: theme.text.primary }}>Lv.{selectedUser.level} / {selectedUser.vipTier}</span></div>
+                        <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Registered</span><br /><span style={{ color: theme.text.primary }}>{new Date(selectedUser.createdAt).toLocaleString()}</span></div>
+                      </div>
+
+                      {/* Balance */}
+                      <div style={{ marginBottom: '16px', background: theme.bg.tertiary, padding: '12px', borderRadius: '8px' }}>
+                        <div style={{ fontWeight: 700, color: theme.text.primary, marginBottom: '8px', fontFamily: "inherit", fontSize: '13px' }}>BALANCE</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                          <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Available</span><br /><span className="mono" style={{ color: theme.success, fontWeight: 700 }}>{formatSol(Number(selectedUser.availableAmount))} SOL</span></div>
+                          <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Locked</span><br /><span className="mono" style={{ color: '#f59e0b', fontWeight: 700 }}>{formatSol(Number(selectedUser.lockedAmount))} SOL</span></div>
+                          <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Pending</span><br /><span className="mono" style={{ color: theme.text.secondary }}>{formatSol(Number(selectedUser.pendingAmount))} SOL</span></div>
+                        </div>
+                      </div>
+
+                      {/* Stats */}
+                      <div style={{ marginBottom: '16px', background: theme.bg.tertiary, padding: '12px', borderRadius: '8px' }}>
+                        <div style={{ fontWeight: 700, color: theme.text.primary, marginBottom: '8px', fontFamily: "inherit", fontSize: '13px' }}>STATS</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '8px' }}>
+                          <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Rounds</span><br /><span className="mono" style={{ color: theme.text.primary }}>{selectedUser.roundsPlayed}</span></div>
+                          <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Wagered</span><br /><span className="mono" style={{ color: theme.text.primary }}>{formatSol(Number(selectedUser.totalWagered))} SOL</span></div>
+                          <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Won</span><br /><span className="mono" style={{ color: theme.success }}>{formatSol(Number(selectedUser.totalWon))} SOL</span></div>
+                          <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Best Multi</span><br /><span className="mono" style={{ color: '#c084fc' }}>{Number(selectedUser.bestMultiplier).toFixed(2)}x</span></div>
+                        </div>
+                      </div>
+
+                      {/* Recent Solo Games */}
+                      {selectedUser.recentResults?.length > 0 && (
+                        <div style={{ marginBottom: '16px', background: theme.bg.tertiary, padding: '12px', borderRadius: '8px' }}>
+                          <div style={{ fontWeight: 700, color: theme.text.primary, marginBottom: '8px', fontFamily: "inherit", fontSize: '13px' }}>SOLO GAMES ({selectedUser.recentResults.length})</div>
+                          <div style={{ maxHeight: '200px', overflow: 'auto' }}>
+                            <table style={{ ...styles.table, fontSize: '12px' }}>
+                              <thead><tr>
+                                <th style={styles.th}>Mode</th>
+                                <th style={styles.th}>Bet</th>
+                                <th style={styles.th}>Payout</th>
+                                <th style={styles.th}>Multi</th>
+                                <th style={styles.th}>Result</th>
+                                <th style={styles.th}>XP</th>
+                                <th style={styles.th}>When</th>
+                              </tr></thead>
+                              <tbody>
+                                {selectedUser.recentResults.map((r: any, i: number) => (
+                                  <tr key={i}>
+                                    <td style={styles.td}>{r.game_mode}</td>
+                                    <td style={styles.td} className="mono">{formatSol(Number(r.bet_amount))}</td>
+                                    <td style={styles.td} className="mono">{formatSol(Number(r.payout_amount))}</td>
+                                    <td style={styles.td} className="mono">{Number(r.final_multiplier).toFixed(2)}x</td>
+                                    <td style={{ ...styles.td, color: r.result_type === 'win' ? theme.success : theme.danger, fontWeight: 600 }}>{r.result_type}</td>
+                                    <td style={styles.td}>{r.xp_awarded}</td>
+                                    <td style={styles.td}>{new Date(r.created_at).toLocaleTimeString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Predictions */}
+                      {selectedUser.predictions?.length > 0 && (
+                        <div style={{ marginBottom: '16px', background: theme.bg.tertiary, padding: '12px', borderRadius: '8px' }}>
+                          <div style={{ fontWeight: 700, color: theme.text.primary, marginBottom: '8px', fontFamily: "inherit", fontSize: '13px' }}>PREDICTIONS ({selectedUser.predictions.length})</div>
+                          <div style={{ maxHeight: '200px', overflow: 'auto' }}>
+                            <table style={{ ...styles.table, fontSize: '12px' }}>
+                              <thead><tr>
+                                <th style={styles.th}>Direction</th>
+                                <th style={styles.th}>Bet</th>
+                                <th style={styles.th}>Payout</th>
+                                <th style={styles.th}>Multi</th>
+                                <th style={styles.th}>Result</th>
+                                <th style={styles.th}>When</th>
+                              </tr></thead>
+                              <tbody>
+                                {selectedUser.predictions.map((p: any, i: number) => (
+                                  <tr key={i}>
+                                    <td style={styles.td}>{p.direction}</td>
+                                    <td style={styles.td} className="mono">{formatSol(Number(p.bet_amount))}</td>
+                                    <td style={styles.td} className="mono">{formatSol(Number(p.payout))}</td>
+                                    <td style={styles.td} className="mono">{Number(p.multiplier).toFixed(2)}x</td>
+                                    <td style={{ ...styles.td, color: p.result === 'win' ? theme.success : theme.danger, fontWeight: 600 }}>{p.result}</td>
+                                    <td style={styles.td}>{new Date(p.created_at).toLocaleTimeString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Ledger / Transactions */}
+                      {selectedUser.ledgerEntries?.length > 0 && (
+                        <div style={{ marginBottom: '16px', background: theme.bg.tertiary, padding: '12px', borderRadius: '8px' }}>
+                          <div style={{ fontWeight: 700, color: theme.text.primary, marginBottom: '8px', fontFamily: "inherit", fontSize: '13px' }}>TRANSACTIONS ({selectedUser.ledgerEntries.length})</div>
+                          <div style={{ maxHeight: '200px', overflow: 'auto' }}>
+                            <table style={{ ...styles.table, fontSize: '12px' }}>
+                              <thead><tr>
+                                <th style={styles.th}>Type</th>
+                                <th style={styles.th}>Amount</th>
+                                <th style={styles.th}>Balance After</th>
+                                <th style={styles.th}>When</th>
+                              </tr></thead>
+                              <tbody>
+                                {selectedUser.ledgerEntries.map((e: any, i: number) => (
+                                  <tr key={i}>
+                                    <td style={styles.td}>{e.entry_type}</td>
+                                    <td style={{ ...styles.td, color: Number(e.amount) >= 0 ? theme.success : theme.danger }} className="mono">{formatSol(Number(e.amount))} SOL</td>
+                                    <td style={styles.td} className="mono">{formatSol(Number(e.balance_after))} SOL</td>
+                                    <td style={styles.td}>{new Date(e.created_at).toLocaleString()}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
             {showBalanceModal && (
               <div style={styles.modalOverlay}>
                 <div style={styles.modalCard}>
@@ -701,7 +862,7 @@ export function AdminScreen() {
                       </tr>
                       {selectedRound?.id === r.id && (
                         <tr key={`${r.id}-details`}>
-                          <td colSpan={6} style={{ ...styles.td, background: 'rgba(153, 69, 255, 0.04)', padding: '16px' }}>
+                          <td colSpan={6} style={{ ...styles.td, background: 'rgba(119, 23, 255, 0.04)', padding: '16px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px', fontSize: '13px' }}>
                               <span style={{ color: theme.text.muted }}>
                                 <strong style={{ color: '#c084fc' }}>Round ID:</strong> {selectedRound.id}
@@ -949,7 +1110,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '22px',
     fontWeight: 800,
     color: theme.danger,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     letterSpacing: '1px',
     marginTop: '8px',
   },
@@ -960,14 +1121,14 @@ const styles: Record<string, React.CSSProperties> = {
   backBtnLarge: {
     marginTop: '12px',
     padding: '10px 24px',
-    background: 'rgba(153, 69, 255, 0.15)',
-    border: '1px solid rgba(153, 69, 255, 0.3)',
+    background: 'rgba(119, 23, 255, 0.15)',
+    border: '1px solid rgba(119, 23, 255, 0.3)',
     borderRadius: '8px',
     color: '#c084fc',
     fontSize: '14px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
   },
@@ -996,7 +1157,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '20px',
     fontWeight: 700,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase',
     letterSpacing: '1px',
     textAlign: 'center',
@@ -1023,13 +1184,13 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     fontWeight: 700,
     color: theme.text.muted,
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
     transition: 'all 0.15s ease',
   },
   tabActive: {
-    background: 'rgba(153, 69, 255, 0.15)',
+    background: 'rgba(119, 23, 255, 0.15)',
     color: '#c084fc',
   },
 
@@ -1067,7 +1228,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '20px',
     fontWeight: 800,
     color: theme.text.primary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     letterSpacing: '0.5px',
     wordBreak: 'break-all',
   },
@@ -1087,16 +1248,16 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
     color: theme.text.primary,
     outline: 'none',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     minWidth: 0,
   },
   searchBtn: {
     padding: '10px 20px',
-    background: 'rgba(153, 69, 255, 0.15)',
-    border: '1px solid rgba(153, 69, 255, 0.3)',
+    background: 'rgba(119, 23, 255, 0.15)',
+    border: '1px solid rgba(119, 23, 255, 0.3)',
     borderRadius: '8px',
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontSize: '14px',
     fontWeight: 700,
     color: '#c084fc',
@@ -1135,7 +1296,7 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.5px',
     borderBottom: `1px solid ${theme.border.subtle}`,
     background: theme.bg.tertiary,
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     whiteSpace: 'nowrap',
   },
   td: {
@@ -1222,7 +1383,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.3px',
   },
@@ -1235,7 +1396,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.3px',
   },
@@ -1248,20 +1409,33 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.3px',
   },
   actionBtnPurple: {
     padding: '3px 8px',
-    background: 'rgba(153, 69, 255, 0.1)',
-    border: '1px solid rgba(153, 69, 255, 0.25)',
+    background: 'rgba(119, 23, 255, 0.1)',
+    border: '1px solid rgba(119, 23, 255, 0.25)',
     borderRadius: '4px',
     color: '#c084fc',
     fontSize: '11px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
+    textTransform: 'uppercase',
+    letterSpacing: '0.3px',
+  },
+  actionBtnBlue: {
+    padding: '3px 8px',
+    background: 'rgba(56, 189, 248, 0.1)',
+    border: '1px solid rgba(56, 189, 248, 0.25)',
+    borderRadius: '4px',
+    color: '#38bdf8',
+    fontSize: '11px',
+    fontWeight: 700,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.3px',
   },
@@ -1282,20 +1456,20 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.3px',
   },
   filterBtnActive: {
     padding: '6px 14px',
-    background: 'rgba(153, 69, 255, 0.15)',
-    border: '1px solid rgba(153, 69, 255, 0.3)',
+    background: 'rgba(119, 23, 255, 0.15)',
+    border: '1px solid rgba(119, 23, 255, 0.3)',
     borderRadius: '6px',
     color: '#c084fc',
     fontSize: '12px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.3px',
   },
@@ -1319,7 +1493,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '10px',
     padding: '24px',
     background: '#1c142a',
-    border: '1px solid rgba(153, 69, 255, 0.2)',
+    border: '1px solid rgba(119, 23, 255, 0.2)',
     borderRadius: '12px',
     width: '360px',
     maxWidth: '90vw',
@@ -1328,7 +1502,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: 800,
     color: '#fff',
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     letterSpacing: '0.5px',
     marginBottom: '4px',
   },
@@ -1343,7 +1517,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#fff',
     fontSize: '14px',
     outline: 'none',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     boxSizing: 'border-box',
   },
   createFormCard: {
@@ -1351,8 +1525,8 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '8px',
     padding: '16px',
-    background: 'rgba(153, 69, 255, 0.06)',
-    border: '1px solid rgba(153, 69, 255, 0.15)',
+    background: 'rgba(119, 23, 255, 0.06)',
+    border: '1px solid rgba(119, 23, 255, 0.15)',
     borderRadius: '10px',
     marginBottom: '12px',
   },

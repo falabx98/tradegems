@@ -15,7 +15,7 @@ const CANDLE_REVEAL_DURATION = 1.5; // seconds per candle
 
 const BULL_COLOR = '#34d399';
 const BEAR_COLOR = '#f87171';
-const GRID_COLOR = 'rgba(153, 69, 255, 0.06)';
+const GRID_COLOR = 'rgba(119, 23, 255, 0.06)';
 const GRID_TEXT = 'rgba(255,255,255,0.35)';
 const ENTRY_COLOR = '#c084fc';
 
@@ -101,7 +101,7 @@ export function CandlestickChart({
 
       // Vignette
       const vg = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w * 0.7);
-      vg.addColorStop(0, 'rgba(153, 69, 255, 0.03)');
+      vg.addColorStop(0, 'rgba(119, 23, 255, 0.03)');
       vg.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = vg;
       ctx.fillRect(0, 0, w, h);
@@ -131,7 +131,7 @@ export function CandlestickChart({
       // Vertical separator between historical & reveal
       if (phase !== 'setup') {
         const sepX = candleX(historicalCandles.length) - candleSlotW / 2;
-        ctx.strokeStyle = 'rgba(153, 69, 255, 0.15)';
+        ctx.strokeStyle = 'rgba(119, 23, 255, 0.15)';
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
         ctx.moveTo(sepX, pad.top);
@@ -227,7 +227,7 @@ export function CandlestickChart({
       if (prediction && (phase === 'revealing' || phase === 'countdown')) {
         const px = pad.left + 10;
         const py = pad.top + 10;
-        ctx.font = "bold 14px 'Rajdhani', sans-serif";
+        ctx.font = "bold 14px inherit";
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
         const labels: Record<PredictionDirection, { text: string; color: string }> = {
@@ -304,7 +304,7 @@ export function CandlestickChart({
         height: '100%',
         borderRadius: '12px',
         overflow: 'hidden',
-        border: '1px solid rgba(153, 69, 255, 0.12)',
+        border: '1px solid rgba(119, 23, 255, 0.12)',
       }}
     >
       <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />

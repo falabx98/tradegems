@@ -205,7 +205,7 @@ const styles: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
+    height: '100%',
     background: theme.bg.primary,
   },
   arenaFull: {

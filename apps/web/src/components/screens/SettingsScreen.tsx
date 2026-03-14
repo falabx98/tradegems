@@ -23,6 +23,37 @@ export function SettingsScreen() {
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Security: set password for wallet users
+  const [secEmail, setSecEmail] = useState('');
+  const [secPassword, setSecPassword] = useState('');
+  const [secConfirm, setSecConfirm] = useState('');
+  const [secSaving, setSecSaving] = useState(false);
+  const [secMsg, setSecMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const hasEmail = !!(profile as any).email;
+
+  async function handleSetPassword() {
+    if (secPassword.length < 8) { setSecMsg({ type: 'error', text: 'Password must be at least 8 characters' }); return; }
+    if (secPassword !== secConfirm) { setSecMsg({ type: 'error', text: 'Passwords do not match' }); return; }
+    if (!hasEmail && !secEmail.includes('@')) { setSecMsg({ type: 'error', text: 'Enter a valid email' }); return; }
+
+    setSecSaving(true);
+    setSecMsg(null);
+    try {
+      await api.setPassword({
+        email: !hasEmail ? secEmail : undefined,
+        password: secPassword,
+      });
+      setSecMsg({ type: 'success', text: 'Password set! You can now login with email/username + password.' });
+      setSecPassword('');
+      setSecConfirm('');
+      setSecEmail('');
+    } catch (err: any) {
+      setSecMsg({ type: 'error', text: err?.message || 'Failed to set password' });
+    } finally {
+      setSecSaving(false);
+    }
+  }
+
   async function handleLogout() {
     setLoggingOut(true);
     try {
@@ -121,10 +152,10 @@ export function SettingsScreen() {
                   fontSize: '13px',
                   fontWeight: 700,
                   color: theme.vip[profile.vipTier as keyof typeof theme.vip] || theme.text.secondary,
-                  background: 'rgba(153, 69, 255, 0.18)',
+                  background: 'rgba(119, 23, 255, 0.18)',
                   padding: '2px 10px',
                   borderRadius: '10px',
-                  border: '1px solid rgba(153, 69, 255, 0.2)',
+                  border: '1px solid rgba(119, 23, 255, 0.2)',
                   position: 'relative' as const,
                   overflow: 'hidden',
                 }}
@@ -260,7 +291,7 @@ export function SettingsScreen() {
                     setVol(v);
                     setVolume(v / 100);
                   }}
-                  style={{ width: '80px', accentColor: '#9945FF' }}
+                  style={{ width: '80px', accentColor: '#7717ff' }}
                 />
                 <span style={styles.prefValue} className="mono">{volume}%</span>
               </div>
@@ -277,8 +308,64 @@ export function SettingsScreen() {
         </div>
       </div>
 
+      {/* Security — Set password */}
+      <div style={styles.card} className="card-enter card-enter-5">
+        <div style={styles.cardHeader}>
+          <span style={styles.cardTitle}>Security</span>
+        </div>
+        <div style={{ padding: '16px', display: 'flex', flexDirection: 'column' as const, gap: '12px' }}>
+          <p style={{ fontSize: '13px', color: theme.text.muted, margin: 0 }}>
+            Set or update your password to login with email/username + password.
+          </p>
+          {!hasEmail && (
+            <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 600, color: theme.text.secondary }}>Email</label>
+              <input
+                type="email" value={secEmail} onChange={(e) => setSecEmail(e.target.value)}
+                placeholder="you@example.com"
+                style={styles.secInput}
+              />
+            </div>
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 600, color: theme.text.secondary }}>New Password</label>
+            <input
+              type="password" value={secPassword} onChange={(e) => setSecPassword(e.target.value)}
+              placeholder="Min. 8 characters" minLength={8}
+              style={styles.secInput}
+            />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '4px' }}>
+            <label style={{ fontSize: '13px', fontWeight: 600, color: theme.text.secondary }}>Confirm Password</label>
+            <input
+              type="password" value={secConfirm} onChange={(e) => setSecConfirm(e.target.value)}
+              placeholder="Repeat password"
+              style={styles.secInput}
+            />
+          </div>
+          {secMsg && (
+            <p style={{
+              fontSize: '13px', margin: 0, fontWeight: 600,
+              color: secMsg.type === 'success' ? '#14F195' : '#f87171',
+            }}>
+              {secMsg.text}
+            </p>
+          )}
+          <button
+            onClick={handleSetPassword}
+            disabled={secSaving || !secPassword || !secConfirm}
+            style={{
+              ...styles.uploadBtn,
+              opacity: (secSaving || !secPassword || !secConfirm) ? 0.5 : 1,
+            }}
+          >
+            {secSaving ? 'Saving...' : 'Set Password'}
+          </button>
+        </div>
+      </div>
+
       {/* Logout */}
-      <div style={styles.dangerCard} className="card-enter card-enter-5">
+      <div style={styles.dangerCard} className="card-enter card-enter-6">
         <button
           onClick={handleLogout}
           disabled={loggingOut}
@@ -310,7 +397,7 @@ function StatBox({ label, value, color, icon }: { label: string; value: string; 
     <div style={statStyles.box}>
       <span style={statStyles.label}>{label}</span>
       <span style={{ ...statStyles.value, color: color || theme.text.primary }} className="mono">
-        {icon && <img src="/sol-coin.png" alt="SOL" style={{ width: '26px', height: '26px', marginRight: '5px', verticalAlign: 'middle' }} />}
+        {icon && <img src="/sol-coin.png" alt="SOL" style={{ width: '18px', height: '18px', marginRight: '4px', verticalAlign: 'middle', flexShrink: 0 }} />}
         {value}
       </span>
     </div>
@@ -338,24 +425,28 @@ const statStyles: Record<string, React.CSSProperties> = {
   box: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '4px',
-    padding: '12px',
-    background: 'rgba(28, 20, 42, 0.85)',
-    backdropFilter: 'blur(8px)',
-    border: '1px solid rgba(153, 69, 255, 0.08)',
+    gap: '6px',
+    padding: '14px',
+    background: theme.bg.elevated,
+    border: `1px solid ${theme.border.subtle}`,
     borderRadius: '10px',
-    transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+    overflow: 'hidden',
   },
   label: {
-    fontSize: '13px',
+    fontSize: '12px',
     fontWeight: 500,
     color: theme.text.muted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   },
   value: {
-    fontSize: '18px',
+    fontSize: '15px',
     fontWeight: 700,
     display: 'flex',
     alignItems: 'center',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis' as const,
+    whiteSpace: 'nowrap' as const,
   },
 };
 
@@ -365,14 +456,14 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '12px',
     padding: '16px',
-    height: '100%',
-    overflow: 'auto',
+    maxWidth: '900px',
+    width: '100%',
+    margin: '0 auto',
+    boxSizing: 'border-box' as const,
   },
   card: {
-    background: 'rgba(28, 20, 42, 0.85)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(153, 69, 255, 0.18)',
+    background: theme.bg.tertiary,
+    border: '1px solid rgba(119, 23, 255, 0.18)',
     borderRadius: '14px',
     overflow: 'hidden',
     boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
@@ -382,14 +473,14 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 14px',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.08)',
-    background: 'rgba(32, 24, 48, 0.95)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
+    background: '#201830',
   },
   cardTitle: {
     fontSize: '15px',
     fontWeight: 700,
     color: theme.text.secondary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
   },
@@ -407,10 +498,10 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     fontSize: '22px',
     fontWeight: 900,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     color: '#fff',
     flexShrink: 0,
-    boxShadow: '0 0 16px rgba(153, 69, 255, 0.3)',
+    boxShadow: '0 0 16px rgba(119, 23, 255, 0.3)',
   },
   avatarImg: {
     width: '48px',
@@ -418,7 +509,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '50%',
     objectFit: 'cover' as const,
     flexShrink: 0,
-    boxShadow: '0 0 16px rgba(153, 69, 255, 0.3)',
+    boxShadow: '0 0 16px rgba(119, 23, 255, 0.3)',
   },
   profileInfo: {
     flex: 1,
@@ -442,8 +533,8 @@ const styles: Record<string, React.CSSProperties> = {
     height: '80px',
     borderRadius: '50%',
     objectFit: 'cover' as const,
-    border: '3px solid rgba(153, 69, 255, 0.4)',
-    boxShadow: '0 0 20px rgba(153, 69, 255, 0.3)',
+    border: '3px solid rgba(119, 23, 255, 0.4)',
+    boxShadow: '0 0 20px rgba(119, 23, 255, 0.3)',
   },
   avatarPreviewGradient: {
     width: '80px',
@@ -454,10 +545,10 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     fontSize: '34px',
     fontWeight: 900,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     color: '#fff',
-    border: '3px solid rgba(153, 69, 255, 0.4)',
-    boxShadow: '0 0 20px rgba(153, 69, 255, 0.3)',
+    border: '3px solid rgba(119, 23, 255, 0.4)',
+    boxShadow: '0 0 20px rgba(119, 23, 255, 0.3)',
   },
   avatarControls: {
     display: 'flex',
@@ -470,14 +561,14 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 18px',
-    background: 'rgba(153, 69, 255, 0.2)',
-    border: '1px solid rgba(153, 69, 255, 0.4)',
+    background: 'rgba(119, 23, 255, 0.2)',
+    border: '1px solid rgba(119, 23, 255, 0.4)',
     borderRadius: '10px',
     color: '#c084fc',
     fontSize: '15px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     transition: 'all 0.15s ease',
     width: 'fit-content',
   },
@@ -490,25 +581,25 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     width: 'fit-content',
   },
   avatarHint: {
     fontSize: '13px',
     color: theme.text.muted,
     margin: 0,
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
   },
   avatarErrorText: {
     fontSize: '13px',
     color: '#f87171',
     margin: 0,
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     fontWeight: 600,
   },
   statsGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+    gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '8px',
     padding: '12px',
   },
@@ -518,7 +609,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     width: '100%',
     padding: '8px 0',
-    borderBottom: '1px solid rgba(153, 69, 255, 0.06)',
+    borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
     transition: 'background-color 0.15s ease, transform 0.1s ease',
   },
   prefLabel: {
@@ -538,7 +629,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
+  },
+  secInput: {
+    padding: '10px 14px',
+    background: theme.bg.primary,
+    border: '1px solid rgba(119, 23, 255, 0.2)',
+    borderRadius: '8px',
+    color: '#fff',
+    fontSize: '14px',
+    fontFamily: 'inherit',
+    outline: 'none',
   },
   dangerCard: {
     padding: '16px',
@@ -553,7 +654,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '16px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: 'Rajdhani, sans-serif',
+    fontFamily: 'inherit',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
     transition: 'all 0.15s ease',

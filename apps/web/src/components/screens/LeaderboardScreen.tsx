@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../utils/api';
 import { useGameStore } from '../../stores/gameStore';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { MoneyIcon, GemIcon, ChartBarIcon, MedalIcon, TrophyIcon } from '../ui/GameIcons';
+import { setProfileTarget } from './PlayerProfileScreen';
+import { isPhotoAvatar, getAvatarGradient, getInitials as getAvatarInitials } from '../../utils/avatars';
 
 interface LeaderboardEntry {
   rank: number;
   userId: string;
   username: string;
+  avatarUrl?: string | null;
   score: string;
   roundsPlayed?: number;
 }
@@ -41,7 +45,13 @@ function getInitials(name: string): string {
 
 export function LeaderboardScreen() {
   const profile = useGameStore((s) => s.profile);
+  const go = useAppNavigate();
   const isMobile = useIsMobile();
+
+  function viewProfile(userId: string) {
+    setProfileTarget(userId);
+    go('profile');
+  }
   const [activeTab, setActiveTab] = useState<string>('profit');
   const [activePeriod, setActivePeriod] = useState<string>('all');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -66,6 +76,7 @@ export function LeaderboardScreen() {
   function formatScore(score: string, tab: string) {
     const val = parseFloat(score || '0');
     if (tab === 'multiplier') return `${val.toFixed(2)}x`;
+    if (tab === 'volume') return `${Math.round(val)} rounds`;
     return `${formatSol(val)} SOL`;
   }
 
@@ -129,26 +140,38 @@ export function LeaderboardScreen() {
                 alignItems: 'center',
                 justifyContent: 'flex-end',
                 gap: '6px',
-              }}>
+                cursor: 'pointer',
+              }} onClick={() => viewProfile(entry.userId)}>
                 {/* Avatar + medal */}
                 <div style={{ position: 'relative' }}>
-                  <div style={{
-                    width: avatarSize,
-                    height: avatarSize,
-                    borderRadius: '50%',
-                    background: `linear-gradient(135deg, ${meta.color}30, ${meta.color}10)`,
-                    border: `2px solid ${meta.color}`,
-                    boxShadow: `0 0 16px ${meta.glow}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: actualRank === 1 ? '20px' : '16px',
-                    fontWeight: 800,
-                    color: meta.color,
-                    fontFamily: "'Orbitron', sans-serif",
-                  }}>
-                    {getInitials(entry.username)}
-                  </div>
+                  {isPhotoAvatar(entry.avatarUrl) ? (
+                    <img src={entry.avatarUrl!} alt={entry.username} style={{
+                      width: avatarSize,
+                      height: avatarSize,
+                      borderRadius: '50%',
+                      objectFit: 'cover' as const,
+                      border: `2px solid ${meta.color}`,
+                      boxShadow: `0 0 16px ${meta.glow}`,
+                    }} />
+                  ) : (
+                    <div style={{
+                      width: avatarSize,
+                      height: avatarSize,
+                      borderRadius: '50%',
+                      background: getAvatarGradient(null, entry.username),
+                      border: `2px solid ${meta.color}`,
+                      boxShadow: `0 0 16px ${meta.glow}`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: actualRank === 1 ? '20px' : '16px',
+                      fontWeight: 800,
+                      color: '#fff',
+                      fontFamily: "inherit",
+                    }}>
+                      {getAvatarInitials(entry.username)}
+                    </div>
+                  )}
                   <span style={{
                     position: 'absolute',
                     bottom: -6,
@@ -204,7 +227,7 @@ export function LeaderboardScreen() {
                   <span style={{
                     fontSize: actualRank === 1 ? '28px' : '22px',
                     fontWeight: 800,
-                    fontFamily: "'Orbitron', sans-serif",
+                    fontFamily: "inherit",
                     color: `${meta.color}60`,
                   }}>
                     {actualRank}
@@ -258,9 +281,11 @@ export function LeaderboardScreen() {
               return (
                 <div
                   key={entry.userId}
+                  onClick={() => viewProfile(entry.userId)}
                   style={{
                     ...styles.row,
                     ...(isMe ? styles.rowMe : {}),
+                    cursor: 'pointer',
                   }}
                 >
                   {/* Rank */}
@@ -277,27 +302,40 @@ export function LeaderboardScreen() {
                   {/* Player */}
                   <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
                     {/* Mini avatar */}
-                    <div style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: '50%',
-                      background: isMe
-                        ? 'rgba(153, 69, 255, 0.15)'
-                        : meta ? `${meta.color}12` : 'rgba(255, 255, 255, 0.04)',
-                      border: isMe
-                        ? '1.5px solid rgba(153, 69, 255, 0.4)'
-                        : meta ? `1.5px solid ${meta.color}30` : '1.5px solid rgba(255, 255, 255, 0.08)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      fontFamily: "'Orbitron', sans-serif",
-                      color: isMe ? '#c084fc' : meta ? meta.color : theme.text.muted,
-                      flexShrink: 0,
-                    }}>
-                      {getInitials(entry.username)}
-                    </div>
+                    {isPhotoAvatar(entry.avatarUrl) ? (
+                      <img src={entry.avatarUrl!} alt={entry.username} style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: '50%',
+                        objectFit: 'cover' as const,
+                        border: isMe
+                          ? '1.5px solid rgba(119, 23, 255, 0.4)'
+                          : meta ? `1.5px solid ${meta.color}30` : '1.5px solid rgba(255, 255, 255, 0.08)',
+                        flexShrink: 0,
+                      }} />
+                    ) : (
+                      <div style={{
+                        width: 30,
+                        height: 30,
+                        borderRadius: '50%',
+                        background: isMe
+                          ? 'rgba(119, 23, 255, 0.15)'
+                          : getAvatarGradient(null, entry.username),
+                        border: isMe
+                          ? '1.5px solid rgba(119, 23, 255, 0.4)'
+                          : meta ? `1.5px solid ${meta.color}30` : '1.5px solid rgba(255, 255, 255, 0.08)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        fontFamily: "inherit",
+                        color: isMe ? '#c084fc' : meta ? meta.color : '#fff',
+                        flexShrink: 0,
+                      }}>
+                        {getAvatarInitials(entry.username)}
+                      </div>
+                    )}
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0 }}>
                       <span style={{
@@ -324,8 +362,8 @@ export function LeaderboardScreen() {
                           height: '100%',
                           borderRadius: '2px',
                           background: isMe
-                            ? 'rgba(153, 69, 255, 0.5)'
-                            : meta ? `${meta.color}50` : 'rgba(153, 69, 255, 0.2)',
+                            ? 'rgba(119, 23, 255, 0.5)'
+                            : meta ? `${meta.color}50` : 'rgba(119, 23, 255, 0.2)',
                           transition: 'width 0.6s ease',
                         }} />
                       </div>
@@ -360,8 +398,8 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '12px',
     padding: '16px',
-    height: '100%',
-    overflow: 'auto',
+    minHeight: '100%',
+    boxSizing: 'border-box',
   },
   header: {
     display: 'flex',
@@ -371,12 +409,12 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     fontSize: '22px',
     fontWeight: 800,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     color: theme.text.primary,
     margin: 0,
     letterSpacing: '1px',
     textTransform: 'uppercase' as const,
-    textShadow: '0 0 20px rgba(153, 69, 255, 0.3)',
+    textShadow: '0 0 20px rgba(119, 23, 255, 0.3)',
   },
 
   // Tabs
@@ -401,15 +439,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     fontWeight: 700,
     cursor: 'pointer',
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "inherit",
     transition: 'all 0.15s',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
   },
   tabActive: {
-    background: 'rgba(153, 69, 255, 0.15)',
+    background: 'rgba(119, 23, 255, 0.15)',
     color: '#c084fc',
-    boxShadow: '0 0 12px rgba(153, 69, 255, 0.25)',
+    boxShadow: '0 0 12px rgba(119, 23, 255, 0.25)',
   },
   periodWrap: {
     display: 'flex',
@@ -427,11 +465,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     fontWeight: 600,
     cursor: 'pointer',
-    fontFamily: "'Rajdhani', sans-serif",
+    fontFamily: "inherit",
     transition: 'all 0.15s',
   },
   periodActive: {
-    background: 'rgba(153, 69, 255, 0.2)',
+    background: 'rgba(119, 23, 255, 0.2)',
     color: '#c084fc',
   },
 
@@ -479,8 +517,8 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background 0.15s',
   },
   rowMe: {
-    background: 'rgba(153, 69, 255, 0.06)',
-    borderLeft: '3px solid #9945FF',
+    background: 'rgba(119, 23, 255, 0.06)',
+    borderLeft: '3px solid #7717ff',
   },
   rankNum: {
     fontSize: '14px',
@@ -493,7 +531,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: '#c084fc',
     padding: '1px 5px',
-    background: 'rgba(153, 69, 255, 0.15)',
+    background: 'rgba(119, 23, 255, 0.15)',
     borderRadius: '4px',
     marginLeft: '6px',
     verticalAlign: 'middle',
@@ -510,7 +548,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '18px',
     fontWeight: 700,
     color: theme.text.secondary,
-    fontFamily: "'Orbitron', sans-serif",
+    fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
     marginTop: '4px',

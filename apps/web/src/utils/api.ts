@@ -279,11 +279,6 @@ export const api = {
     }),
 
   // Bonus
-  claimBonus: () =>
-    apiFetch<{ success: boolean; message: string; amount?: number }>('/v1/wallet/claim-bonus', {
-      method: 'POST',
-    }),
-
   getBonusStatus: () =>
     apiFetch<{
       claimed: boolean;
@@ -413,14 +408,14 @@ export const api = {
     }),
 
   // Predictions
-  lockPrediction: (betAmount: number) =>
+  lockPrediction: (betAmount: number, direction: 'up' | 'down' | 'sideways') =>
     apiFetch<{ success: boolean; lockRef: string; fee: number }>('/v1/predictions/lock', {
       method: 'POST',
-      body: JSON.stringify({ betAmount }),
+      body: JSON.stringify({ betAmount, direction }),
     }),
 
   savePredictionRound: (data: { lockRef: string; direction: string; result: string; pattern?: string }) =>
-    apiFetch<{ success: boolean; id: string; payout: number; xpGained: number }>('/v1/predictions/save', {
+    apiFetch<{ success: boolean; id: string; payout: number; xpGained: number; result: 'win' | 'loss' }>('/v1/predictions/save', {
       method: 'POST',
       body: JSON.stringify(data),
     }),

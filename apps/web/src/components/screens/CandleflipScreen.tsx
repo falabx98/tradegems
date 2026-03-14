@@ -50,7 +50,6 @@ function generateFlipCandles(mult: number, isBull: boolean, count: number): Arra
   const candles: Array<{ o: number; h: number; l: number; c: number }> = [];
   let price = 1.0;
   const drift = isBull ? 0.02 : -0.015;
-
   for (let i = 0; i < count; i++) {
     const open = price;
     const noise = (Math.random() - 0.45) * 0.06;
@@ -60,20 +59,18 @@ function generateFlipCandles(mult: number, isBull: boolean, count: number): Arra
     candles.push({ o: open, h: Math.max(open, close) + wickUp, l: Math.max(0.6, Math.min(open, close) - wickDn), c: close });
     price = close;
   }
-  // Final candle reaches the multiplier
   const last = candles[candles.length - 1];
   if (isBull) { last.c = mult; last.h = Math.max(last.h, mult * 1.02); }
   else { last.c = mult; last.l = Math.min(last.l, mult * 0.98); }
   return candles;
 }
 
-// Candlestick chart canvas (rugs.fun style) for candleflip results
+// Candlestick chart canvas for candleflip results
 function CandleflipChart({ multiplier, isBullish, width, height }: { multiplier: number; isBullish: boolean; width: number; height: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const candlesRef = useRef<Array<{ o: number; h: number; l: number; c: number }> | null>(null);
   const keyRef = useRef('');
   const key = `${multiplier}-${isBullish}`;
-
   if (keyRef.current !== key) {
     candlesRef.current = generateFlipCandles(multiplier, isBullish, 10);
     keyRef.current = key;
@@ -99,14 +96,13 @@ function CandleflipChart({ multiplier, isBullish, width, height }: { multiplier:
     const pad = { top: 6, bottom: 6, left: 4, right: 4 };
     const chartW = w - pad.left - pad.right;
     const chartH = h - pad.top - pad.bottom;
-
     let pMin = Infinity, pMax = -Infinity;
     for (const c of candles) { pMin = Math.min(pMin, c.l); pMax = Math.max(pMax, c.h); }
     pMin -= 0.02; pMax += 0.02;
     const pRange = pMax - pMin || 0.1;
     const toY = (v: number) => pad.top + ((pMax - v) / pRange) * chartH;
 
-    // 1.0x reference line (dashed green)
+    // 1.0x reference line
     const refY = toY(1.0);
     ctx.strokeStyle = 'rgba(34,197,94,0.3)';
     ctx.lineWidth = 1;
@@ -114,20 +110,15 @@ function CandleflipChart({ multiplier, isBullish, width, height }: { multiplier:
     ctx.beginPath(); ctx.moveTo(pad.left, refY); ctx.lineTo(w - pad.right, refY); ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw candles
     const spacing = chartW / candles.length;
     const candleW = Math.max(3, spacing * 0.55);
-
     for (let i = 0; i < candles.length; i++) {
       const c = candles[i];
       const x = pad.left + (i + 0.5) * spacing;
       const isGreen = c.c >= c.o;
       const color = isGreen ? '#22c55e' : '#ef4444';
-
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = color; ctx.lineWidth = 1;
       ctx.beginPath(); ctx.moveTo(x, toY(c.h)); ctx.lineTo(x, toY(c.l)); ctx.stroke();
-
       const bTop = toY(Math.max(c.o, c.c));
       const bBot = toY(Math.min(c.o, c.c));
       ctx.fillStyle = color;
@@ -136,6 +127,250 @@ function CandleflipChart({ multiplier, isBullish, width, height }: { multiplier:
   }, [multiplier, isBullish, width, height]);
 
   return <canvas ref={canvasRef} style={{ width: `${width}px`, height: `${height}px`, flexShrink: 0, borderRadius: '8px' }} />;
+}
+
+// ─── LIVE SPECTATOR: Auto-cycling candleflip chart ───
+function LiveFlipChart({ recentResults }: { recentResults: any[] }) {
+  const isMobile = useIsMobile();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const phaseRef = useRef<'waiting' | 'flipping' | 'result'>('waiting');
+  const [phase, setPhase] = useState<'waiting' | 'flipping' | 'result'>('waiting');
+  const [flipResult, setFlipResult] = useState<{ mult: number; isBull: boolean } | null>(null);
+  const [flipCountdown, setFlipCountdown] = useState(3);
+  const candlesRef = useRef<Array<{ o: number; h: number; l: number; c: number }>>([]);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0) return;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width;
+    const h = rect.height;
+    const currentPhase = phaseRef.current;
+
+    ctx.fillStyle = '#0a0c10';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, w, h, 12);
+    ctx.fill();
+
+    const pad = { top: 30, bottom: 20, left: 10, right: isMobile ? 44 : 52 };
+    const chartW = w - pad.left - pad.right;
+    const chartH = h - pad.top - pad.bottom;
+
+    if (currentPhase === 'waiting') {
+      // Grid
+      for (let i = 0; i < 4; i++) {
+        const y = pad.top + (chartH / 4) * i;
+        ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+      }
+      // 1.0x line
+      const midY = pad.top + chartH * 0.5;
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(pad.left, midY); ctx.lineTo(w - pad.right, midY); ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = `900 ${isMobile ? 18 : 24}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(251,191,36,0.4)';
+      ctx.shadowBlur = 12;
+      ctx.fillText('NEXT FLIP', w / 2, h * 0.4);
+      ctx.shadowBlur = 0;
+
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = `600 ${isMobile ? 12 : 14}px 'Inter', system-ui, sans-serif`;
+      ctx.fillText('Over / Under 1.00x', w / 2, h * 0.4 + 24);
+      return;
+    }
+
+    if (currentPhase === 'flipping') {
+      // Animated flipping state - show building candles
+      const candles = candlesRef.current;
+      if (candles.length === 0) return;
+
+      let pMin = Infinity, pMax = -Infinity;
+      for (const c of candles) { pMin = Math.min(pMin, c.l); pMax = Math.max(pMax, c.h); }
+      pMin -= 0.03; pMax += 0.03;
+      const pRange = pMax - pMin || 0.1;
+      const toY = (v: number) => pad.top + ((pMax - v) / pRange) * chartH;
+
+      const refY = toY(1.0);
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(pad.left, refY); ctx.lineTo(w - pad.right, refY); ctx.stroke();
+      ctx.setLineDash([]);
+
+      const spacing = chartW / Math.max(candles.length, 10);
+      const cw = Math.max(4, spacing * 0.6);
+      for (let i = 0; i < candles.length; i++) {
+        const c = candles[i];
+        const x = pad.left + (i + 0.5) * spacing;
+        const isGreen = c.c >= c.o;
+        const color = isGreen ? '#22c55e' : '#ef4444';
+        ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.moveTo(x, toY(c.h)); ctx.lineTo(x, toY(c.l)); ctx.stroke();
+        const bTop = toY(Math.max(c.o, c.c));
+        const bBot = toY(Math.min(c.o, c.c));
+        ctx.fillStyle = color;
+        ctx.fillRect(x - cw / 2, bTop, cw, Math.max(2, bBot - bTop));
+      }
+
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = `700 ${isMobile ? 12 : 14}px 'Inter', system-ui, sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText('Flipping...', w / 2, pad.top - 6);
+      return;
+    }
+
+    // RESULT phase - show full chart
+    const candles = candlesRef.current;
+    if (candles.length === 0 || !flipResult) return;
+
+    let pMin = Infinity, pMax = -Infinity;
+    for (const c of candles) { pMin = Math.min(pMin, c.l); pMax = Math.max(pMax, c.h); }
+    pMin -= 0.03; pMax += 0.03;
+    const pRange = pMax - pMin || 0.1;
+    const toY = (v: number) => pad.top + ((pMax - v) / pRange) * chartH;
+
+    // Grid + labels
+    for (let i = 0; i <= 4; i++) {
+      const val = pMin + (pRange / 4) * (4 - i);
+      const y = toY(val);
+      ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.font = `500 ${isMobile ? 9 : 10}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'right';
+      ctx.fillText(`${val.toFixed(2)}x`, w - 4, y + 3);
+    }
+
+    // 1.0x line
+    const refY = toY(1.0);
+    ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, refY); ctx.lineTo(w - pad.right, refY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    const spacing = chartW / candles.length;
+    const cw = Math.max(4, spacing * 0.6);
+    for (let i = 0; i < candles.length; i++) {
+      const c = candles[i];
+      const x = pad.left + (i + 0.5) * spacing;
+      const isGreen = c.c >= c.o;
+      const color = isGreen ? '#22c55e' : '#ef4444';
+      ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(x, toY(c.h)); ctx.lineTo(x, toY(c.l)); ctx.stroke();
+      const bTop = toY(Math.max(c.o, c.c));
+      const bBot = toY(Math.min(c.o, c.c));
+      ctx.fillStyle = color;
+      ctx.fillRect(x - cw / 2, bTop, cw, Math.max(2, bBot - bTop));
+    }
+
+    // Result text
+    const resColor = flipResult.isBull ? '#34d399' : '#f87171';
+    ctx.fillStyle = resColor;
+    ctx.font = `900 ${isMobile ? 24 : 32}px 'JetBrains Mono', monospace`;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = `${resColor}80`;
+    ctx.shadowBlur = 16;
+    ctx.fillText(`${flipResult.mult.toFixed(2)}x`, w / 2, pad.top - 4);
+    ctx.shadowBlur = 0;
+
+    ctx.font = `700 ${isMobile ? 12 : 14}px 'JetBrains Mono', monospace`;
+    ctx.fillText(flipResult.isBull ? 'BULLISH' : 'BEARISH', w / 2, h - 6);
+  }, [isMobile]);
+
+  // Auto-cycle flips
+  useEffect(() => {
+    let cancelled = false;
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+
+    const runFlip = () => {
+      if (cancelled) return;
+
+      // WAITING
+      phaseRef.current = 'waiting';
+      setPhase('waiting');
+      candlesRef.current = [];
+      setFlipResult(null);
+      draw();
+
+      const flipTO = setTimeout(() => {
+        if (cancelled) return;
+
+        // FLIPPING - generate result
+        const isBull = Math.random() > 0.48;
+        const mult = isBull
+          ? 1.0 + Math.random() * 0.5
+          : 0.5 + Math.random() * 0.5;
+
+        const candles = generateFlipCandles(mult, isBull, 10);
+        phaseRef.current = 'flipping';
+        setPhase('flipping');
+
+        // Build candles incrementally
+        let idx = 0;
+        const buildInt = setInterval(() => {
+          if (cancelled || idx >= candles.length) {
+            clearInterval(buildInt);
+            if (cancelled) return;
+
+            // RESULT
+            candlesRef.current = candles;
+            phaseRef.current = 'result';
+            setPhase('result');
+            setFlipResult({ mult, isBull });
+            draw();
+
+            // After 3s, next flip
+            const nextTO = setTimeout(() => {
+              if (!cancelled) runFlip();
+            }, 3000);
+            timeouts.push(nextTO);
+            return;
+          }
+
+          candlesRef.current = candles.slice(0, idx + 1);
+          idx++;
+          draw();
+        }, 200);
+
+        return () => clearInterval(buildInt);
+      }, 3000 + Math.random() * 2000);
+      timeouts.push(flipTO);
+    };
+
+    runFlip();
+
+    return () => {
+      cancelled = true;
+      timeouts.forEach(t => clearTimeout(t));
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => draw();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [draw]);
+
+  const chartHeight = isMobile ? 200 : 280;
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ width: '100%', height: `${chartHeight}px`, display: 'block', borderRadius: '12px' }}
+    />
+  );
 }
 
 export function CandleflipScreen() {
@@ -161,7 +396,6 @@ export function CandleflipScreen() {
   const [animating, setAnimating] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Fetch lobbies + recent results
   const fetchLobbies = async () => {
     try {
       const res = await api.getCandleflipLobbies();
@@ -183,21 +417,19 @@ export function CandleflipScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch history
   useEffect(() => {
     if (tab === 'history' && userId) {
       api.getCandleflipHistory(20).then(r => setHistory(r.games || [])).catch(() => {});
     }
   }, [tab, userId]);
 
-  // Create lobby
   const handleCreate = async () => {
     if (!isAuthenticated) { go('auth'); return; }
     if (loading) return;
     setError(''); setLoading(true);
     playButtonClick(); hapticLight();
     try {
-      const res = await api.createCandleflipGame(betAmount, pick);
+      await api.createCandleflipGame(betAmount, pick);
       fetchLobbies();
     } catch (err: any) {
       setError(err.message || 'Failed to create game');
@@ -205,7 +437,6 @@ export function CandleflipScreen() {
     } finally { setLoading(false); }
   };
 
-  // Join lobby
   const handleJoin = async (gameId: string) => {
     if (!isAuthenticated) { go('auth'); return; }
     if (loading) return;
@@ -228,7 +459,6 @@ export function CandleflipScreen() {
     } finally { setLoading(false); }
   };
 
-  // Cancel own lobby
   const handleCancel = async (gameId: string) => {
     try {
       await api.cancelCandleflipGame(gameId);
@@ -239,7 +469,7 @@ export function CandleflipScreen() {
     }
   };
 
-  // Candle animation
+  // Candle animation for result
   const drawCandle = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas || !activeGame) return;
@@ -250,8 +480,7 @@ export function CandleflipScreen() {
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
     ctx.scale(dpr, dpr);
-    const w = rect.width;
-    const h = rect.height;
+    const w = rect.width, h = rect.height;
     ctx.clearRect(0, 0, w, h);
 
     const multiplier = parseFloat(activeGame.resultMultiplier);
@@ -265,10 +494,7 @@ export function CandleflipScreen() {
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(0, midY);
-    ctx.lineTo(w, midY);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, midY); ctx.lineTo(w, midY); ctx.stroke();
     ctx.setLineDash([]);
 
     ctx.fillStyle = 'rgba(255,255,255,0.3)';
@@ -285,15 +511,10 @@ export function CandleflipScreen() {
     const bodyH = Math.abs(closeY - openY);
 
     const wickExtend = bodyH * 0.4 + 10;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.moveTo(w / 2, bodyTop - wickExtend);
-    ctx.lineTo(w / 2, bodyTop + bodyH + wickExtend);
-    ctx.stroke();
+    ctx.strokeStyle = color; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(w / 2, bodyTop - wickExtend); ctx.lineTo(w / 2, bodyTop + bodyH + wickExtend); ctx.stroke();
 
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 20;
+    ctx.shadowColor = color; ctx.shadowBlur = 20;
     ctx.fillStyle = color;
     ctx.fillRect(candleX, bodyTop, candleW, Math.max(4, bodyH));
     ctx.shadowBlur = 0;
@@ -325,7 +546,6 @@ export function CandleflipScreen() {
         <button style={s.backBtn} onClick={resetGame} className="hover-bright">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
         </button>
-
         <div style={{ textAlign: 'center', padding: '16px 0' }}>
           <div style={{ fontSize: '14px', fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '2px' }}>
             {won ? 'YOU WON!' : 'YOU LOST'}
@@ -334,9 +554,7 @@ export function CandleflipScreen() {
             {won ? `+${formatSol(activeGame.prizeAmount - activeGame.betAmount)}` : `-${formatSol(activeGame.betAmount)}`} SOL
           </div>
         </div>
-
         <canvas ref={canvasRef} style={{ width: '100%', height: '200px', borderRadius: '12px' }} />
-
         <div style={{ ...s.resultCard, borderColor: activeGame.result === 'bullish' ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{ fontSize: '13px', fontWeight: 600, color: theme.text.muted }}>Result</span>
@@ -351,13 +569,10 @@ export function CandleflipScreen() {
           {activeGame.seed && (
             <div style={{ marginTop: '8px', padding: '8px', background: 'rgba(119,23,255,0.06)', borderRadius: '8px' }}>
               <span style={{ fontSize: '10px', fontWeight: 600, color: theme.text.muted, display: 'block', marginBottom: '4px' }}>SEED (Provably Fair)</span>
-              <span style={{ fontSize: '10px', color: theme.text.muted, wordBreak: 'break-all', fontFamily: "'JetBrains Mono', monospace" }}>
-                {activeGame.seed}
-              </span>
+              <span style={{ fontSize: '10px', color: theme.text.muted, wordBreak: 'break-all', fontFamily: "'JetBrains Mono', monospace" }}>{activeGame.seed}</span>
             </div>
           )}
         </div>
-
         <button style={s.playAgainBtn} onClick={resetGame} className="hover-scale">Play Again</button>
       </div>
     );
@@ -398,6 +613,40 @@ export function CandleflipScreen() {
 
       {error && <div style={s.errorMsg} className="screen-enter">{error}</div>}
 
+      {/* LIVE SPECTATOR CHART */}
+      <LiveFlipChart recentResults={recentResults} />
+
+      {/* Recent results strip */}
+      {recentResults.length > 0 && (
+        <div style={{
+          display: 'flex', gap: '6px', overflowX: 'auto', padding: '2px 0',
+          scrollbarWidth: 'none',
+        }}>
+          {recentResults.slice(0, 12).map((r: any) => {
+            const mult = parseFloat(r.resultMultiplier || '1');
+            const isBull = r.result === 'bullish';
+            return (
+              <div key={r.id} style={{
+                padding: '4px 10px', borderRadius: '8px', flexShrink: 0,
+                background: isBull ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)',
+                border: `1px solid ${isBull ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)'}`,
+                display: 'flex', alignItems: 'center', gap: '4px',
+              }}>
+                <span style={{ fontSize: '10px', color: isBull ? '#34d399' : '#f87171' }}>
+                  {isBull ? '\u25B2' : '\u25BC'}
+                </span>
+                <span className="mono" style={{
+                  fontSize: '11px', fontWeight: 800,
+                  color: isBull ? '#34d399' : '#f87171',
+                }}>
+                  {mult.toFixed(2)}x
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Tabs */}
       <div style={s.tabRow}>
         {(['play', 'history'] as Tab[]).map(t => (
@@ -413,90 +662,6 @@ export function CandleflipScreen() {
 
       {tab === 'play' && (
         <>
-          {/* Latest Result Hero Card */}
-          {recentResults.length > 0 && (() => {
-            const hero = recentResults[0];
-            const heroMult = parseFloat(hero.resultMultiplier || '1');
-            const heroIsBull = hero.result === 'bullish';
-            const heroColor = heroIsBull ? '#34d399' : '#f87171';
-            return (
-              <div style={{
-                background: theme.bg.secondary,
-                borderRadius: '14px',
-                padding: '20px',
-                border: `1px solid ${heroColor}40`,
-                animation: 'cardEntrance 0.3s ease-out both',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px',
-              }} className="card-enter">
-                <CandleflipChart multiplier={heroMult} isBullish={heroIsBull} width={140} height={100} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '24px', fontWeight: 900, color: heroColor, fontFamily: "'JetBrains Mono', monospace" }}>
-                    {heroMult.toFixed(2)}x
-                  </div>
-                  <div style={{ marginTop: '6px' }}>
-                    <StatusBadge status={heroIsBull ? 'bullish' : 'bearish'} size="md" />
-                  </div>
-                  <div style={{ fontSize: '12px', color: theme.text.muted, marginTop: '6px' }}>
-                    {formatSol(hero.betAmount)} SOL bet &middot; {formatSol(hero.prizeAmount || 0)} SOL prize
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* Recent Public Results — prominent at top */}
-          <div style={s.recentSection}>
-            <LiveRoundBanner title="Live Results" accentColor="#34d399" count={recentResults.length} />
-            {recentResults.length === 0 ? (
-              <div style={s.emptyState}>
-                <span style={{ fontSize: '28px' }}>🕯️</span>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: theme.text.secondary }}>No recent games</span>
-              </div>
-            ) : (
-              <div style={s.recentScroll}>
-                {recentResults.map(r => {
-                  const mult = parseFloat(r.resultMultiplier || '1');
-                  const isBull = r.result === 'bullish';
-                  return (
-                    <div key={r.id} style={{ ...s.recentGameCard, borderLeft: `3px solid ${isBull ? '#34d399' : '#f87171'}` }} className="card-enter">
-                      <CandleflipChart multiplier={mult} isBullish={isBull} width={72} height={44} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <MultiplierBadge value={mult} />
-                          <StatusBadge status={isBull ? 'bullish' : 'bearish'} />
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: theme.text.muted, marginTop: '2px' }}>
-                          <LiveDot color="#34d399" size={7} />
-                          {formatSol(r.betAmount)} SOL bet
-                          {r.resolvedAt ? ` · ${timeAgo(r.resolvedAt)}` : ''}
-                        </div>
-                      </div>
-                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                        <div style={{ fontSize: '14px', fontWeight: 800, color: '#fbbf24' }} className="mono">
-                          {formatSol(r.prizeAmount || 0)}
-                        </div>
-                        <div style={{ fontSize: '10px', color: theme.text.muted }}>SOL won</div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* How it works */}
-          <div style={s.howItWorks}>
-            <div style={s.howStep}><span style={s.howIcon}>🟢</span><span style={s.howLabel}>Pick Trend</span></div>
-            <div style={s.howDivider} />
-            <div style={s.howStep}><span style={s.howIcon}>💰</span><span style={s.howLabel}>Set Bet</span></div>
-            <div style={s.howDivider} />
-            <div style={s.howStep}><span style={s.howIcon}>🕯️</span><span style={s.howLabel}>Flip</span></div>
-            <div style={s.howDivider} />
-            <div style={s.howStep}><span style={s.howIcon}>🏆</span><span style={s.howLabel}>Win 1.9x</span></div>
-          </div>
-
           {/* Pick */}
           <div style={s.sectionLabel}>Pick Your Trend</div>
           <div style={{ display: 'flex', gap: '10px' }}>
@@ -518,7 +683,7 @@ export function CandleflipScreen() {
             </button>
           </div>
 
-          {/* Bet Amount */}
+          {/* Bet */}
           <div style={s.sectionLabel}>Bet Amount</div>
           <div style={s.betGrid}>
             {BET_AMOUNTS.map(b => (
@@ -533,7 +698,6 @@ export function CandleflipScreen() {
             ))}
           </div>
 
-          {/* Custom input */}
           <div style={s.customBetRow}>
             <input
               type="number"
@@ -548,15 +712,9 @@ export function CandleflipScreen() {
               className="mono"
             />
           </div>
+
           <button
-            style={{
-              width: '100%', padding: '16px',
-              background: 'linear-gradient(135deg, #7717ff, #886cff)',
-              border: 'none', borderRadius: '14px', color: '#fff',
-              fontSize: '16px', fontWeight: 800, cursor: 'pointer',
-              fontFamily: 'inherit',
-              boxShadow: '0 4px 20px rgba(119, 23, 255, 0.3)',
-            }}
+            style={s.createBtn}
             onClick={handleCreate}
             disabled={loading || betAmount <= 0}
             className="hover-scale"
@@ -565,14 +723,13 @@ export function CandleflipScreen() {
           </button>
 
           {/* Open Lobbies */}
-          <div style={{ ...s.sectionLabel, marginTop: '8px' }}>
+          <div style={{ ...s.sectionLabel, marginTop: '4px' }}>
             <span>Open Lobbies</span>
             <span style={{ fontSize: '11px', fontWeight: 500, color: theme.text.muted }}>{lobbies.length} open</span>
           </div>
 
           {lobbies.length === 0 ? (
             <div style={s.emptyState}>
-              <span style={{ fontSize: '28px' }}>🕯️</span>
               <span style={{ fontSize: '14px', fontWeight: 700, color: theme.text.secondary }}>No open lobbies</span>
               <span style={{ fontSize: '12px', color: theme.text.muted }}>Create one and wait for an opponent!</span>
             </div>
@@ -605,9 +762,7 @@ export function CandleflipScreen() {
                     {isOwn ? (
                       <button style={s.cancelBtn} onClick={() => handleCancel(lobby.id)} className="hover-bright">Cancel</button>
                     ) : (
-                      <button style={s.joinBtn} onClick={() => handleJoin(lobby.id)} disabled={loading} className="hover-scale">
-                        JOIN
-                      </button>
+                      <button style={s.joinBtn} onClick={() => handleJoin(lobby.id)} disabled={loading} className="hover-scale">JOIN</button>
                     )}
                   </div>
                 );
@@ -622,7 +777,7 @@ export function CandleflipScreen() {
           {!isAuthenticated ? (
             <div style={s.emptyState}>
               <span style={{ fontSize: '14px', fontWeight: 700, color: theme.text.secondary }}>Sign in to see your history</span>
-              <button style={{ ...s.createBtn, marginTop: '8px' }} onClick={() => go('auth')}>Sign In</button>
+              <button style={{ ...s.joinBtn, marginTop: '8px' }} onClick={() => go('auth')}>Sign In</button>
             </div>
           ) : history.length === 0 ? (
             <div style={s.emptyState}>
@@ -639,9 +794,7 @@ export function CandleflipScreen() {
                     <span style={{ fontSize: '13px', fontWeight: 700, color: g.result === 'bullish' ? '#34d399' : '#f87171' }}>
                       {mult.toFixed(2)}x {g.result === 'bullish' ? 'BULLISH' : 'BEARISH'}
                     </span>
-                    <span style={{ fontSize: '11px', color: theme.text.muted }}>
-                      {new Date(g.resolvedAt).toLocaleDateString()}
-                    </span>
+                    <span style={{ fontSize: '11px', color: theme.text.muted }}>{new Date(g.resolvedAt).toLocaleDateString()}</span>
                   </div>
                   <span style={{ fontSize: '12px', color: theme.text.muted }} className="mono">{formatSol(g.betAmount)} SOL bet</span>
                 </div>
@@ -659,8 +812,8 @@ export function CandleflipScreen() {
 
 const s: Record<string, React.CSSProperties> = {
   root: {
-    display: 'flex', flexDirection: 'column', gap: '14px',
-    padding: '16px', minHeight: '100%', boxSizing: 'border-box',
+    display: 'flex', flexDirection: 'column', gap: '12px',
+    padding: '12px', minHeight: '100%', boxSizing: 'border-box',
     maxWidth: '900px', margin: '0 auto', width: '100%',
   },
   headerSection: { display: 'flex', alignItems: 'center', gap: '12px' },
@@ -689,33 +842,6 @@ const s: Record<string, React.CSSProperties> = {
   tabBtnActive: {
     background: 'rgba(119,23,255,0.12)', borderColor: 'rgba(119,23,255,0.4)', color: '#c084fc',
   },
-  // Recent results section
-  recentSection: {
-    background: theme.bg.secondary, borderRadius: '12px',
-    border: `1px solid ${theme.border.subtle}`, overflow: 'hidden',
-  },
-  recentHeader: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: '10px 14px', borderBottom: `1px solid ${theme.border.subtle}`,
-  },
-  recentScroll: {
-    display: 'flex', flexDirection: 'column' as const, gap: '1px',
-    maxHeight: '280px', overflow: 'auto',
-  },
-  recentGameCard: {
-    display: 'flex', alignItems: 'center', gap: '10px',
-    padding: '10px 14px', background: theme.bg.primary,
-    borderBottom: `1px solid ${theme.border.subtle}`,
-  },
-  howItWorks: {
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
-    padding: '12px 14px', background: theme.bg.secondary, borderRadius: '12px',
-    border: `1px solid ${theme.border.subtle}`,
-  },
-  howStep: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: '3px' },
-  howIcon: { fontSize: '18px' },
-  howLabel: { fontSize: '10px', fontWeight: 700, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.5px' },
-  howDivider: { width: '20px', height: '1px', background: theme.border.subtle },
   sectionLabel: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     fontSize: '12px', fontWeight: 700, color: theme.text.muted,
@@ -745,9 +871,12 @@ const s: Record<string, React.CSSProperties> = {
     outline: 'none', fontFamily: "'JetBrains Mono', monospace", minWidth: 0,
   },
   createBtn: {
-    padding: '12px 24px', background: theme.accent.purple, border: 'none', borderRadius: '10px',
-    color: '#fff', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-    transition: 'all 0.15s', whiteSpace: 'nowrap',
+    width: '100%', padding: '16px',
+    background: 'linear-gradient(135deg, #7717ff, #886cff)',
+    border: 'none', borderRadius: '14px', color: '#fff',
+    fontSize: '16px', fontWeight: 800, cursor: 'pointer',
+    fontFamily: 'inherit',
+    boxShadow: '0 4px 20px rgba(119, 23, 255, 0.3)',
   },
   emptyState: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: '8px',

@@ -4,7 +4,6 @@ import { getDb } from '../../config/database.js';
 import { getRedis } from '../../config/redis.js';
 import { AppError } from '../../middleware/errorHandler.js';
 
-const BONUS_AMOUNT = 1_000_000_000; // 1 SOL in lamports
 const BONUS_PROFIT_THRESHOLD = 1_000_000_000; // Must profit 1 SOL to unlock withdrawal
 
 interface LedgerRef {
@@ -211,6 +210,55 @@ export class WalletService {
       referenceType: 'deposit',
       referenceId: depositId,
     });
+
+    // ── 100% First Deposit Bonus ──
+    // If user hasn't received deposit bonus yet, match 100% of this deposit
+    try {
+      const user = await this.db.query.users.findFirst({
+        where: eq(users.id, userId),
+      });
+
+      if (user && !user.bonusClaimed) {
+        // Apply 100% bonus (same amount as deposit)
+        const bonusAmount = amount;
+
+        await this.db.execute(sql`
+          UPDATE balances
+          SET available_amount = available_amount + ${bonusAmount},
+              bonus_amount = COALESCE(bonus_amount, 0) + ${bonusAmount},
+              updated_at = now()
+          WHERE user_id = ${userId} AND asset = ${asset}
+        `);
+
+        // Mark bonus as used
+        await this.db.execute(sql`
+          UPDATE users SET bonus_claimed = true, updated_at = now()
+          WHERE id = ${userId}
+        `);
+
+        // Get updated balance for ledger
+        const updatedBal = await this.db.query.balances.findFirst({
+          where: and(eq(balances.userId, userId), eq(balances.asset, asset)),
+        });
+
+        // Record bonus ledger entry
+        await this.db.insert(balanceLedgerEntries).values({
+          userId,
+          asset,
+          entryType: 'signup_bonus',
+          amount: bonusAmount,
+          balanceAfter: updatedBal?.availableAmount ?? balanceAfter + bonusAmount,
+          referenceType: 'bonus',
+          referenceId: `deposit-bonus-${depositId}`,
+          metadata: { bonusType: 'first_deposit_100pct', depositAmount: amount, bonusAmount },
+        });
+
+        console.log(`[DepositBonus] Applied 100% bonus of ${bonusAmount} lamports to user ${userId}`);
+      }
+    } catch (err) {
+      // Don't fail the deposit if bonus fails
+      console.error(`[DepositBonus] Failed to apply bonus for user ${userId}:`, err);
+    }
   }
 
   // ─── Transactions ────────────────────────────────────────
@@ -274,57 +322,6 @@ export class WalletService {
       referenceType: 'withdrawal',
       referenceId: withdrawalId,
     });
-  }
-
-  // ─── Bonus: Claim new user bonus ─────────────────────────
-
-  async claimNewUserBonus(userId: string): Promise<{ success: boolean; message: string; amount?: number }> {
-    // Check if user already claimed
-    const user = await this.db.query.users.findFirst({
-      where: eq(users.id, userId),
-    });
-
-    if (!user) {
-      throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
-    }
-
-    if (user.bonusClaimed) {
-      return { success: false, message: 'Bonus already claimed' };
-    }
-
-    // Credit the bonus to available balance AND track in bonusAmount
-    await this.db.execute(sql`
-      INSERT INTO balances (user_id, asset, available_amount, locked_amount, pending_amount, bonus_amount)
-      VALUES (${userId}, 'SOL', ${BONUS_AMOUNT}, 0, 0, ${BONUS_AMOUNT})
-      ON CONFLICT (user_id, asset)
-      DO UPDATE SET available_amount = balances.available_amount + ${BONUS_AMOUNT},
-                    bonus_amount = balances.bonus_amount + ${BONUS_AMOUNT},
-                    updated_at = now()
-    `);
-
-    // Mark user as bonus claimed
-    await this.db.execute(sql`
-      UPDATE users SET bonus_claimed = true, updated_at = now()
-      WHERE id = ${userId}
-    `);
-
-    // Record ledger entry
-    const bal = await this.db.query.balances.findFirst({
-      where: and(eq(balances.userId, userId), eq(balances.asset, 'SOL')),
-    });
-
-    await this.db.insert(balanceLedgerEntries).values({
-      userId,
-      asset: 'SOL',
-      entryType: 'signup_bonus',
-      amount: BONUS_AMOUNT,
-      balanceAfter: bal?.availableAmount ?? BONUS_AMOUNT,
-      referenceType: 'bonus',
-      referenceId: 'new-user-bonus',
-      metadata: { bonusAmount: BONUS_AMOUNT, profitThreshold: BONUS_PROFIT_THRESHOLD },
-    });
-
-    return { success: true, message: 'Welcome bonus of 1 SOL claimed!', amount: BONUS_AMOUNT };
   }
 
   // ─── Bonus: Get bonus status ────────────────────────────
@@ -410,7 +407,7 @@ export class WalletService {
       return {
         eligible: false,
         maxWithdrawable: withdrawable,
-        reason: `Your 1 SOL welcome bonus is locked until you earn 1 SOL in profit. Current profit: ${(currentProfit / 1_000_000_000).toFixed(4)} SOL`,
+        reason: `Your deposit bonus is locked until you earn 1 SOL in profit. Current profit: ${(currentProfit / 1_000_000_000).toFixed(4)} SOL`,
       };
     }
 

@@ -5,7 +5,7 @@ import { api, API_BASE } from '../../utils/api';
 import { formatSol, solToLamports } from '../../utils/sol';
 import { isPhantomInstalled, connectPhantom, sendSolToTreasury, getConnectedAddress } from '../../utils/phantom';
 import { theme } from '../../styles/theme';
-import { CheckIcon, LockIcon, PartyIcon, WalletIcon } from '../ui/GameIcons';
+import { CheckIcon, GiftIcon, WalletIcon } from '../ui/GameIcons';
 
 interface Transaction {
   id: string;
@@ -50,19 +50,13 @@ export function WalletScreen() {
 
   const [linkedAddress, setLinkedAddress] = useState<string | null>(walletAddress);
 
-  const [bonusStatus, setBonusStatus] = useState<{
-    claimed: boolean;
-    bonusAmount: number;
-    profitRequired: number;
-    currentProfit: number;
-    withdrawalUnlocked: boolean;
-  } | null>(null);
+  const [depositBonusUsed, setDepositBonusUsed] = useState<boolean | null>(null);
 
   useEffect(() => {
     loadTransactions();
     loadLinkedWallet();
     loadDepositAddress();
-    loadBonusStatus();
+    loadDepositBonusStatus();
   }, []);
 
   async function loadDepositAddress() {
@@ -82,10 +76,10 @@ export function WalletScreen() {
     }
   }
 
-  async function loadBonusStatus() {
+  async function loadDepositBonusStatus() {
     try {
       const status = await api.getBonusStatus();
-      setBonusStatus(status);
+      setDepositBonusUsed(status.claimed);
     } catch {}
   }
 
@@ -121,6 +115,7 @@ export function WalletScreen() {
       setDepositState('confirmed');
       await syncProfile();
       await loadTransactions();
+      await loadDepositBonusStatus();
       setTimeout(() => setDepositState('idle'), 3000);
     } catch (err: any) {
       setDepositError(err.message || 'Deposit failed');
@@ -342,9 +337,22 @@ export function WalletScreen() {
                 {depositState === 'confirmed' && <div style={s.successMsg}>Deposit confirmed and credited!</div>}
                 {depositError && <div style={s.errorMsg}>{depositError}</div>}
 
+                {/* 100% Deposit Bonus Banner */}
+                {depositBonusUsed === false && (
+                  <div style={s.bonusBanner}>
+                    <div style={s.bonusBannerHeader}>
+                      <GiftIcon size={18} color="#34d399" />
+                      <span style={{ ...s.bonusBannerTitle, color: '#34d399' }}>100% First Deposit Bonus</span>
+                    </div>
+                    <div style={s.bonusBannerDesc}>
+                      Deposit any amount and we'll <strong style={{ color: theme.accent.green }}>double it</strong>. Your first deposit gets matched 100% — deposit 1 SOL, play with 2 SOL!
+                    </div>
+                  </div>
+                )}
+
                 <div style={s.howItWorks}>
                   <div style={s.howTitle}>How it works</div>
-                  {['Send SOL to your deposit address from any wallet', 'Balance updates automatically — no manual verification', 'Bets placed instantly from balance — no wallet popups'].map((text, i) => (
+                  {['Send SOL to your deposit address from any wallet', 'Balance updates automatically — no manual verification', depositBonusUsed === false ? 'First deposit doubled with 100% bonus!' : 'Bets placed instantly from balance — no wallet popups'].map((text, i) => (
                     <div key={i} style={s.howStep}>
                       <span style={s.howNum}>{i + 1}</span>
                       <span style={s.howText}>{text}</span>
@@ -409,42 +417,6 @@ export function WalletScreen() {
                   <span style={s.infoDot}>i</span>
                   <span style={s.infoText}>Min withdrawal: 0.01 SOL. Network fees may apply.</span>
                 </div>
-
-                {/* Bonus lock banner */}
-                {bonusStatus && bonusStatus.claimed && !bonusStatus.withdrawalUnlocked && (
-                  <div style={s.bonusBanner}>
-                    <div style={s.bonusBannerHeader}>
-                      <LockIcon size={18} color="#fbbf24" />
-                      <span style={s.bonusBannerTitle}>Welcome Bonus Locked</span>
-                    </div>
-                    <div style={s.bonusBannerDesc}>
-                      Your <strong style={{ color: theme.accent.green }}>1 SOL</strong> welcome bonus requires <strong style={{ color: theme.accent.green }}>1 SOL</strong> net profit to unlock.
-                    </div>
-                    <div style={s.bonusProgressWrap}>
-                      <div style={s.bonusProgressBar}>
-                        <div style={{
-                          ...s.bonusProgressFill,
-                          width: `${Math.max(0, Math.min(100, (bonusStatus.currentProfit / bonusStatus.profitRequired) * 100))}%`,
-                        }} />
-                      </div>
-                      <div style={s.bonusProgressLabels}>
-                        <span className="mono" style={{ color: bonusStatus.currentProfit >= 0 ? '#34d399' : '#f87171' }}>
-                          {(bonusStatus.currentProfit / 1_000_000_000).toFixed(4)} SOL
-                        </span>
-                        <span className="mono" style={{ color: theme.text.muted }}>
-                          / {(bonusStatus.profitRequired / 1_000_000_000).toFixed(1)} SOL
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {bonusStatus && bonusStatus.claimed && bonusStatus.withdrawalUnlocked && (
-                  <div style={s.bonusUnlockedBanner}>
-                    <PartyIcon size={18} color="#34d399" />
-                    <span style={s.bonusUnlockedText}>Bonus unlocked! Full balance withdrawable.</span>
-                  </div>
-                )}
 
                 <button
                   style={{ ...s.withdrawBtn, opacity: withdrawState === 'processing' ? 0.6 : 1 }}

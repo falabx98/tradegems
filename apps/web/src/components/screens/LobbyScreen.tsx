@@ -6,7 +6,7 @@ import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { api } from '../../utils/api';
 import { formatSol } from '../../utils/sol';
-import { GiftIcon, LockIcon, PartyIcon } from '../ui/GameIcons';
+import { GiftIcon } from '../ui/GameIcons';
 import { LiveDot, GameTypeBadge, timeAgo } from '../ui/LiveIndicators';
 import { ActivityFeed } from '../ActivityFeed';
 import { getAvatarGradient, getInitials } from '../../utils/avatars';
@@ -50,29 +50,9 @@ export function LobbyScreen() {
   const go = useAppNavigate();
   const [showAuthPrompt, setShowAuthPrompt] = useState(false);
   const [liveStats, setLiveStats] = useState({ active: 0, volume: '0', topWin: '1.0x' });
-  const [bonusClaimed, setBonusClaimed] = useState<boolean | null>(null);
-  const [claimingBonus, setClaimingBonus] = useState(false);
-  const [bonusUnlocked, setBonusUnlocked] = useState(false);
-  const [bonusProfit, setBonusProfit] = useState(0);
-  const [bonusProfitRequired, setBonusProfitRequired] = useState(1_000_000_000);
   const [rugRecent, setRugRecent] = useState<any[]>([]);
   const [candleRecent, setCandleRecent] = useState<any[]>([]);
   const [tradingRooms, setTradingRooms] = useState<any[]>([]);
-
-  useEffect(() => {
-    if (!isAuthenticated) return;
-    (async () => {
-      try {
-        const status = await api.getBonusStatus();
-        setBonusClaimed(status.claimed);
-        setBonusUnlocked(status.withdrawalUnlocked);
-        setBonusProfit(status.currentProfit);
-        setBonusProfitRequired(status.profitRequired);
-      } catch {
-        // Ignore
-      }
-    })();
-  }, [isAuthenticated]);
 
   useEffect(() => {
     const fetchLiveData = async () => {
@@ -100,20 +80,6 @@ export function LobbyScreen() {
 
   const activeRoomCount = tradingRooms.filter(r => r.status === 'waiting' || r.status === 'active').length;
 
-  const handleClaimBonus = async () => {
-    setClaimingBonus(true);
-    try {
-      const res = await api.claimBonus();
-      if (res.success) {
-        setBonusClaimed(true);
-        await syncProfile();
-      }
-    } catch (err) {
-      console.error('Failed to claim bonus:', err);
-    }
-    setClaimingBonus(false);
-  };
-
   useEffect(() => {
     (async () => {
       const [profitRes, multRes, onlineRes] = await Promise.all([
@@ -137,8 +103,8 @@ export function LobbyScreen() {
     if (banner.action === 'bonus') {
       if (!isAuthenticated) {
         go('auth');
-      } else if (bonusClaimed === false) {
-        handleClaimBonus();
+      } else {
+        go('wallet');
       }
     } else if (banner.action === 'referrals' || banner.action === 'rewards') {
       if (!isAuthenticated) {
@@ -322,41 +288,17 @@ export function LobbyScreen() {
           </div>
         </div>
 
-        {/* Bonus cards */}
-        {isAuthenticated && bonusClaimed === false && (
-          <div style={styles.bonusCard} className="card-enter card-enter-1">
+        {/* Deposit bonus promo */}
+        {isAuthenticated && (
+          <div style={styles.bonusCard} className="card-enter card-enter-1" onClick={() => go('wallet')}>
             <div style={styles.bonusContent}>
-              <div style={styles.bonusIcon}><GiftIcon size={20} color={theme.accent.violet} /></div>
+              <div style={styles.bonusIcon}><GiftIcon size={20} color={theme.accent.green} /></div>
               <div style={styles.bonusTextWrap}>
-                <span style={styles.bonusTitle}>Welcome Bonus!</span>
-                <span style={styles.bonusDesc}>Claim <strong style={{ color: theme.accent.green }}>1 SOL</strong> free</span>
+                <span style={styles.bonusTitle}>100% Deposit Bonus</span>
+                <span style={styles.bonusDesc}>Double your first deposit!</span>
               </div>
-              <button onClick={handleClaimBonus} disabled={claimingBonus} style={styles.bonusBtn}>
-                {claimingBonus ? '...' : 'Claim'}
-              </button>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent.green, whiteSpace: 'nowrap' as const }}>Deposit →</span>
             </div>
-          </div>
-        )}
-        {isAuthenticated && bonusClaimed === true && !bonusUnlocked && (
-          <div style={styles.bonusStatusCard}>
-            <div style={styles.bonusStatusRow}>
-              <LockIcon size={16} color="#f87171" />
-              <div style={styles.bonusStatusTextWrap}>
-                <span style={styles.bonusStatusTitle}>Bonus locked</span>
-              </div>
-              <span style={{ ...styles.bonusStatusProgress, color: bonusProfit >= 0 ? '#34d399' : '#f87171' }} className="mono">
-                {(bonusProfit / 1e9).toFixed(2)}/{(bonusProfitRequired / 1e9).toFixed(0)}
-              </span>
-            </div>
-            <div style={styles.bonusProgressBarSmall}>
-              <div style={{ ...styles.bonusProgressFillSmall, width: `${Math.max(0, Math.min(100, (bonusProfit / bonusProfitRequired) * 100))}%` }} />
-            </div>
-          </div>
-        )}
-        {isAuthenticated && bonusClaimed === true && bonusUnlocked && (
-          <div style={styles.bonusUnlockedCard}>
-            <PartyIcon size={16} color="#34d399" />
-            <span style={styles.bonusUnlockedText}>Bonus unlocked!</span>
           </div>
         )}
 
@@ -534,39 +476,16 @@ export function LobbyScreen() {
             </div>
           </div>
 
-          {isAuthenticated && bonusClaimed === false && (
-            <div style={styles.bonusCard} className="card-enter card-enter-1">
+          {isAuthenticated && (
+            <div style={styles.bonusCard} className="card-enter card-enter-1" onClick={() => go('wallet')}>
               <div style={styles.bonusContent}>
-                <div style={styles.bonusIcon}><GiftIcon size={24} color={theme.accent.violet} /></div>
+                <div style={styles.bonusIcon}><GiftIcon size={24} color={theme.accent.green} /></div>
                 <div style={styles.bonusTextWrap}>
-                  <span style={styles.bonusTitle}>Welcome Bonus!</span>
-                  <span style={styles.bonusDesc}>Claim <strong style={{ color: theme.accent.green }}>1 SOL</strong> free to start playing. Withdrawable after 1 SOL profit.</span>
+                  <span style={styles.bonusTitle}>100% Deposit Bonus</span>
+                  <span style={styles.bonusDesc}>Double your first deposit — we match it 100%!</span>
                 </div>
-                <button onClick={handleClaimBonus} disabled={claimingBonus} style={styles.bonusBtn}>{claimingBonus ? 'Claiming...' : 'Claim 1 SOL'}</button>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: theme.accent.green, whiteSpace: 'nowrap' as const, cursor: 'pointer' }}>Deposit →</span>
               </div>
-            </div>
-          )}
-          {isAuthenticated && bonusClaimed === true && !bonusUnlocked && (
-            <div style={styles.bonusStatusCard}>
-              <div style={styles.bonusStatusRow}>
-                <LockIcon size={18} color="#f87171" />
-                <div style={styles.bonusStatusTextWrap}>
-                  <span style={styles.bonusStatusTitle}>Bonus: 1 SOL locked</span>
-                  <span style={styles.bonusStatusDesc}>Earn {(bonusProfitRequired / 1e9).toFixed(0)} SOL profit to unlock withdrawals</span>
-                </div>
-                <span style={{ ...styles.bonusStatusProgress, color: bonusProfit >= 0 ? '#34d399' : '#f87171' }} className="mono">
-                  {(bonusProfit / 1e9).toFixed(2)}/{(bonusProfitRequired / 1e9).toFixed(0)}
-                </span>
-              </div>
-              <div style={styles.bonusProgressBarSmall}>
-                <div style={{ ...styles.bonusProgressFillSmall, width: `${Math.max(0, Math.min(100, (bonusProfit / bonusProfitRequired) * 100))}%` }} />
-              </div>
-            </div>
-          )}
-          {isAuthenticated && bonusClaimed === true && bonusUnlocked && (
-            <div style={styles.bonusUnlockedCard}>
-              <PartyIcon size={18} color="#34d399" />
-              <span style={styles.bonusUnlockedText}>Bonus unlocked! Full balance withdrawable.</span>
             </div>
           )}
 

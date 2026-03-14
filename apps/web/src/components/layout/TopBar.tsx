@@ -77,7 +77,7 @@ export function TopBar() {
                 style={styles.ctaPill}
                 className="cta-glow"
               >
-                <span>Play Free — 1 SOL Bonus</span>
+                <span>100% Deposit Bonus</span>
               </div>
             )}
             <button style={styles.walletBtn} onClick={() => go('auth')}>

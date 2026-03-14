@@ -21,6 +21,266 @@ const ENTRY_TIERS = [
   { fee: 500_000_000, label: '0.5', color: '#fbbf24', gradient: 'linear-gradient(135deg, #78350f, #d97706)', icon: '🏆' },
 ];
 
+// ─── LIVE SPECTATOR CHART: Simulated trading round always running ───
+function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: any[] }) {
+  const isMobile = useIsMobile();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const candlesRef = useRef<Array<{ o: number; h: number; l: number; c: number }>>([]);
+  const phaseRef = useRef<'trading' | 'result'>('trading');
+  const [phase, setPhase] = useState<'trading' | 'result'>('trading');
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [pnl, setPnl] = useState(0);
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0) return;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const w = rect.width;
+    const h = rect.height;
+
+    ctx.fillStyle = '#0a0c10';
+    ctx.beginPath();
+    ctx.roundRect(0, 0, w, h, 12);
+    ctx.fill();
+
+    const candles = candlesRef.current;
+    if (candles.length === 0) {
+      // Waiting state
+      ctx.fillStyle = '#34d399';
+      ctx.font = `900 ${isMobile ? 18 : 24}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'center';
+      ctx.shadowColor = 'rgba(52,211,153,0.4)';
+      ctx.shadowBlur = 12;
+      ctx.fillText('TRADING ARENA', w / 2, h * 0.4);
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = `600 ${isMobile ? 12 : 14}px 'Inter', system-ui, sans-serif`;
+      ctx.fillText('Live PvP Trading Competition', w / 2, h * 0.4 + 24);
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.font = `500 ${isMobile ? 11 : 12}px 'Inter', system-ui, sans-serif`;
+      ctx.fillText('60 seconds • Most profit wins', w / 2, h * 0.4 + 48);
+      return;
+    }
+
+    const pad = { top: 30, bottom: 20, left: 10, right: isMobile ? 44 : 52 };
+    const chartW = w - pad.left - pad.right;
+    const chartH = h - pad.top - pad.bottom;
+
+    // Price range
+    const prices = candles.flatMap(c => [c.h, c.l]);
+    const pMin = Math.min(...prices) * 0.998;
+    const pMax = Math.max(...prices) * 1.002;
+    const pRange = pMax - pMin || 1;
+    const toY = (v: number) => pad.top + ((pMax - v) / pRange) * chartH;
+
+    // Grid
+    ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const val = pMin + (pRange / 4) * (4 - i);
+      const y = toY(val);
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.25)';
+      ctx.font = `500 ${isMobile ? 9 : 10}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'right';
+      ctx.fillText(`$${val.toFixed(1)}`, w - 4, y + 3);
+    }
+
+    // Draw candles
+    const maxVisible = isMobile ? 40 : 60;
+    const startIdx = Math.max(0, candles.length - maxVisible);
+    const visible = candles.slice(startIdx);
+    const spacing = chartW / Math.max(visible.length, 20);
+    const cw = Math.max(3, spacing * 0.6);
+
+    for (let i = 0; i < visible.length; i++) {
+      const c = visible[i];
+      const x = pad.left + (i + 0.5) * spacing;
+      const isGreen = c.c >= c.o;
+      const color = isGreen ? '#34d399' : '#f87171';
+      ctx.strokeStyle = color; ctx.lineWidth = isMobile ? 1 : 1.5;
+      ctx.beginPath(); ctx.moveTo(x, toY(c.h)); ctx.lineTo(x, toY(c.l)); ctx.stroke();
+      const bTop = toY(Math.max(c.o, c.c));
+      const bBot = toY(Math.min(c.o, c.c));
+      ctx.fillStyle = color;
+      ctx.fillRect(x - cw / 2, bTop, cw, Math.max(2, bBot - bTop));
+    }
+
+    // Current price line
+    if (candles.length > 0) {
+      const lastC = candles[candles.length - 1];
+      const priceY = toY(lastC.c);
+      const isUp = lastC.c >= candles[0].o;
+      const lineColor = isUp ? '#34d399' : '#f87171';
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(pad.left, priceY); ctx.lineTo(w - pad.right, priceY); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // Price tag
+      ctx.fillStyle = lineColor;
+      ctx.font = `700 ${isMobile ? 10 : 11}px 'JetBrains Mono', monospace`;
+      ctx.textAlign = 'right';
+      ctx.fillText(`$${lastC.c.toFixed(2)}`, w - 4, priceY - 4);
+    }
+
+    // Top info
+    const currentPhase = phaseRef.current;
+    if (currentPhase === 'trading') {
+      ctx.fillStyle = '#34d399';
+      ctx.font = "700 9px 'Inter', system-ui, sans-serif";
+      ctx.textAlign = 'left';
+      ctx.fillText('\u25CF LIVE ROUND', pad.left + 4, 16);
+    } else {
+      ctx.fillStyle = '#fbbf24';
+      ctx.font = "700 9px 'Inter', system-ui, sans-serif";
+      ctx.textAlign = 'left';
+      ctx.fillText('ROUND COMPLETE', pad.left + 4, 16);
+    }
+  }, [isMobile]);
+
+  // Auto-cycle trading rounds
+  useEffect(() => {
+    let cancelled = false;
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    const intervals: ReturnType<typeof setInterval>[] = [];
+
+    const startRound = () => {
+      if (cancelled) return;
+      phaseRef.current = 'trading';
+      setPhase('trading');
+      candlesRef.current = [];
+      setTimeLeft(60);
+      setPnl(0);
+      draw();
+
+      let price = 90 + Math.random() * 20; // $90-$110 start
+      let sec = 0;
+      const totalSec = 60;
+      const drift = (Math.random() - 0.5) * 0.3; // slight trend
+
+      const buildInt = setInterval(() => {
+        if (cancelled || sec >= totalSec) {
+          clearInterval(buildInt);
+          if (cancelled) return;
+
+          // Show result
+          phaseRef.current = 'result';
+          setPhase('result');
+          const startP = candlesRef.current[0]?.o || 100;
+          const endP = price;
+          setPnl(((endP - startP) / startP) * 100);
+          draw();
+
+          // After 5s, next round
+          const nextTO = setTimeout(() => {
+            if (!cancelled) startRound();
+          }, 5000);
+          timeouts.push(nextTO);
+          return;
+        }
+
+        // Generate candle
+        const open = price;
+        const vol = 0.5 + Math.random() * 1.5;
+        const noise = (Math.random() - 0.5) * vol;
+        const close = open + drift + noise;
+        const high = Math.max(open, close) + Math.random() * vol * 0.5;
+        const low = Math.min(open, close) - Math.random() * vol * 0.5;
+        candlesRef.current.push({ o: open, h: high, l: low, c: close });
+        price = close;
+        sec++;
+        setTimeLeft(totalSec - sec);
+        draw();
+      }, 500); // 500ms per candle = 30 seconds for full round visually
+      intervals.push(buildInt);
+    };
+
+    startRound();
+    return () => {
+      cancelled = true;
+      timeouts.forEach(t => clearTimeout(t));
+      intervals.forEach(i => clearInterval(i));
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleResize = () => draw();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [draw]);
+
+  const chartHeight = isMobile ? 200 : 260;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <div style={{ position: 'relative' }}>
+        <canvas
+          ref={canvasRef}
+          style={{ width: '100%', height: `${chartHeight}px`, display: 'block', borderRadius: '12px' }}
+        />
+        {/* Timer overlay */}
+        {phase === 'trading' && (
+          <div style={{
+            position: 'absolute', top: '6px', right: '8px',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            padding: '4px 10px', borderRadius: '8px',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+          }}>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+            <span className="mono" style={{ fontSize: '12px', fontWeight: 700, color: timeLeft <= 10 ? '#f87171' : '#fff' }}>{timeLeft}s</span>
+          </div>
+        )}
+        {phase === 'result' && (
+          <div style={{
+            position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+            textAlign: 'center', padding: '12px 24px', borderRadius: '12px',
+            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+          }}>
+            <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' }}>Round Complete</div>
+            <div className="mono" style={{ fontSize: '22px', fontWeight: 900, color: pnl >= 0 ? '#34d399' : '#f87171', marginTop: '2px' }}>
+              {pnl >= 0 ? '+' : ''}{pnl.toFixed(1)}%
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Active rooms indicator */}
+      {rooms.length > 0 && (
+        <div style={{
+          display: 'flex', gap: '6px', overflowX: 'auto', padding: '2px 0',
+          scrollbarWidth: 'none',
+        }}>
+          {rooms.slice(0, 6).map((r: any) => {
+            const tier = ENTRY_TIERS.find(t => t.fee === Number(r.entryFee)) || ENTRY_TIERS[0];
+            return (
+              <div key={r.id} style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                padding: '5px 10px', background: theme.bg.secondary, borderRadius: '8px',
+                border: `1px solid ${theme.border.subtle}`, flexShrink: 0,
+              }}>
+                <span style={{ fontSize: '12px' }}>{tier.icon}</span>
+                <span className="mono" style={{ fontSize: '11px', fontWeight: 700, color: tier.color }}>
+                  {tier.label} SOL
+                </span>
+                <span style={{ fontSize: '10px', color: theme.text.muted }}>{r.currentPlayers}/{r.maxPlayers}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function TradingSimScreen() {
   const go = useAppNavigate();
   const isMobile = useIsMobile();
@@ -329,6 +589,9 @@ export function TradingSimScreen() {
         </div>
 
         {error && <div style={s.errorMsg} className="screen-enter">{error}</div>}
+
+        {/* LIVE SPECTATOR CHART */}
+        <LiveTradingChart rooms={rooms} recentRooms={recentRooms} />
 
         {/* How it works */}
         <div style={s.howItWorks}>

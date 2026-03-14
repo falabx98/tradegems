@@ -134,13 +134,6 @@ export async function walletRoutes(server: FastifyInstance) {
     );
   });
 
-  // ─── Bonus: Claim new user bonus ────────────────────────
-
-  server.post('/claim-bonus', { config: { rateLimit: { max: 3, timeWindow: '1 minute' } } }, async (request) => {
-    const userId = getAuthUser(request).userId;
-    return walletService.claimNewUserBonus(userId);
-  });
-
   // ─── Bonus: Get bonus status ────────────────────────────
 
   server.get('/bonus-status', async (request) => {

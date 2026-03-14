@@ -172,7 +172,12 @@ export function PredictionScreen() {
     return () => cancelAnimationFrame(raf);
   }, [phase, roundConfig]);
 
-  const WIN_PROBABILITY = 0.45;
+  // Map frontend direction names to backend enum
+  const DIR_MAP: Record<PredictionDirection, 'up' | 'down' | 'sideways'> = {
+    long: 'up',
+    short: 'down',
+    range: 'sideways',
+  };
 
   async function handlePrediction(dir: PredictionDirection) {
     if (!roundConfig || locking) return;
@@ -182,11 +187,11 @@ export function PredictionScreen() {
       return;
     }
 
-    // Pre-lock funds on server before starting the game
+    // Pre-lock funds on server before starting the game (server determines outcome)
     if (isAuthenticated) {
       setLocking(true);
       try {
-        const lockResult = await api.lockPrediction(betAmount);
+        const lockResult = await api.lockPrediction(betAmount, DIR_MAP[dir]);
         setLockRef(lockResult.lockRef);
         // Deduct from local balance immediately for UI feedback
         const feeRate = (globalThis as any).__serverFeeRate ?? 0.03;
@@ -209,63 +214,79 @@ export function PredictionScreen() {
     playBetPlaced();
     hapticMedium();
 
-    // Apply 45% win rate: decide if player should win, then adjust reveal candles
-    const shouldWin = Math.random() < WIN_PROBABILITY;
-    if (shouldWin && roundConfig.outcome !== dir) {
-      setRoundConfig(regenerateWithOutcome(roundConfig, dir));
-    } else if (!shouldWin && roundConfig.outcome === dir) {
-      const alternatives: PredictionDirection[] = (['long', 'short', 'range'] as const).filter(d => d !== dir);
-      const altTarget = alternatives[Math.floor(Math.random() * alternatives.length)];
-      setRoundConfig(regenerateWithOutcome(roundConfig, altTarget));
-    }
-
+    // Chart outcome will be adjusted at resolve time once server tells us win/loss
+    // For now just start the countdown — no client-side manipulation
     setPhase('countdown');
   }
-
-  // Map frontend direction names to backend enum
-  const DIR_MAP: Record<PredictionDirection, 'up' | 'down' | 'sideways'> = {
-    long: 'up',
-    short: 'down',
-    range: 'sideways',
-  };
 
   function resolveRound() {
     if (!roundConfig || !prediction) return;
 
-    const predResult = calculatePredictionResult(prediction, roundConfig, betAmount);
-    setResult(predResult);
-    setPhase('result');
-
-    if (predResult.correct) {
-      playLevelUp();
-      hapticHeavy();
-    } else {
-      playRoundEnd(false);
-    }
-
-    // Settle prediction on server using pre-locked funds and sync balance
     if (isAuthenticated && lockRef) {
+      // ── Server-authoritative flow: ask server for result, then show it ──
       (async () => {
         try {
-          const serverResult = await api.savePredictionRound({
+          const saveResponse = await api.savePredictionRound({
             lockRef,
             direction: DIR_MAP[prediction],
-            result: predResult.correct ? 'win' : 'loss',
+            result: 'loss', // placeholder — server ignores this
           });
+
+          const isWin = saveResponse.result === 'win';
+
+          // Adjust chart candles to match server-determined outcome
+          let finalConfig = roundConfig;
+          if (isWin && roundConfig.outcome !== prediction) {
+            finalConfig = regenerateWithOutcome(roundConfig, prediction);
+          } else if (!isWin && roundConfig.outcome === prediction) {
+            const alternatives: PredictionDirection[] = (['long', 'short', 'range'] as const).filter(d => d !== prediction);
+            const altTarget = alternatives[Math.floor(Math.random() * alternatives.length)];
+            finalConfig = regenerateWithOutcome(roundConfig, altTarget);
+          }
+          setRoundConfig(finalConfig);
+
+          const predResult = calculatePredictionResult(prediction, finalConfig, betAmount);
+          setResult(predResult);
+          setPhase('result');
+
+          if (isWin) {
+            playLevelUp();
+            hapticHeavy();
+          } else {
+            playRoundEnd(false);
+          }
+
           // Update local balance with server-confirmed payout
-          if (serverResult.payout > 0) {
+          if (saveResponse.payout > 0) {
             useGameStore.setState((s) => ({
-              profile: { ...s.profile, balance: s.profile.balance + serverResult.payout },
+              profile: { ...s.profile, balance: s.profile.balance + saveResponse.payout },
             }));
           }
         } catch (err: any) {
           console.warn('Failed to save prediction round:', err);
           toast.error('Save Failed', err?.message || 'Prediction could not be saved to server');
+          // Fallback: show client-calculated result
+          const predResult = calculatePredictionResult(prediction, roundConfig, betAmount);
+          setResult(predResult);
+          setPhase('result');
+          playRoundEnd(false);
         } finally {
           await syncProfile();
           setLockRef(null);
         }
       })();
+    } else {
+      // ── Guest/unauthenticated: use client-side chart outcome ──
+      const predResult = calculatePredictionResult(prediction, roundConfig, betAmount);
+      setResult(predResult);
+      setPhase('result');
+
+      if (predResult.correct) {
+        playLevelUp();
+        hapticHeavy();
+      } else {
+        playRoundEnd(false);
+      }
     }
   }
 
@@ -295,7 +316,7 @@ export function PredictionScreen() {
       </div>
 
       {/* Chart */}
-      <div style={{ ...s.chartWrap, flex: 1, minHeight: isMobile ? '250px' : '350px', position: 'relative' }}>
+      <div style={{ ...s.chartWrap, height: isMobile ? 250 : 350, position: 'relative' }}>
         <CandlestickChart
           historicalCandles={roundConfig.historicalCandles}
           revealCandles={roundConfig.revealCandles}
@@ -577,6 +598,7 @@ const s: Record<string, CSSProperties> = {
   },
   chartWrap: {
     flexShrink: 0,
+    overflow: 'hidden',
   },
 
   // Bet selector

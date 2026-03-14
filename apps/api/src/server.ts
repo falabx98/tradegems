@@ -66,7 +66,7 @@ export async function buildServer() {
   });
 
   await server.register(cookie, {
-    secret: env.JWT_SECRET,
+    secret: crypto.createHash('sha256').update('cookie:' + env.JWT_SECRET).digest('hex'),
     parseOptions: {},
   });
 
@@ -74,6 +74,17 @@ export async function buildServer() {
     max: 100,
     timeWindow: '1 minute',
     redis: getRedis(),
+  });
+
+  // ─── Security Headers ───────────────────────────────────
+  server.addHook('onSend', (_request, reply, _payload, done) => {
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('X-XSS-Protection', '0');
+    reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    done();
   });
 
   // ─── Error Handler ───────────────────────────────────────
@@ -98,21 +109,30 @@ export async function buildServer() {
 
   // ─── SOL Price Proxy (avoids CoinGecko CORS) ────────────
   let cachedSolPrice = { usd: 0, ts: 0 };
+  let solPriceFetchPromise: Promise<any> | null = null;
   server.get('/v1/sol-price', async () => {
     const now = Date.now();
     if (now - cachedSolPrice.ts < 30_000 && cachedSolPrice.usd > 0) {
       return { solana: { usd: cachedSolPrice.usd } };
     }
-    try {
-      const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-      const data = await res.json() as { solana?: { usd?: number } };
-      if (data?.solana?.usd) {
-        cachedSolPrice = { usd: data.solana.usd, ts: now };
-      }
-      return data;
-    } catch {
-      return { solana: { usd: cachedSolPrice.usd || 0 } };
+    // Coalesce concurrent requests to avoid thundering herd
+    if (!solPriceFetchPromise) {
+      solPriceFetchPromise = (async () => {
+        try {
+          const res = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+          const data = await res.json() as { solana?: { usd?: number } };
+          if (data?.solana?.usd) {
+            cachedSolPrice = { usd: data.solana.usd, ts: Date.now() };
+          }
+          return data;
+        } catch {
+          return { solana: { usd: cachedSolPrice.usd || 0 } };
+        } finally {
+          solPriceFetchPromise = null;
+        }
+      })();
     }
+    return solPriceFetchPromise;
   });
 
   // ─── Routes ──────────────────────────────────────────────

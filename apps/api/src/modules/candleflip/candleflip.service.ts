@@ -104,12 +104,13 @@ export class CandleflipService {
     const loserIsBot = loserUser?.role === 'bot';
 
     // Settle winner: unlock their bet + add winnings
+    // fee=0: lockFunds only locked betAmount; house fee is taken from pool difference
     if (!winnerIsBot) {
       try {
         await this.wallet.settlePayout(
           winnerId,
           game.betAmount,
-          Math.floor(houseFee / 2),
+          0,
           prizeAmount,
           'SOL',
           { type: 'candleflip', id: gameId },
@@ -117,13 +118,13 @@ export class CandleflipService {
       } catch { /* lock may already be released */ }
     }
 
-    // Settle loser: unlock with zero payout
+    // Settle loser: unlock with zero payout (fee=0, betAmount is total locked)
     if (!loserIsBot) {
       try {
         await this.wallet.settlePayout(
           loserId,
           game.betAmount,
-          Math.floor(houseFee / 2),
+          0,
           0,
           'SOL',
           { type: 'candleflip', id: gameId },

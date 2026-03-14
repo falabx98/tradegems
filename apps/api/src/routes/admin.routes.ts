@@ -66,11 +66,13 @@ export async function adminRoutes(server: FastifyInstance) {
 
   server.get('/users', async (request) => {
     const { limit, offset, search } = request.query as { limit?: string; offset?: string; search?: string };
-    const lim = parseInt(limit || '50');
-    const off = parseInt(offset || '0');
+    const lim = Math.min(Math.max(parseInt(limit || '50') || 50, 1), 200);
+    const off = Math.max(parseInt(offset || '0') || 0, 0);
 
+    // Escape LIKE special characters to prevent injection
+    const escapeLike = (s: string) => s.replace(/[%_\\]/g, '\\$&');
     const conditions = search
-      ? or(ilike(users.username, `%${search}%`), ilike(users.email, `%${search}%`))
+      ? or(ilike(users.username, `%${escapeLike(search)}%`), ilike(users.email, `%${escapeLike(search)}%`))
       : undefined;
 
     const data = await db

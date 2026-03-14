@@ -52,6 +52,11 @@ export async function seasonRoutes(server: FastifyInstance) {
       track: z.enum(['free', 'premium']),
     }).parse(request.body);
 
+    // Premium track gate: require premium pass (currently unavailable)
+    if (body.track === 'premium') {
+      return reply.status(400).send({ error: 'Premium season pass required. Coming soon!' });
+    }
+
     const rewards = body.track === 'free' ? FREE_REWARDS : PREMIUM_REWARDS;
     const rewardAmount = rewards[body.level];
     if (!rewardAmount) {
@@ -64,18 +69,20 @@ export async function seasonRoutes(server: FastifyInstance) {
       return reply.status(400).send({ error: 'Level not reached yet' });
     }
 
-    // Check if already claimed
-    const existing = await db.query.seasonPassClaims.findFirst({
-      where: and(
-        eq(seasonPassClaims.userId, userId),
-        eq(seasonPassClaims.seasonNumber, CURRENT_SEASON),
-        eq(seasonPassClaims.level, body.level),
-        eq(seasonPassClaims.track, body.track),
-      ),
-    });
-
-    if (existing) {
-      return reply.status(400).send({ error: 'Already claimed' });
+    // Atomic claim guard: INSERT claim first, fail on duplicate (prevents race condition)
+    try {
+      await db.insert(seasonPassClaims).values({
+        userId,
+        seasonNumber: CURRENT_SEASON,
+        level: body.level,
+        track: body.track,
+        amountLamports: rewardAmount,
+      });
+    } catch (err: any) {
+      if (err?.code === '23505' || err?.message?.includes('duplicate')) {
+        return reply.status(400).send({ error: 'Already claimed' });
+      }
+      throw err;
     }
 
     // Credit balance atomically
@@ -86,7 +93,6 @@ export async function seasonRoutes(server: FastifyInstance) {
 
     let newBalance: number;
     if (updated.length === 0) {
-      // No row existed — insert
       const [ins] = await db.insert(balances).values({ userId, asset: 'SOL', availableAmount: rewardAmount, updatedAt: new Date() }).returning({ newBalance: balances.availableAmount });
       newBalance = ins.newBalance;
     } else {
@@ -103,15 +109,6 @@ export async function seasonRoutes(server: FastifyInstance) {
       referenceType: 'season',
       referenceId: `season-${CURRENT_SEASON}-${body.track}-${body.level}`,
       metadata: { seasonNumber: CURRENT_SEASON, level: body.level, track: body.track },
-    });
-
-    // Record claim
-    await db.insert(seasonPassClaims).values({
-      userId,
-      seasonNumber: CURRENT_SEASON,
-      level: body.level,
-      track: body.track,
-      amountLamports: rewardAmount,
     });
 
     return { success: true, amount: rewardAmount, newBalance };

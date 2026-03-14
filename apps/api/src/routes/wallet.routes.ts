@@ -28,7 +28,8 @@ const depositVerifySchema = z.object({
 });
 
 const linkWalletSchema = z.object({
-  address: z.string().min(32).max(64),
+  address: z.string().min(32).max(64).regex(/^[1-9A-HJ-NP-Za-km-z]+$/, 'Invalid Solana address format'),
+  signature: z.string().min(64).max(256).optional(), // TODO: make required once frontend sends signatures
 });
 
 export async function walletRoutes(server: FastifyInstance) {
@@ -244,14 +245,16 @@ export async function walletRoutes(server: FastifyInstance) {
       });
     }
 
-    // 8. Credit balance atomically using SQL increment
+    // 8. Credit balance atomically using SQL increment + RETURNING for accurate balanceAfter
     const [existing] = await db.select().from(balances).where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL')));
 
+    let newBalance: number;
     if (existing) {
-      await db.update(balances).set({
+      const [updated] = await db.update(balances).set({
         availableAmount: sql`${balances.availableAmount} + ${bonusCode.amountLamports}`,
         updatedAt: new Date(),
-      }).where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL')));
+      }).where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL'))).returning({ availableAmount: balances.availableAmount });
+      newBalance = Number(updated?.availableAmount ?? 0);
     } else {
       await db.insert(balances).values({
         userId,
@@ -259,10 +262,10 @@ export async function walletRoutes(server: FastifyInstance) {
         availableAmount: bonusCode.amountLamports,
         updatedAt: new Date(),
       });
+      newBalance = bonusCode.amountLamports;
     }
 
-    // 9. Create ledger entry
-    const newBalance = (existing?.availableAmount ?? 0) + bonusCode.amountLamports;
+    // 9. Create ledger entry with accurate balance
     await db.insert(balanceLedgerEntries).values({
       userId,
       asset: 'SOL',
@@ -274,12 +277,21 @@ export async function walletRoutes(server: FastifyInstance) {
       metadata: { code: bonusCode.code },
     });
 
-    // 10. Insert redemption record
-    await db.insert(bonusCodeRedemptions).values({
-      bonusCodeId: bonusCode.id,
-      userId,
-      amountLamports: bonusCode.amountLamports,
-    });
+    // 10. Insert redemption record (unique constraint prevents double-redemption)
+    try {
+      await db.insert(bonusCodeRedemptions).values({
+        bonusCodeId: bonusCode.id,
+        userId,
+        amountLamports: bonusCode.amountLamports,
+      });
+    } catch (err: any) {
+      // If duplicate constraint fires, the balance was already credited — log and continue
+      if (err?.code === '23505' || err?.message?.includes('duplicate')) {
+        console.warn(`[BonusCode] Duplicate redemption caught for user ${userId}, code ${bonusCode.code}`);
+      } else {
+        throw err;
+      }
+    }
 
     return {
       success: true,

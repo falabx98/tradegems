@@ -58,15 +58,21 @@ export async function tipRoutes(server: FastifyInstance) {
     }
 
     // Settle: remove from sender's locked, credit to recipient's available
-    // Sender side: deduct locked funds (no payout back)
-    await db.execute(sql`
+    // Sender side: deduct locked funds — MUST check result to prevent money creation
+    const deductResult = await db.execute(sql`
       UPDATE balances
       SET locked_amount = locked_amount - ${amount},
           updated_at = now()
       WHERE user_id = ${senderId}
         AND asset = ${asset}
         AND locked_amount >= ${amount}
+      RETURNING locked_amount
     `);
+    const deductRows = deductResult as unknown as Array<Record<string, unknown>>;
+    if (deductRows.length === 0) {
+      // Locked funds already consumed (race condition) — abort without crediting recipient
+      throw new AppError(409, 'TIP_FAILED', 'Tip settlement failed — funds no longer locked');
+    }
 
     // Credit recipient (upsert to handle missing balance row)
     await db.execute(sql`

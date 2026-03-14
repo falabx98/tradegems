@@ -258,9 +258,12 @@ export function RugGameScreen() {
 
   // Track which round we cashed out of (so we keep watching)
   const cashedRoundRef = useRef<string | null>(null);
+  const fetchingRef = useRef(false);
 
-  // Fetch current round from server
+  // Fetch current round from server (with stacking guard)
   const fetchRound = useCallback(async () => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
     try {
       const data = await api.getRugGameRound();
       setRound(data?.round || null);
@@ -271,6 +274,7 @@ export function RugGameScreen() {
         setCashOutDone(null);
       }
     } catch { /* ignore polling errors */ }
+    finally { fetchingRef.current = false; }
   }, []);
 
   const fetchRecent = useCallback(async () => {

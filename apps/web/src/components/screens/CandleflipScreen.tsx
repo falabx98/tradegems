@@ -245,12 +245,16 @@ export function CandleflipScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recentRounds, setRecentRounds] = useState<any[]>([]);
+  const fetchingRef = useRef(false);
 
   const fetchRound = useCallback(async () => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
     try {
       const data = await api.getCandleflipRound();
       setRound(data?.round || null);
     } catch { /* ignore */ }
+    finally { fetchingRef.current = false; }
   }, []);
 
   const fetchRecent = useCallback(async () => {

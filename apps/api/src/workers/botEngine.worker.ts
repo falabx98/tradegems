@@ -474,7 +474,7 @@ async function maintainTradingSimRooms(): Promise<void> {
         maxPlayers,
         currentPlayers: 1,
         status: 'waiting',
-        prizePool: entryFee,
+        prizePool: 0, // Bot-created room: no real funds locked
         duration: 60,
       });
 
@@ -545,7 +545,7 @@ async function processPendingSimJoins(): Promise<void> {
           await db.update(tradingSimRooms)
             .set({
               currentPlayers: sql`${tradingSimRooms.currentPlayers} + 1`,
-              prizePool: sql`${tradingSimRooms.prizePool} + ${room.entryFee}`,
+              // Don't add to prizePool — bots don't lock real funds
             })
             .where(eq(tradingSimRooms.id, roomId));
 

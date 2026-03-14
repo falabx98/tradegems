@@ -368,15 +368,15 @@ export const useGameStore = create<GameState>((set, get) => ({
         profile: {
           ...state.profile,
           id: me.id,
-          username: me.username || state.profile.username,
-          level: me.level || state.profile.level,
-          vipTier: (me.vipTier as any) || state.profile.vipTier,
+          username: me.username ?? state.profile.username,
+          level: me.level ?? state.profile.level,
+          vipTier: (me.vipTier as any) ?? state.profile.vipTier,
           avatarUrl: me.avatarUrl ?? state.profile.avatarUrl,
           balance: availableLamports, // stored as lamports
-          totalWagered: stats.totalWagered || state.profile.totalWagered,
-          totalWon: stats.totalWon || state.profile.totalWon,
-          roundsPlayed: stats.roundsPlayed || state.profile.roundsPlayed,
-          winRate: stats.winRate || state.profile.winRate,
+          totalWagered: stats.totalWagered ?? state.profile.totalWagered,
+          totalWon: stats.totalWon ?? state.profile.totalWon,
+          roundsPlayed: stats.roundsPlayed ?? state.profile.roundsPlayed,
+          winRate: stats.winRate ?? state.profile.winRate,
           bestMultiplier: stats.bestMultiplier ? parseFloat(stats.bestMultiplier) : state.profile.bestMultiplier,
         },
       }));

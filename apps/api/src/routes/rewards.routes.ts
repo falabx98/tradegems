@@ -131,15 +131,10 @@ export async function rewardsRoutes(server: FastifyInstance) {
     const userId = getAuthUser(request).userId;
     const { id } = request.params as { id: string };
 
-    // Check if already claimed
-    const alreadyClaimed = await db.execute(sql`
-      SELECT id FROM balance_ledger_entries
-      WHERE user_id = ${userId} AND entry_type = 'mission_claim' AND reference_id = ${id}
-      LIMIT 1
-    `);
-    const alreadyRows = alreadyClaimed as unknown as Array<Record<string, unknown>>;
-    if (alreadyRows.length > 0) {
-      return { success: false, message: 'Mission already claimed' };
+    // Validate mission ID upfront
+    const rewardLamports = MISSION_REWARDS_LAMPORTS[id];
+    if (!rewardLamports) {
+      return { success: false, message: 'Unknown mission' };
     }
 
     // Verify mission is actually completed
@@ -170,9 +165,20 @@ export async function rewardsRoutes(server: FastifyInstance) {
       return { success: false, message: 'Mission not yet completed' };
     }
 
-    const rewardLamports = MISSION_REWARDS_LAMPORTS[id];
-    if (!rewardLamports) {
-      return { success: false, message: 'Unknown mission' };
+    // Atomic claim guard: INSERT ledger entry with ON CONFLICT to prevent double-claim race condition
+    const claimResult = await db.execute(sql`
+      INSERT INTO balance_ledger_entries
+        (user_id, asset, entry_type, amount, balance_after, reference_type, reference_id)
+      SELECT ${userId}, 'SOL', 'mission_claim', ${rewardLamports}, 0, 'mission', ${id}
+      WHERE NOT EXISTS (
+        SELECT 1 FROM balance_ledger_entries
+        WHERE user_id = ${userId} AND entry_type = 'mission_claim' AND reference_id = ${id}
+      )
+      RETURNING id
+    `);
+    const claimRows = claimResult as unknown as Array<Record<string, unknown>>;
+    if (claimRows.length === 0) {
+      return { success: false, message: 'Mission already claimed' };
     }
 
     // Credit reward to balance
@@ -182,18 +188,15 @@ export async function rewardsRoutes(server: FastifyInstance) {
       WHERE user_id = ${userId} AND asset = 'SOL'
     `);
 
-    // Get updated balance
+    // Update ledger entry with correct balance_after
     const balResult = await db.execute(sql`
       SELECT available_amount FROM balances
       WHERE user_id = ${userId} AND asset = 'SOL'
     `);
     const balAfter = Number((balResult as unknown as Array<Record<string, unknown>>)[0]?.available_amount || 0);
-
-    // Record claim in ledger
     await db.execute(sql`
-      INSERT INTO balance_ledger_entries
-        (user_id, asset, entry_type, amount, balance_after, reference_type, reference_id)
-      VALUES (${userId}, 'SOL', 'mission_claim', ${rewardLamports}, ${balAfter}, 'mission', ${id})
+      UPDATE balance_ledger_entries SET balance_after = ${balAfter}
+      WHERE id = ${claimRows[0].id}
     `);
 
     return { success: true, message: `Claimed ${(rewardLamports / 1e9).toFixed(2)} SOL!`, amount: rewardLamports };
@@ -276,64 +279,74 @@ export async function rewardsRoutes(server: FastifyInstance) {
 
   server.post('/rakeback/claim', async (request) => {
     const userId = getAuthUser(request).userId;
+    const { getRedis } = await import('../config/redis.js');
+    const redis = getRedis();
 
-    // Get claimable amount
-    const userResult = await db.execute(sql`
-      SELECT vip_tier FROM users WHERE id = ${userId}
-    `);
-    const userRows = userResult as unknown as Array<Record<string, unknown>>;
-    const vipTier = String(userRows[0]?.vip_tier || 'bronze');
-    const rate = RAKEBACK_RATES[vipTier] || 0.01;
-
-    // Calculate accumulated rakeback from total fees paid (solo + prediction + tournament)
-    const feeResult2 = await db.execute(sql`
-      SELECT COALESCE(SUM(fee), 0) as total_fees FROM (
-        SELECT fee FROM bets WHERE user_id = ${userId} AND status = 'settled'
-        UNION ALL
-        SELECT (metadata->>'fee')::bigint as fee FROM prediction_rounds WHERE user_id = ${userId} AND metadata->>'fee' IS NOT NULL
-        UNION ALL
-        SELECT fee FROM tournament_participants tp JOIN tournaments t ON t.id = tp.tournament_id WHERE tp.user_id = ${userId}
-      ) all_fees
-    `);
-    const feeRows2 = feeResult2 as unknown as Array<Record<string, unknown>>;
-    const totalFees2 = Number(feeRows2[0]?.total_fees || 0);
-    const accumulated2 = Math.floor(totalFees2 * rate);
-
-    // Subtract what has already been claimed
-    const claimedResult2 = await db.execute(sql`
-      SELECT COALESCE(SUM(amount), 0) as total_claimed
-      FROM balance_ledger_entries
-      WHERE user_id = ${userId} AND asset = 'SOL' AND entry_type = 'rakeback_claim'
-    `);
-    const claimedRows2 = claimedResult2 as unknown as Array<Record<string, unknown>>;
-    const totalClaimed2 = Number(claimedRows2[0]?.total_claimed || 0);
-    const claimable = Math.max(0, accumulated2 - totalClaimed2);
-
-    if (claimable <= 0) {
-      return { success: false, message: 'No rakeback to claim' };
+    // Distributed lock to prevent double-claim race condition
+    const lockKey = `rakeback_claim:${userId}`;
+    const locked = await redis.set(lockKey, '1', 'EX', 10, 'NX');
+    if (!locked) {
+      return { success: false, message: 'Claim already in progress' };
     }
 
-    // Credit to balance
-    await db.execute(sql`
-      UPDATE balances
-      SET available_amount = available_amount + ${claimable}, updated_at = now()
-      WHERE user_id = ${userId} AND asset = 'SOL'
-    `);
+    try {
+      // Get claimable amount
+      const userResult = await db.execute(sql`
+        SELECT vip_tier FROM users WHERE id = ${userId}
+      `);
+      const userRows = userResult as unknown as Array<Record<string, unknown>>;
+      const vipTier = String(userRows[0]?.vip_tier || 'bronze');
+      const rate = RAKEBACK_RATES[vipTier] || 0.01;
 
-    // Record ledger entry so we track what was claimed
-    const balResult = await db.execute(sql`
-      SELECT available_amount FROM balances
-      WHERE user_id = ${userId} AND asset = 'SOL'
-    `);
-    const balAfter = Number((balResult as unknown as Array<Record<string, unknown>>)[0]?.available_amount || 0);
+      const feeResult2 = await db.execute(sql`
+        SELECT COALESCE(SUM(fee), 0) as total_fees FROM (
+          SELECT fee FROM bets WHERE user_id = ${userId} AND status = 'settled'
+          UNION ALL
+          SELECT (metadata->>'fee')::bigint as fee FROM prediction_rounds WHERE user_id = ${userId} AND metadata->>'fee' IS NOT NULL
+          UNION ALL
+          SELECT fee FROM tournament_participants tp JOIN tournaments t ON t.id = tp.tournament_id WHERE tp.user_id = ${userId}
+        ) all_fees
+      `);
+      const feeRows2 = feeResult2 as unknown as Array<Record<string, unknown>>;
+      const totalFees2 = Number(feeRows2[0]?.total_fees || 0);
+      const accumulated2 = Math.floor(totalFees2 * rate);
 
-    await db.execute(sql`
-      INSERT INTO balance_ledger_entries
-        (user_id, asset, entry_type, amount, balance_after, reference_type, reference_id)
-      VALUES (${userId}, 'SOL', 'rakeback_claim', ${claimable}, ${balAfter}, 'rakeback', ${userId})
-    `);
+      const claimedResult2 = await db.execute(sql`
+        SELECT COALESCE(SUM(amount), 0) as total_claimed
+        FROM balance_ledger_entries
+        WHERE user_id = ${userId} AND asset = 'SOL' AND entry_type = 'rakeback_claim'
+      `);
+      const claimedRows2 = claimedResult2 as unknown as Array<Record<string, unknown>>;
+      const totalClaimed2 = Number(claimedRows2[0]?.total_claimed || 0);
+      const claimable = Math.max(0, accumulated2 - totalClaimed2);
 
-    return { success: true, claimed: claimable };
+      if (claimable <= 0) {
+        return { success: false, message: 'No rakeback to claim' };
+      }
+
+      // Credit to balance
+      await db.execute(sql`
+        UPDATE balances
+        SET available_amount = available_amount + ${claimable}, updated_at = now()
+        WHERE user_id = ${userId} AND asset = 'SOL'
+      `);
+
+      // Record ledger entry
+      const balResult = await db.execute(sql`
+        SELECT available_amount FROM balances WHERE user_id = ${userId} AND asset = 'SOL'
+      `);
+      const balAfter = Number((balResult as unknown as Array<Record<string, unknown>>)[0]?.available_amount || 0);
+
+      await db.execute(sql`
+        INSERT INTO balance_ledger_entries
+          (user_id, asset, entry_type, amount, balance_after, reference_type, reference_id)
+        VALUES (${userId}, 'SOL', 'rakeback_claim', ${claimable}, ${balAfter}, 'rakeback', ${userId})
+      `);
+
+      return { success: true, claimed: claimable };
+    } finally {
+      await redis.del(lockKey);
+    }
   });
 
   // ---- Daily Mystery Box ----
@@ -422,35 +435,26 @@ export async function rewardsRoutes(server: FastifyInstance) {
     const level = Number(userRows[0]?.level || 1);
     const vipTier = String(userRows[0]?.vip_tier || 'bronze');
 
-    // Check 24h cooldown
-    const lastClaimResult = await db.execute(sql`
-      SELECT claimed_at FROM daily_rewards
-      WHERE user_id = ${userId}
-      ORDER BY claimed_at DESC
-      LIMIT 1
-    `);
-    const claimRows = lastClaimResult as unknown as Array<Record<string, unknown>>;
-    const lastClaimed = claimRows[0]?.claimed_at
-      ? new Date(claimRows[0].claimed_at as string)
-      : null;
-
-    const now = new Date();
-    const cooldownMs = 24 * 60 * 60 * 1000;
-    if (lastClaimed && now.getTime() - lastClaimed.getTime() < cooldownMs) {
-      const nextAvailableAt = new Date(lastClaimed.getTime() + cooldownMs);
-      return { success: false, message: 'Daily box already claimed', nextAvailableAt: nextAvailableAt.toISOString() };
-    }
-
-    // Roll the mystery box
+    // Roll the mystery box (before cooldown check so we can insert atomically)
     const { rarity, amountLamports } = rollMysteryBox(vipTier);
 
-    // Insert daily_rewards record
+    // Atomic: Insert daily_rewards only if 24h cooldown has passed (prevents race condition)
+    const cooldownMs = 24 * 60 * 60 * 1000;
     const insertResult = await db.execute(sql`
       INSERT INTO daily_rewards (user_id, rarity, amount_lamports, user_level, vip_tier)
-      VALUES (${userId}, ${rarity}, ${amountLamports}, ${level}, ${vipTier})
+      SELECT ${userId}, ${rarity}, ${amountLamports}, ${level}, ${vipTier}
+      WHERE NOT EXISTS (
+        SELECT 1 FROM daily_rewards
+        WHERE user_id = ${userId}
+          AND claimed_at > NOW() - INTERVAL '24 hours'
+      )
       RETURNING id
     `);
-    const rewardId = (insertResult as unknown as Array<Record<string, unknown>>)[0]?.id as string;
+    const insertRows = insertResult as unknown as Array<Record<string, unknown>>;
+    if (insertRows.length === 0) {
+      return { success: false, message: 'Daily box already claimed', nextAvailableAt: null };
+    }
+    const rewardId = insertRows[0].id as string;
 
     // Credit balance
     await db.execute(sql`

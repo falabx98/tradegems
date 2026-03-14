@@ -63,7 +63,9 @@ function ConfettiCanvas({ active }: { active: boolean }) {
     }));
 
     let frame = 0;
+    let cancelled = false;
     const tick = () => {
+      if (cancelled) return;
       ctx.clearRect(0, 0, w, h);
       let alive = false;
       for (const p of particles) {
@@ -87,6 +89,7 @@ function ConfettiCanvas({ active }: { active: boolean }) {
       if (alive && frame < 200) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
+    return () => { cancelled = true; };
   }, [active]);
 
   if (!active) return null;

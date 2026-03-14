@@ -2,6 +2,8 @@ import { buildServer } from './server.js';
 import { env } from './config/env.js';
 import { startSweepWorker, stopSweepWorker } from './workers/sweepWorker.js';
 import { stopBotEngine } from './workers/botEngine.worker.js';
+import { stopRugRoundManager } from './modules/round-manager/rugRoundManager.js';
+import { stopCandleflipRoundManager } from './modules/round-manager/candleflipRoundManager.js';
 
 async function main() {
   const server = await buildServer();
@@ -24,6 +26,8 @@ async function main() {
       server.log.info(`${signal} received, shutting down...`);
       stopSweepWorker();
       stopBotEngine();
+      stopRugRoundManager();
+      stopCandleflipRoundManager();
       await server.close();
       process.exit(0);
     });

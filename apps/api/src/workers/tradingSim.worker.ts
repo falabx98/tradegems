@@ -1,7 +1,8 @@
 import { getDb } from '../config/database.js';
-import { tradingSimRooms } from '@tradingarena/db';
+import { tradingSimRooms, tradingSimParticipants, users } from '@tradingarena/db';
 import { eq, and, lte, sql } from 'drizzle-orm';
 import { TradingSimService } from '../modules/trading-sim/tradingSim.service.js';
+import { WalletService } from '../modules/wallet/wallet.service.js';
 
 const POLL_INTERVAL_MS = 5_000; // 5 seconds — games are short
 
@@ -35,11 +36,40 @@ async function tick(): Promise<void> {
     }
 
     // Clean up old waiting rooms (> 10 minutes old, never started)
+    // Refund real players' locked entry fees before marking as finished
     const tenMinAgo = new Date(now - 10 * 60 * 1000);
-    await db
-      .update(tradingSimRooms)
-      .set({ status: 'finished' })
+    const staleRooms = await db
+      .select({ id: tradingSimRooms.id, entryFee: tradingSimRooms.entryFee })
+      .from(tradingSimRooms)
       .where(and(eq(tradingSimRooms.status, 'waiting'), lte(tradingSimRooms.createdAt, tenMinAgo)));
+
+    const wallet = new WalletService();
+    for (const staleRoom of staleRooms) {
+      try {
+        const participants = await db
+          .select({ userId: tradingSimParticipants.userId, role: users.role })
+          .from(tradingSimParticipants)
+          .innerJoin(users, eq(users.id, tradingSimParticipants.userId))
+          .where(eq(tradingSimParticipants.roomId, staleRoom.id));
+
+        for (const p of participants) {
+          if (p.role === 'bot') continue;
+          try {
+            await wallet.settlePayout(
+              p.userId, staleRoom.entryFee, 0, staleRoom.entryFee, 'SOL',
+              { type: 'trading_sim', id: staleRoom.id },
+            );
+          } catch { /* lock may already be released */ }
+        }
+
+        await db.update(tradingSimRooms)
+          .set({ status: 'finished' })
+          .where(eq(tradingSimRooms.id, staleRoom.id));
+        console.log(`[TradingSimWorker] Stale room ${staleRoom.id} cleaned up with refunds`);
+      } catch (err) {
+        console.error(`[TradingSimWorker] Failed to clean stale room ${staleRoom.id}:`, err);
+      }
+    }
   } catch (err) {
     console.error('[TradingSimWorker] Tick error:', err);
   }

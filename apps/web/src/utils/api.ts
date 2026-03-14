@@ -502,7 +502,7 @@ export const api = {
   // ─── Candleflip (Public Rounds) ──────────────────────────────
 
   getCandleflipRound: () =>
-    apiFetch<any>('/v1/candleflip/round'),
+    apiFetch<{ round: any }>('/v1/candleflip/round'),
 
   betCandleflipRound: (pick: 'bullish' | 'bearish', betAmount: number) =>
     apiFetch<{ success: boolean; message?: string }>('/v1/candleflip/bet', {
@@ -511,7 +511,7 @@ export const api = {
     }),
 
   getCandleflipRecentRounds: (limit = 10) =>
-    apiFetch<any[]>(`/v1/candleflip/rounds/recent?limit=${limit}`),
+    apiFetch<{ rounds: any[] }>(`/v1/candleflip/rounds/recent?limit=${limit}`),
 
   // Legacy candleflip endpoints (backward compat)
   getCandleflipLobbies: () =>
@@ -529,7 +529,7 @@ export const api = {
   // ─── Rug Game (Public Rounds) ────────────────────────────────
 
   getRugGameRound: () =>
-    apiFetch<any>('/v1/rug-game/round'),
+    apiFetch<{ round: any }>('/v1/rug-game/round'),
 
   joinRugGameRound: (betAmount: number) =>
     apiFetch<{ success: boolean; message?: string }>('/v1/rug-game/join', {
@@ -544,7 +544,7 @@ export const api = {
     }),
 
   getRugGameRecentRounds: (limit = 10) =>
-    apiFetch<any[]>(`/v1/rug-game/rounds/recent?limit=${limit}`),
+    apiFetch<{ rounds: any[] }>(`/v1/rug-game/rounds/recent?limit=${limit}`),
 
   // Legacy rug game endpoints (backward compat)
   startRugGame: (betAmount: number) =>

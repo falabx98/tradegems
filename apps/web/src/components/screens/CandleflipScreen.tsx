@@ -249,14 +249,14 @@ export function CandleflipScreen() {
   const fetchRound = useCallback(async () => {
     try {
       const data = await api.getCandleflipRound();
-      setRound(data);
+      setRound(data?.round || null);
     } catch { /* ignore */ }
   }, []);
 
   const fetchRecent = useCallback(async () => {
     try {
       const data = await api.getCandleflipRecentRounds(10);
-      setRecentRounds(data || []);
+      setRecentRounds(data?.rounds || []);
     } catch { /* ignore */ }
   }, []);
 

@@ -263,10 +263,10 @@ export function RugGameScreen() {
   const fetchRound = useCallback(async () => {
     try {
       const data = await api.getRugGameRound();
-      setRound(data);
+      setRound(data?.round || null);
 
       // If we transitioned to a new round, reset cashout state
-      if (cashedRoundRef.current && data?.roundId !== cashedRoundRef.current) {
+      if (cashedRoundRef.current && data?.round?.roundId !== cashedRoundRef.current) {
         cashedRoundRef.current = null;
         setCashOutDone(null);
       }
@@ -276,7 +276,7 @@ export function RugGameScreen() {
   const fetchRecent = useCallback(async () => {
     try {
       const data = await api.getRugGameRecentRounds(10);
-      setRecentRounds(data || []);
+      setRecentRounds(data?.rounds || []);
     } catch { /* ignore */ }
   }, []);
 

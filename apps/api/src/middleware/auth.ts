@@ -77,11 +77,43 @@ export async function optionalAuth(request: FastifyRequest, _reply: FastifyReply
   try {
     await request.jwtVerify();
     const payload = request.user as unknown as { sub: string; role: string; sid: string };
-    (request as any).authUser = {
+    const authUser: AuthUser = {
       userId: payload.sub,
       role: payload.role,
       sessionId: payload.sid,
-    } as AuthUser;
+    };
+
+    // M9 fix: Check session revocation (on failure, clear identity instead of blocking)
+    try {
+      const { getRedis } = await import('../config/redis.js');
+      const redis = getRedis();
+      const cacheKey = `revoked:session:${authUser.sessionId}`;
+      const cached = await redis.get(cacheKey);
+      if (cached === '1') {
+        (request as any).authUser = null;
+        return;
+      }
+      if (cached === null) {
+        const { getDb } = await import('../config/database.js');
+        const { userSessions } = await import('@tradingarena/db');
+        const { eq } = await import('drizzle-orm');
+        const db = getDb();
+        const session = await db.query.userSessions.findFirst({
+          where: eq(userSessions.id, authUser.sessionId),
+          columns: { revokedAt: true },
+        });
+        if (session?.revokedAt) {
+          await redis.set(cacheKey, '1', 'EX', 300);
+          (request as any).authUser = null;
+          return;
+        }
+        await redis.set(cacheKey, '0', 'EX', 60);
+      }
+    } catch {
+      // On error, still allow optionalAuth to pass (degrade gracefully)
+    }
+
+    (request as any).authUser = authUser;
   } catch {
     // No valid token — that's fine for optional auth
     (request as any).authUser = null;

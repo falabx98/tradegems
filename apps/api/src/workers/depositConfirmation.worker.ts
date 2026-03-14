@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm';
 import { deposits } from '@tradingarena/db';
 import { getDb } from '../config/database.js';
 import { getRedis } from '../config/redis.js';
@@ -149,17 +149,29 @@ async function processDeposit(
     `[DepositWorker] Deposit ${deposit.id} confirmed (${verification.confirmations} confirmations, ${deposit.amount} lamports)`,
   );
 
-  // Update deposit status to confirmed
-  await db
+  // Atomic status transition: only update if still 'confirming' (prevents double-credit)
+  const updateResult = await db
     .update(deposits)
     .set({
       status: 'confirmed',
       confirmations: verification.confirmations,
       confirmedAt: new Date(),
     })
-    .where(eq(deposits.id, deposit.id));
+    .where(
+      and(
+        eq(deposits.id, deposit.id),
+        eq(deposits.status, 'confirming'),
+      ),
+    )
+    .returning();
 
-  // Credit user balance
+  if (!updateResult || updateResult.length === 0) {
+    // Already confirmed by submitDeposit or another worker cycle — skip credit
+    console.log(`[DepositWorker] Deposit ${deposit.id} already confirmed, skipping credit`);
+    return;
+  }
+
+  // Credit user balance (only reached if we won the status transition)
   await walletService.creditDeposit(
     deposit.userId,
     deposit.amount,

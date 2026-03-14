@@ -172,15 +172,32 @@ export async function adminRoutes(server: FastifyInstance) {
     const actor = getAuthUser(request);
     const assetType = asset || 'SOL';
 
-    // Upsert balance atomically
-    const updated = await db.update(balances).set({
-      availableAmount: sql`${balances.availableAmount} + ${amount}`,
-      updatedAt: new Date(),
-    }).where(and(eq(balances.userId, id), eq(balances.asset, assetType)))
-      .returning({ newBalance: balances.availableAmount });
+    // M7 fix: For negative adjustments, guard against driving balance below zero
+    let updated;
+    if (amount < 0) {
+      updated = await db.update(balances).set({
+        availableAmount: sql`${balances.availableAmount} + ${amount}`,
+        updatedAt: new Date(),
+      }).where(and(
+        eq(balances.userId, id),
+        eq(balances.asset, assetType),
+        sql`${balances.availableAmount} >= ${Math.abs(amount)}`,
+      )).returning({ newBalance: balances.availableAmount });
+
+      if (updated.length === 0) {
+        throw new Error('Insufficient balance for negative adjustment');
+      }
+    } else {
+      updated = await db.update(balances).set({
+        availableAmount: sql`${balances.availableAmount} + ${amount}`,
+        updatedAt: new Date(),
+      }).where(and(eq(balances.userId, id), eq(balances.asset, assetType)))
+        .returning({ newBalance: balances.availableAmount });
+    }
 
     let newBalance: number;
     if (updated.length === 0) {
+      if (amount < 0) throw new Error('Cannot create balance with negative amount');
       const [ins] = await db.insert(balances).values({
         userId: id,
         asset: assetType,

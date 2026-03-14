@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
-import { api, API_BASE } from '../../utils/api';
+import { api, API_BASE, apiFetch } from '../../utils/api';
 import { formatSol, solToLamports } from '../../utils/sol';
 import { isPhantomInstalled, connectPhantom, sendSolToTreasury, getConnectedAddress } from '../../utils/phantom';
 import { theme } from '../../styles/theme';
@@ -85,11 +85,7 @@ export function WalletScreen() {
 
   async function loadLinkedWallet() {
     try {
-      const token = localStorage.getItem('accessToken');
-      const linked = await fetch(`${API_BASE}/v1/wallet/linked`, {
-        headers: { Authorization: `Bearer ${token}` },
-        credentials: 'include',
-      }).then(r => r.json()).catch(() => []);
+      const linked = await apiFetch<any[]>('/v1/wallet/linked').catch(() => []);
       if (Array.isArray(linked) && linked.length > 0) {
         setLinkedAddress(linked[0].address);
         setWithdrawDest(linked[0].address);

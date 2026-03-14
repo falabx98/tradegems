@@ -69,6 +69,9 @@ export async function userRoutes(server: FastifyInstance) {
     const { users, userProfiles } = await import('@tradingarena/db');
 
     const db = getDb();
+    // Escape LIKE special characters to prevent wildcard abuse
+    const escapeLike = (s: string) => s.replace(/[%_\\]/g, '\\$&');
+    const parsedLimit = Math.min(Math.max(parseInt(limit || '10') || 10, 1), 50);
     const results = await db
       .select({
         id: users.id,
@@ -80,8 +83,8 @@ export async function userRoutes(server: FastifyInstance) {
       })
       .from(users)
       .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-      .where(ilike(users.username, `%${q}%`))
-      .limit(parseInt(limit || '10'));
+      .where(ilike(users.username, `%${escapeLike(q)}%`))
+      .limit(parsedLimit);
 
     return { data: results };
   });

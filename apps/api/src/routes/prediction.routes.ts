@@ -20,6 +20,7 @@ interface PredictionLock {
   fee: number;
   totalCost: number;
   refId: string;
+  direction: 'up' | 'down' | 'sideways'; // locked at bet time — client cannot change
   serverOutcome: 'win' | 'loss'; // Server-determined result — client cannot override
 }
 
@@ -73,6 +74,7 @@ export async function predictionRoutes(server: FastifyInstance) {
       fee,
       totalCost,
       refId,
+      direction: body.direction,
       serverOutcome,
     };
     await redis.set(`prediction:lock:${refId}`, JSON.stringify(lockData), 'EX', 120);
@@ -109,11 +111,16 @@ export async function predictionRoutes(server: FastifyInstance) {
     // Delete the lock so it can't be reused
     await redis.del(`prediction:lock:${body.lockRef}`);
 
+    // H9 fix: Enforce direction matches what was locked — client cannot change direction after locking
+    if (body.direction !== lock.direction) {
+      throw new AppError(400, 'DIRECTION_MISMATCH', 'Direction must match the one used when locking funds');
+    }
+
     const ref = { type: 'prediction', id: lock.refId };
 
     // ── SERVER DETERMINES OUTCOME — client result is IGNORED ──
     const serverResult = lock.serverOutcome; // 'win' or 'loss' — set at lock time
-    const expectedMultiplier = ALLOWED_MULTIPLIERS[body.direction];
+    const expectedMultiplier = ALLOWED_MULTIPLIERS[lock.direction];
     const safeMultiplier = serverResult === 'win' ? expectedMultiplier : 0;
 
     // Calculate actual payout using server-determined outcome
@@ -127,7 +134,7 @@ export async function predictionRoutes(server: FastifyInstance) {
     // Save prediction record to DB
     const [saved] = await db.insert(predictionRounds).values({
       userId,
-      direction: body.direction,
+      direction: lock.direction,
       betAmount: lock.betAmount,
       result: serverResult,
       payout: actualPayout,

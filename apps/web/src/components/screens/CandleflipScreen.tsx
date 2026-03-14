@@ -299,9 +299,11 @@ export function CandleflipScreen() {
     }
   };
 
-  // When round resolves, sync profile
+  // When round resolves, sync profile (only once per roundId)
+  const lastResolvedRoundRef = useRef<string | null>(null);
   useEffect(() => {
-    if (round?.status === 'resolved' && myBet) {
+    if (round?.status === 'resolved' && myBet && round.roundId !== lastResolvedRoundRef.current) {
+      lastResolvedRoundRef.current = round.roundId;
       syncProfile();
       playRoundEnd(myBet.status === 'won');
     }
@@ -486,10 +488,18 @@ export function CandleflipScreen() {
               onChange={e => {
                 setCustomBet(e.target.value);
                 const val = parseFloat(e.target.value);
-                if (!isNaN(val) && val > 0) setBetAmount(Math.floor(val * 1_000_000_000));
+                if (!isNaN(val) && val > 0) {
+                  const lamports = Math.floor(val * 1_000_000_000);
+                  if (lamports < 1_000_000) {
+                    setError('Minimum bet is 0.001 SOL');
+                    setTimeout(() => setError(''), 3000);
+                  } else {
+                    setBetAmount(lamports);
+                  }
+                }
               }}
               style={s.customBetInput}
-              placeholder="Custom SOL"
+              placeholder="Custom SOL (min 0.001)"
               className="mono"
             />
           </div>

@@ -108,9 +108,15 @@ export async function leaderboardRoutes(server: FastifyInstance) {
     }
   });
 
-  server.get('/:type/me', { preHandler: [requireAuth] }, async (request) => {
+  server.get('/:type/me', { preHandler: [requireAuth] }, async (request, reply) => {
     const { type } = request.params as { type: string };
     const userId = getAuthUser(request).userId;
+
+    // Whitelist type to prevent unexpected behavior
+    const allowedTypes = ['profit', 'multiplier', 'volume'];
+    if (!allowedTypes.includes(type)) {
+      return reply.status(400).send({ error: 'Invalid leaderboard type' });
+    }
 
     let scoreExpr: string;
     switch (type) {

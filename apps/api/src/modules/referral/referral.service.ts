@@ -185,25 +185,22 @@ export class ReferralService {
     }
 
     try {
-      // Sum pending earnings
-      const sumResult = await this.db.execute(sql`
-        SELECT COALESCE(SUM(commission_amount), 0)::bigint as total
-        FROM referral_earnings
-        WHERE referrer_id = ${userId} AND status = 'pending'
+      // Atomic: mark pending as claimed AND get the exact sum in one query
+      const claimResult = await this.db.execute(sql`
+        WITH claimed AS (
+          UPDATE referral_earnings
+          SET status = 'claimed', claimed_at = now()
+          WHERE referrer_id = ${userId} AND status = 'pending'
+          RETURNING commission_amount
+        )
+        SELECT COALESCE(SUM(commission_amount), 0)::bigint as total FROM claimed
       `);
-      const sumRows = sumResult as unknown as Array<Record<string, unknown>>;
-      const total = Number(sumRows[0]?.total || 0);
+      const claimRows = claimResult as unknown as Array<Record<string, unknown>>;
+      const total = Number(claimRows[0]?.total || 0);
 
       if (total <= 0) {
         return { claimed: 0 };
       }
-
-      // Mark all pending as claimed
-      await this.db.execute(sql`
-        UPDATE referral_earnings
-        SET status = 'claimed', claimed_at = now()
-        WHERE referrer_id = ${userId} AND status = 'pending'
-      `);
 
       // Credit to balance
       await this.db.execute(sql`

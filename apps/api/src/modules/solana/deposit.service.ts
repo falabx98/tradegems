@@ -41,10 +41,15 @@ export class DepositService {
       // Get user's deposit wallet address
       const userWalletAddress = await this.depositWalletService.getWalletAddress(userId);
 
-      // Verify on-chain against the user's deposit wallet (or treasury as fallback)
+      // M12 fix: Reject if user has no deposit wallet (prevents claiming treasury deposits)
+      if (!userWalletAddress) {
+        throw new AppError(400, 'NO_DEPOSIT_WALLET', 'Please generate a deposit address first');
+      }
+
+      // Verify on-chain against the user's deposit wallet
       const verification = await this.solanaService.verifyDepositTransaction(
         txHash,
-        userWalletAddress || undefined,
+        userWalletAddress,
       );
 
       if (!verification.valid) {

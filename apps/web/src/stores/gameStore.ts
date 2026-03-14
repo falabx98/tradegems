@@ -15,7 +15,7 @@ import {
   computeNodeEffect,
 } from '../engine/engineConfig';
 import type { EngineConfig } from '../engine/engineConfig';
-import { api } from '../utils/api';
+import { api, getServerConfig } from '../utils/api';
 import { toast } from './toastStore';
 
 interface GameState {
@@ -140,8 +140,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     const config = generateRound(undefined, state.engineConfig);
 
     // Deduct betAmount + fee from local balance immediately
-    // M1 fix: use cached server config fee rate (fetched on app load)
-    const feeRate = (globalThis as any).__serverFeeRate ?? 0.03;
+    // Use cached server config fee rate; sync it in background if not loaded yet
+    const cachedConfig = (globalThis as any).__serverConfig;
+    const feeRate = cachedConfig?.feeRate ?? 0.05;
     const fee = Math.floor(state.betAmount * feeRate);
     const totalCost = state.betAmount + fee;
     const profile = { ...state.profile };
@@ -352,6 +353,8 @@ export const useGameStore = create<GameState>((set, get) => ({
       const [me, balances] = await Promise.all([
         api.getMe(),
         api.getBalances(),
+        // Fetch and cache server config (fee rate, bet limits)
+        getServerConfig().then(cfg => { (globalThis as any).__serverConfig = cfg; }).catch(() => {}),
       ]);
 
       const solBalance = balances.balances?.find((b: any) => b.asset === 'SOL');

@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import { getDb } from '../../config/database.js';
 import { lotteryDraws, lotteryTickets, lotteryWinners, balanceLedgerEntries, balances, users } from '@tradingarena/db';
 import { WalletService } from '../wallet/wallet.service.js';
@@ -55,7 +56,7 @@ function getNextFriday(): Date {
 function generateUniqueNumbers(count: number, max: number): number[] {
   const nums = new Set<number>();
   while (nums.size < count) {
-    nums.add(Math.floor(Math.random() * max) + 1);
+    nums.add(crypto.randomInt(1, max + 1));
   }
   return Array.from(nums).sort((a, b) => a - b);
 }
@@ -278,7 +279,7 @@ export class LotteryService {
 
     // 2. Generate winning numbers
     const winningNumbers = generateUniqueNumbers(MAIN_NUMBER_COUNT, MAIN_NUMBER_MAX);
-    const winningGemBall = Math.floor(Math.random() * GEMBALL_MAX) + 1;
+    const winningGemBall = crypto.randomInt(1, GEMBALL_MAX + 1);
 
     // 3. Store winning numbers
     await db
@@ -561,7 +562,7 @@ export class LotteryService {
     for (let i = 0; i < count; i++) {
       results.push({
         numbers: generateUniqueNumbers(MAIN_NUMBER_COUNT, MAIN_NUMBER_MAX),
-        gemBall: Math.floor(Math.random() * GEMBALL_MAX) + 1,
+        gemBall: crypto.randomInt(1, GEMBALL_MAX + 1),
       });
     }
     return results;

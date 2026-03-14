@@ -14,7 +14,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_ACCESS_EXPIRY: z.string().default('1h'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
-  PLATFORM_FEE_RATE: z.coerce.number().default(0.03),
+  PLATFORM_FEE_RATE: z.coerce.number().default(0.05),
   SOLANA_RPC_URL: z.string().default('https://api.devnet.solana.com'),
   SOLANA_CLUSTER: z.string().default('devnet'),
   TREASURY_PRIVATE_KEY: z.string().optional(),

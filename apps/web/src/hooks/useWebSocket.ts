@@ -20,7 +20,8 @@ export function useWebSocket() {
   const [isConnected, setIsConnected] = useState(false);
 
   const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+    // Skip if already open or connecting
+    if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) return;
 
     const token = getAccessToken();
     const url = token ? `${WS_URL}?token=${token}` : WS_URL;
@@ -68,9 +69,16 @@ export function useWebSocket() {
   const disconnect = useCallback(() => {
     if (reconnectTimeout.current) {
       clearTimeout(reconnectTimeout.current);
+      reconnectTimeout.current = undefined;
     }
-    wsRef.current?.close();
-    wsRef.current = null;
+    if (wsRef.current) {
+      // Remove onclose to prevent auto-reconnect during intentional disconnect
+      wsRef.current.onclose = null;
+      wsRef.current.onerror = null;
+      wsRef.current.onmessage = null;
+      wsRef.current.close();
+      wsRef.current = null;
+    }
     setIsConnected(false);
   }, []);
 

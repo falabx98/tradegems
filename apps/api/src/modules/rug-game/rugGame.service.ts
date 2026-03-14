@@ -74,6 +74,14 @@ export class RugGameService {
 
   // ─── Cash Out ──────────────────────────────────────────────
 
+  // Multiplier growth function: starts at 1.00x and grows exponentially over time
+  // This must match the client-side growth curve so the server can cap the max achievable multiplier
+  private getMaxMultiplierForElapsed(elapsedMs: number): number {
+    // Growth: multiplier = e^(speed * t), speed tuned so 10x is reached in ~23s
+    const GROWTH_SPEED = 0.0001; // ~e^(0.0001 * ms)
+    return Math.exp(GROWTH_SPEED * elapsedMs);
+  }
+
   async cashOut(userId: string, gameId: string, currentMultiplier: number) {
     const game = await this.db.query.rugGames.findFirst({
       where: eq(rugGames.id, gameId),
@@ -85,14 +93,20 @@ export class RugGameService {
 
     const rugMultiplier = parseFloat(game.rugMultiplier);
 
+    // Server-side time check: cap multiplier based on elapsed time since game start
+    const elapsedMs = Date.now() - game.createdAt.getTime();
+    const maxAllowedByTime = this.getMaxMultiplierForElapsed(elapsedMs);
+    // Clamp to what's achievable in the elapsed time (+ 10% tolerance for latency)
+    const clampedMultiplier = Math.min(currentMultiplier, maxAllowedByTime * 1.10);
+
     // Check if the player is trying to cash out past the rug point
-    if (currentMultiplier >= rugMultiplier) {
+    if (clampedMultiplier >= rugMultiplier) {
       // Got rugged! They lose
       return this.resolveRug(gameId, game);
     }
 
     // Successful cash out — fee=0 because house edge is in the crash point; lockFunds only locked betAmount
-    const payout = Math.floor(game.betAmount * currentMultiplier);
+    const payout = Math.floor(game.betAmount * clampedMultiplier);
 
     await this.wallet.settlePayout(
       userId,

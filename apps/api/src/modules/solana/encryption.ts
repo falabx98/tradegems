@@ -8,7 +8,11 @@ function getEncryptionKey(): Buffer {
   if (env.WALLET_ENCRYPTION_KEY) {
     return Buffer.from(env.WALLET_ENCRYPTION_KEY, 'hex');
   }
-  // Derive a deterministic key from JWT_SECRET in dev (not for production)
+  // In production, require a dedicated encryption key
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('WALLET_ENCRYPTION_KEY must be set in production — cannot derive from JWT_SECRET');
+  }
+  // Derive a deterministic key from JWT_SECRET in dev only
   return crypto.createHash('sha256').update(env.JWT_SECRET).digest();
 }
 

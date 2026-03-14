@@ -92,7 +92,7 @@ export function calculateP2PPayout(
 
     payouts.push({
       playerId: player.playerId,
-      payout: Math.round(payout * 100) / 100,
+      payout: Math.floor(payout),
       band,
       rank: i + 1,
     });

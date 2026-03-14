@@ -28,7 +28,7 @@ export async function tradingSimRoutes(server: FastifyInstance) {
     const user = getAuthUser(request);
 
     const body = z.object({
-      entryFee: z.number().int().positive(),
+      entryFee: z.number().int().positive().max(10_000_000_000), // Max 10 SOL
       maxPlayers: z.number().int().min(2).max(8),
     }).parse(request.body);
 

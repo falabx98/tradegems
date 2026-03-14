@@ -102,7 +102,7 @@ export class WalletService {
   // ─── Release Funds (bet cancel / refund) ─────────────────
 
   async releaseFunds(userId: string, amount: number, asset: string, ref: LedgerRef) {
-    await this.db.execute(sql`
+    const result = await this.db.execute(sql`
       UPDATE balances
       SET available_amount = available_amount + ${amount},
           locked_amount = locked_amount - ${amount},
@@ -110,18 +110,19 @@ export class WalletService {
       WHERE user_id = ${userId}
         AND asset = ${asset}
         AND locked_amount >= ${amount}
-    `);
+      RETURNING available_amount
+    `) as unknown as { available_amount: number }[];
 
-    const bal = await this.db.query.balances.findFirst({
-      where: and(eq(balances.userId, userId), eq(balances.asset, asset)),
-    });
+    if (!result || result.length === 0) {
+      throw new AppError(409, 'RELEASE_FAILED', `Release failed — insufficient locked funds for user ${userId}, ref ${ref.type}:${ref.id}`);
+    }
 
     await this.db.insert(balanceLedgerEntries).values({
       userId,
       asset,
       entryType: 'bet_unlock',
       amount: amount,
-      balanceAfter: bal?.availableAmount ?? 0,
+      balanceAfter: result[0].available_amount,
       referenceType: ref.type,
       referenceId: ref.id,
     });
@@ -214,12 +215,15 @@ export class WalletService {
     // ── 100% First Deposit Bonus ──
     // If user hasn't received deposit bonus yet, match 100% of this deposit
     try {
-      const user = await this.db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
+      // M14 fix: Atomically claim bonus — only update if bonus_claimed=false (prevents double bonus)
+      const bonusClaim = await this.db.execute(sql`
+        UPDATE users SET bonus_claimed = true, updated_at = now()
+        WHERE id = ${userId} AND bonus_claimed = false
+        RETURNING id
+      `) as unknown as { id: string }[];
 
-      if (user && !user.bonusClaimed) {
-        // Apply 100% bonus (same amount as deposit)
+      if (bonusClaim && bonusClaim.length > 0) {
+        // We won the atomic flag — apply 100% bonus
         const bonusAmount = amount;
 
         await this.db.execute(sql`
@@ -228,12 +232,6 @@ export class WalletService {
               bonus_amount = COALESCE(bonus_amount, 0) + ${bonusAmount},
               updated_at = now()
           WHERE user_id = ${userId} AND asset = ${asset}
-        `);
-
-        // Mark bonus as used
-        await this.db.execute(sql`
-          UPDATE users SET bonus_claimed = true, updated_at = now()
-          WHERE id = ${userId}
         `);
 
         // Get updated balance for ledger
@@ -255,6 +253,7 @@ export class WalletService {
 
         console.log(`[DepositBonus] Applied 100% bonus of ${bonusAmount} lamports to user ${userId}`);
       }
+      // else: bonus already claimed (concurrent deposit lost the race) — no-op
     } catch (err) {
       // Don't fail the deposit if bonus fails
       console.error(`[DepositBonus] Failed to apply bonus for user ${userId}:`, err);
@@ -267,7 +266,10 @@ export class WalletService {
     const conditions = [eq(balanceLedgerEntries.userId, userId)];
     if (cursor) {
       // cursor is the id of the last item from previous page — fetch older entries
-      conditions.push(sql`${balanceLedgerEntries.id} < ${parseInt(cursor, 10)}`);
+      const cursorId = parseInt(cursor, 10);
+      if (!isNaN(cursorId) && cursorId > 0) {
+        conditions.push(sql`${balanceLedgerEntries.id} < ${cursorId}`);
+      }
     }
     const entries = await this.db.query.balanceLedgerEntries.findMany({
       where: and(...conditions),
@@ -305,25 +307,26 @@ export class WalletService {
   // ─── Settle Withdrawal ──────────────────────────────────
 
   async settleWithdrawal(userId: string, totalAmount: number, asset: string, withdrawalId: string) {
-    await this.db.execute(sql`
+    const result = await this.db.execute(sql`
       UPDATE balances
       SET locked_amount = locked_amount - ${totalAmount},
           updated_at = now()
       WHERE user_id = ${userId}
         AND asset = ${asset}
         AND locked_amount >= ${totalAmount}
-    `);
+      RETURNING available_amount
+    `) as unknown as { available_amount: number }[];
 
-    const bal = await this.db.query.balances.findFirst({
-      where: and(eq(balances.userId, userId), eq(balances.asset, asset)),
-    });
+    if (!result || result.length === 0) {
+      throw new AppError(409, 'WITHDRAWAL_SETTLE_FAILED', `Withdrawal settlement failed — insufficient locked funds for user ${userId}`);
+    }
 
     await this.db.insert(balanceLedgerEntries).values({
       userId,
       asset,
       entryType: 'withdraw_complete',
       amount: -totalAmount,
-      balanceAfter: bal?.availableAmount ?? 0,
+      balanceAfter: result[0].available_amount,
       referenceType: 'withdrawal',
       referenceId: withdrawalId,
     });

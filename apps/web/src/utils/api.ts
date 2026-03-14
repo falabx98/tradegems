@@ -25,14 +25,25 @@ export function setAccessToken(token: string | null) {
 
 function scheduleTokenRefresh() {
   if (_refreshTimer) clearTimeout(_refreshTimer);
-  // Refresh 5 minutes before the 1-hour expiry = 55 min
+  // Parse JWT exp to calculate actual time until expiry, refresh 5 min before
+  let delayMs = 55 * 60 * 1000; // default 55 min
+  try {
+    const token = accessToken || localStorage.getItem('accessToken');
+    if (token) {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (payload.exp) {
+        const expiresInMs = payload.exp * 1000 - Date.now();
+        delayMs = Math.max(10_000, expiresInMs - 5 * 60 * 1000); // 5 min before expiry, min 10s
+      }
+    }
+  } catch { /* fallback to default */ }
   _refreshTimer = setTimeout(async () => {
     try {
       await refreshToken();
     } catch {
       // Will be caught on next API call
     }
-  }, 55 * 60 * 1000);
+  }, delayMs);
 }
 
 export function getAccessToken(): string | null {
@@ -84,7 +95,7 @@ export async function apiFetch<T = unknown>(
 ): Promise<T> {
   const token = getAccessToken();
   const headers: Record<string, string> = {
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    ...(typeof options.body === 'string' ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string>),
   };
   if (token) {

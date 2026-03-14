@@ -194,6 +194,7 @@ export class TradingSimService {
 
     if (!room) throw new Error('Room not found');
     if (room.status !== 'active') throw new Error('Room is not active');
+    if (!room.startedAt) throw new Error('Room has not started');
 
     // Verify user is a participant
     const participant = await this.db.query.tradingSimParticipants.findFirst({
@@ -203,6 +204,30 @@ export class TradingSimService {
       ),
     });
     if (!participant) throw new Error('Not a participant in this room');
+
+    // H10 fix: Validate trade price against server chart data
+    const chartData = room.chartData as { close: number }[];
+    if (!chartData || chartData.length === 0) throw new Error('Chart data not available');
+
+    // Find the candle at the given timestamp (index = seconds elapsed)
+    const elapsedSec = Math.floor((timestamp - room.startedAt.getTime()) / 1000);
+    const candleIdx = Math.max(0, Math.min(elapsedSec, chartData.length - 1));
+    const expectedPrice = chartData[candleIdx]?.close;
+
+    if (expectedPrice !== undefined) {
+      // Allow 2% tolerance for latency/rounding
+      const tolerance = expectedPrice * 0.02;
+      if (Math.abs(price - expectedPrice) > tolerance) {
+        throw new Error(`Trade price deviates too far from chart price`);
+      }
+    }
+
+    // Validate timestamp is within room duration
+    if (timestamp > Date.now() + 5000) throw new Error('Trade timestamp in the future');
+
+    // Validate quantity is reasonable (max = 2x start balance worth)
+    const maxQty = Math.ceil((SIM_START_BALANCE * 2) / Math.max(price, 0.01));
+    if (quantity > maxQty) throw new Error(`Quantity exceeds maximum allowed`);
 
     // Record the trade
     const [trade] = await this.db

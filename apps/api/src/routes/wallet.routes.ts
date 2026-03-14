@@ -245,16 +245,34 @@ export async function walletRoutes(server: FastifyInstance) {
       });
     }
 
-    // 8. Credit balance atomically using SQL increment + RETURNING for accurate balanceAfter
+    // 8. Insert redemption record FIRST (unique constraint prevents double-redemption)
+    //    This MUST happen before crediting balance to avoid double-credit on race condition
+    try {
+      await db.insert(bonusCodeRedemptions).values({
+        bonusCodeId: bonusCode.id,
+        userId,
+        amountLamports: bonusCode.amountLamports,
+      });
+    } catch (err: any) {
+      if (err?.code === '23505' || err?.message?.includes('duplicate')) {
+        // Duplicate: user already redeemed — do NOT credit balance, return early
+        return reply.status(400).send({
+          error: { code: 'ALREADY_REDEEMED', message: 'You have already redeemed this bonus code' },
+        });
+      }
+      throw err;
+    }
+
+    // 9. Credit balance atomically (only reached if redemption INSERT succeeded)
     const [existing] = await db.select().from(balances).where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL')));
 
     let newBalance: number;
     if (existing) {
-      const [updated] = await db.update(balances).set({
+      const [updatedBal] = await db.update(balances).set({
         availableAmount: sql`${balances.availableAmount} + ${bonusCode.amountLamports}`,
         updatedAt: new Date(),
       }).where(and(eq(balances.userId, userId), eq(balances.asset, 'SOL'))).returning({ availableAmount: balances.availableAmount });
-      newBalance = Number(updated?.availableAmount ?? 0);
+      newBalance = Number(updatedBal?.availableAmount ?? 0);
     } else {
       await db.insert(balances).values({
         userId,
@@ -265,7 +283,7 @@ export async function walletRoutes(server: FastifyInstance) {
       newBalance = bonusCode.amountLamports;
     }
 
-    // 9. Create ledger entry with accurate balance
+    // 10. Create ledger entry with accurate balance
     await db.insert(balanceLedgerEntries).values({
       userId,
       asset: 'SOL',
@@ -276,22 +294,6 @@ export async function walletRoutes(server: FastifyInstance) {
       referenceId: bonusCode.id,
       metadata: { code: bonusCode.code },
     });
-
-    // 10. Insert redemption record (unique constraint prevents double-redemption)
-    try {
-      await db.insert(bonusCodeRedemptions).values({
-        bonusCodeId: bonusCode.id,
-        userId,
-        amountLamports: bonusCode.amountLamports,
-      });
-    } catch (err: any) {
-      // If duplicate constraint fires, the balance was already credited — log and continue
-      if (err?.code === '23505' || err?.message?.includes('duplicate')) {
-        console.warn(`[BonusCode] Duplicate redemption caught for user ${userId}, code ${bonusCode.code}`);
-      } else {
-        throw err;
-      }
-    }
 
     return {
       success: true,

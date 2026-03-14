@@ -5,7 +5,7 @@ export function lamportsToSol(lamports: number): number {
 }
 
 export function solToLamports(sol: number): number {
-  return Math.floor(sol * LAMPORTS_PER_SOL);
+  return Math.round(sol * LAMPORTS_PER_SOL);
 }
 
 export function formatSol(lamports: number, decimals: number = 4): string {

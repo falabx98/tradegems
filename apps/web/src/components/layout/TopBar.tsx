@@ -138,7 +138,7 @@ const styles: Record<string, React.CSSProperties> = {
   balanceValue: {
     fontSize: '13px',
     fontWeight: 700,
-    color: theme.accent.purple,
+    color: '#ffffff',
   },
   walletBtn: {
     display: 'flex',

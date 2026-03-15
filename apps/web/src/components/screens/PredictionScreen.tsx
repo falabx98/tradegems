@@ -360,22 +360,20 @@ export function PredictionScreen() {
         </div>
       )}
 
-      {phase === 'setup' && (
-        <RecentGames
-          title="Recent Predictions"
-          fetchGames={async () => {
-            const res = await api.getRecentPredictions(10);
-            return (res.data || []).map((r: any) => ({
-              id: r.id,
-              result: r.result === 'win' ? 'win' : 'loss',
-              multiplier: parseFloat(r.multiplier) || 0,
-              amount: r.betAmount || 0,
-              payout: r.payout || 0,
-              time: r.createdAt,
-            }));
-          }}
-        />
-      )}
+      <RecentGames
+        title="Recent Predictions"
+        fetchGames={async () => {
+          const res = await api.getRecentPredictions(10);
+          return (res.data || []).map((r: any) => ({
+            id: r.id,
+            result: r.result === 'win' ? 'win' : 'loss',
+            multiplier: parseFloat(r.multiplier) || 0,
+            amount: r.betAmount || 0,
+            payout: r.payout || 0,
+            time: r.createdAt,
+          }));
+        }}
+      />
 
       {phase === 'revealing' && (
         <div style={s.revealPanel}>

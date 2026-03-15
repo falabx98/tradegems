@@ -20,6 +20,7 @@ import { ArrowUpIcon, ArrowDownIcon, ArrowSidewaysIcon, TrophyIcon, ExplosionIco
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { toast } from '../../stores/toastStore';
 import { BetPanel } from '../ui/BetPanel';
+import { RecentGames } from '../ui/RecentGames';
 
 // ─── Confetti (lightweight version) ──────────────────────────────────────────
 
@@ -357,6 +358,23 @@ export function PredictionScreen() {
             compact
           />
         </div>
+      )}
+
+      {phase === 'betting' && (
+        <RecentGames
+          title="Recent Predictions"
+          fetchGames={async () => {
+            const res = await api.getPredictionHistory(10);
+            return (res.data || []).map((r: any) => ({
+              id: r.id,
+              result: r.result === 'win' ? 'win' : 'loss',
+              multiplier: parseFloat(r.multiplier) || 0,
+              amount: r.betAmount || 0,
+              payout: r.payout || 0,
+              time: r.createdAt,
+            }));
+          }}
+        />
       )}
 
       {phase === 'revealing' && (

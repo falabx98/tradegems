@@ -9,6 +9,7 @@ import { getAvatarGradient, getInitials } from '../../utils/avatars';
 import { playBetPlaced, playRoundEnd, hapticMedium } from '../../utils/sounds';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { BetPanel } from '../ui/BetPanel';
+import { RecentGames } from '../ui/RecentGames';
 
 interface Candle {
   open: number;
@@ -458,6 +459,21 @@ export function CandleflipScreen() {
           submitLoading={loading}
         />
       )}
+
+      <RecentGames
+        title="Recent Flips"
+        fetchGames={async () => {
+          const res = await api.getCandleflipRecentRounds(10);
+          return (res.rounds || []).map((r: any) => ({
+            id: r.id,
+            result: r.result === 'bullish' ? 'win' : 'loss',
+            multiplier: r.multiplier || 1.9,
+            amount: r.totalPool ? r.totalPool / 2 : 0,
+            payout: r.totalPool || 0,
+            time: r.createdAt || r.resolvedAt,
+          }));
+        }}
+      />
 
       {/* Already bet, waiting */}
       {round?.status === 'waiting' && hasBet && (

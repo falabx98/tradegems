@@ -10,6 +10,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { playButtonClick, playBetPlaced, playRoundEnd, hapticLight, hapticMedium } from '../../utils/sounds';
 import { LiveDot, LiveRoundBanner, StatusBadge, WinAmountDisplay, timeAgo } from '../ui/LiveIndicators';
 import { BetPanel } from '../ui/BetPanel';
+import { RecentGames } from '../ui/RecentGames';
 
 interface Candle { open: number; high: number; low: number; close: number; volume: number; timestamp: number; }
 interface Participant { id: string; userId: string; username?: string; startBalance: number; finalBalance?: number; finalPnl?: number; rank?: number; }
@@ -656,6 +657,21 @@ export function TradingSimScreen() {
           onSubmit={handleJoinRoom}
           submitDisabled={entryAmount <= 0}
           submitLoading={loading}
+        />
+
+        <RecentGames
+          title="Recent Trading Rooms"
+          fetchGames={async () => {
+            const res = await api.getTradingSimRecent(10);
+            return (res.rooms || []).map((r: any) => ({
+              id: r.id,
+              result: r.winnerId ? 'win' : 'loss',
+              multiplier: r.potSize && r.entryFee ? r.potSize / r.entryFee : 1,
+              amount: r.entryFee || 0,
+              payout: r.potSize || 0,
+              time: r.createdAt,
+            }));
+          }}
         />
 
         {/* Available Rooms */}

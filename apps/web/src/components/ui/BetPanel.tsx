@@ -173,7 +173,7 @@ export function BetPanel({
         {/* Fee line */}
         <div style={s.feeLine}>
           <span>Fee ({(feeRate * 100).toFixed(0)}%)</span>
-          <span className="mono">{formatSol(fee)} SOL</span>
+          <span className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><img src="/sol-coin.png" alt="SOL" style={{ width: '12px', height: '12px' }} />{formatSol(fee)}</span>
         </div>
       </div>
 

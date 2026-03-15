@@ -11,14 +11,18 @@ interface StatCardProps {
 
 export function StatCard({ label, value, icon, trend, color }: StatCardProps) {
   const valColor = color || (trend === 'up' ? theme.accent.green : trend === 'down' ? theme.accent.red : theme.text.primary);
+  const strVal = String(value);
+  const hasSol = strVal.includes('SOL');
+  const displayVal = hasSol ? strVal.replace(' SOL', '').replace('SOL', '') : strVal;
   return (
     <div style={s.card}>
       <div style={s.top}>
         <span style={s.label}>{label}</span>
         {icon && <span style={s.icon}>{icon}</span>}
       </div>
-      <span className="mono" style={{ ...s.value, color: valColor }}>
-        {trend === 'up' && '+'}{value}
+      <span className="mono" style={{ ...s.value, color: valColor, display: 'flex', alignItems: 'center', gap: '6px' }}>
+        {hasSol && <img src="/sol-coin.png" alt="SOL" style={{ width: '18px', height: '18px' }} />}
+        {trend === 'up' && '+'}{displayVal}
       </span>
     </div>
   );

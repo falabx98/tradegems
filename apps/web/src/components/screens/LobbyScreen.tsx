@@ -277,7 +277,7 @@ export function LobbyScreen() {
             <line x1="6" y1="20" x2="6" y2="16" />
           </svg>
         }
-        color={theme.accent.blue}
+        color="#ffffff"
       />
       <StatCard
         label="Top Win"
@@ -414,7 +414,7 @@ export function LobbyScreen() {
         {/* Quick Stats — 2x2 compact on mobile */}
         <div style={{ ...s.statsRow, gridTemplateColumns: 'repeat(2, 1fr)' }}>
           <StatCard label="Players" value={liveStats.active} color={theme.accent.lavender} />
-          <StatCard label="24h Volume" value={`${liveStats.volume} SOL`} color={theme.accent.blue} />
+          <StatCard label="24h Volume" value={`${liveStats.volume} SOL`} color="#ffffff" />
           <StatCard label="Top Win" value={liveStats.topWin} color={theme.accent.amber} />
           {isAuthenticated
             ? <StatCard label="Balance" value={`${formatSol(profile.balance)} SOL`} color={theme.accent.purple} />

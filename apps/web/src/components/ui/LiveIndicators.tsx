@@ -110,7 +110,7 @@ export function WinAmountDisplay({
         color,
       }}
     >
-      {sign}{displayAmount} SOL
+      {sign}<img src="/sol-coin.png" alt="SOL" style={{ width: sizeMap[size], height: sizeMap[size], verticalAlign: 'middle', marginRight: '3px' }} />{displayAmount}
     </span>
   );
 }

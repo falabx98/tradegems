@@ -5,8 +5,9 @@ import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { RiskTier } from '../../types/game';
 import { playBetPlaced, hapticMedium } from '../../utils/sounds';
-import { getServerConfig } from '../../utils/api';
+import { api, getServerConfig } from '../../utils/api';
 import { BetPanel } from '../ui/BetPanel';
+import { RecentGames } from '../ui/RecentGames';
 
 // Defaults that match server — will be overwritten by getServerConfig()
 let _feeRate = 0.05;
@@ -112,6 +113,21 @@ export function SoloSetupScreen() {
           submitLabel="START ROUND"
           onSubmit={handleStart}
           submitDisabled={!canAfford || !meetsMinBet}
+        />
+
+        <RecentGames
+          title="Recent Solo Games"
+          fetchGames={async () => {
+            const res = await api.getRoundHistory(10) as any;
+            return (res.data || res || []).map((r: any) => ({
+              id: r.id || r.roundId,
+              result: r.resultType === 'win' ? 'win' : 'loss',
+              multiplier: r.finalMultiplier || 0,
+              amount: r.betAmount || 0,
+              payout: r.payoutAmount || 0,
+              time: r.createdAt,
+            }));
+          }}
         />
 
         {/* How it works */}

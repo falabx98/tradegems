@@ -25,7 +25,7 @@ import { activityRoutes } from './routes/activity.routes.js';
 import { initSentry } from './config/sentry.js';
 import { fairnessRoutes } from './routes/fairness.routes.js';
 import { seasonRoutes } from './routes/season.routes.js';
-import { predictionRoutes } from './routes/prediction.routes.js';
+import { predictionRoutes, predictionPublicRoutes } from './routes/prediction.routes.js';
 import { lotteryRoutes } from './routes/lottery.routes.js';
 import { tradingSimRoutes } from './routes/trading-sim.routes.js';
 import { candleflipRoutes } from './routes/candleflip.routes.js';
@@ -150,6 +150,7 @@ export async function buildServer() {
   await server.register(fairnessRoutes, { prefix: '/v1/fairness' });
   await server.register(seasonRoutes, { prefix: '/v1/season' });
   await server.register(predictionRoutes, { prefix: '/v1/predictions' });
+  await server.register(predictionPublicRoutes, { prefix: '/v1/predictions' });
   await server.register(activityRoutes, { prefix: '/v1/activity' });
   await server.register(lotteryRoutes, { prefix: '/v1/lottery' });
   await server.register(tradingSimRoutes, { prefix: '/v1/trading-sim' });

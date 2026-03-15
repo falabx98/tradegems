@@ -226,7 +226,12 @@ export async function predictionRoutes(server: FastifyInstance) {
     return { data };
   });
 
-  // Global recent predictions (public, all users)
+}
+
+// Public route (no auth) - registered separately
+export async function predictionPublicRoutes(server: FastifyInstance) {
+  const db = getDb();
+
   server.get('/recent', async (request) => {
     const { limit } = request.query as { limit?: string };
 

@@ -111,7 +111,7 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
   },
   logoImg: {
-    height: '30px',
+    height: '40px',
     width: 'auto',
     objectFit: 'contain' as const,
   },

@@ -301,7 +301,7 @@ export function PredictionScreen() {
       </div>
 
       {/* Chart */}
-      <div style={{ ...s.chartWrap, height: isMobile ? 200 : 280, position: 'relative' }}>
+      <div style={{ ...s.chartWrap, height: isMobile ? 280 : 400, position: 'relative' }}>
         <CandlestickChart
           historicalCandles={roundConfig.historicalCandles}
           revealCandles={roundConfig.revealCandles}

@@ -142,12 +142,12 @@ export function LobbyScreen() {
     const fetchLiveData = async () => {
       try {
         const [rug, candle, trading] = await Promise.all([
-          api.getRugGameRecent(3).catch(() => ({ games: [] })),
-          api.getCandleflipRecent(3).catch(() => ({ results: [] })),
+          api.getRugGameRecentRounds(3).catch(() => ({ rounds: [] })),
+          api.getCandleflipRecentRounds(3).catch(() => ({ rounds: [] })),
           api.getTradingSimRooms().catch(() => ({ rooms: [] })),
         ]);
-        setRugRecent(rug.games || []);
-        setCandleRecent(candle.results || []);
+        setRugRecent(rug.rounds || []);
+        setCandleRecent(candle.rounds || []);
         setTradingRooms(trading.rooms || []);
       } catch {}
     };
@@ -231,11 +231,10 @@ export function LobbyScreen() {
     }
     if (id === 'rug-game' && rugRecent.length > 0) {
       const last = rugRecent[0];
-      const won = last.status === 'cashed_out';
       return (
         <span style={{ ...s.liveDataRow, marginTop: '3px' }}>
-          <span style={{ fontSize: '10px', fontWeight: 700, color: won ? theme.accent.green : theme.accent.red }} className="mono">
-            {won ? 'CASHED' : 'RUGGED'}{last.multiplier ? ` ${Number(last.multiplier).toFixed(2)}x` : ''}
+          <span style={{ fontSize: '10px', fontWeight: 700, color: theme.accent.green }} className="mono">
+            {Number(last.rugMultiplier).toFixed(2)}x — {last.playerCount}p
           </span>
         </span>
       );
@@ -364,8 +363,8 @@ export function LobbyScreen() {
           <GameTypeBadge type={item.gameType === 'rug' ? 'rug' : 'candle'} />
           <span style={s.liveRowText}>
             {item.gameType === 'rug'
-              ? `${item.status === 'cashed_out' ? 'Cashed' : 'Rugged'}${item.multiplier ? ` at ${Number(item.multiplier).toFixed(2)}x` : ''}`
-              : `${item.result === 'bullish' ? 'Bull' : 'Bear'} flip${item.betAmount ? ` — ${(Number(item.betAmount) / 1e9).toFixed(3)} SOL` : ''}`
+              ? `Rug ${Number(item.rugMultiplier).toFixed(2)}x — ${item.playerCount} player${item.playerCount !== 1 ? 's' : ''}`
+              : `${item.result === 'bullish' ? 'Bull' : 'Bear'} flip — ${Number(item.resultMultiplier).toFixed(2)}x`
             }
           </span>
           {item.time && <span style={s.liveRowTime}>{timeAgo(item.time)}</span>}

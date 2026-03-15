@@ -360,7 +360,7 @@ export function PredictionScreen() {
         </div>
       )}
 
-      {phase === 'betting' && (
+      {phase === 'setup' && (
         <RecentGames
           title="Recent Predictions"
           fetchGames={async () => {

@@ -568,7 +568,7 @@ function LiveWinsTicker() {
           id: i.id,
           username: i.payload.username,
           feedType: i.feedType === 'prediction_result' ? 'PRED' : 'SOLO',
-          multiplier: i.payload.multiplier ?? 0,
+          multiplier: Number(i.payload.multiplier) || 0,
           profit: i.payload.payout - i.payload.betAmount,
         })));
       } catch { /* ignore */ }

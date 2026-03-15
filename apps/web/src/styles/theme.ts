@@ -148,7 +148,7 @@ export const theme = {
 
   layout: {
     headerHeight: '56px',
-    sidebarWidth: '68px',
+    sidebarWidth: '220px',
     bottomNavHeight: '64px',
     maxWidth: '1400px',
   },

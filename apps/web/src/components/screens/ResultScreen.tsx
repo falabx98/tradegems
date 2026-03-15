@@ -9,6 +9,7 @@ import { playLevelUp, hapticHeavy } from '../../utils/sounds';
 import { GemIcon, BombIcon, ShieldIcon, LightningIcon, WaveIcon, TrophyIcon, ExplosionIcon } from '../ui/GameIcons';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { getServerConfig } from '../../utils/api';
+import { StatCard as SharedStatCard } from '../ui/StatCard';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -74,7 +75,7 @@ function ConfettiCanvas({ active }: { active: boolean }) {
     const W = canvas.width = canvas.offsetWidth;
     const H = canvas.height = canvas.offsetHeight;
 
-    const colors = ['#34d399', '#14F195', '#7717ff', '#c084fc', '#fbbf24', '#5b8def', '#fff'];
+    const colors = ['#2ecc71', '#14F195', '#8b5cf6', '#3b82f6', '#a78bfa', '#5b8def', '#fff'];
 
     // Burst particles
     for (let i = 0; i < 120; i++) {
@@ -254,9 +255,9 @@ export function ResultScreen() {
 
           {/* Quick stats row */}
           <div style={s.statsRow}>
-            <StatCard label="Hit Rate" value={`${hitRate}%`} accent={hitRate >= 50 ? theme.game.multiplier : theme.game.divider} />
-            <StatCard label="Nodes Hit" value={`${result.nodesHit.length}/${totalNodes}`} accent={theme.accent.purple} />
-            <StatCard label="XP Earned" value={`+${result.xpGained}`} accent={theme.accent.cyan} />
+            <SharedStatCard label="Hit Rate" value={`${hitRate}%`} color={hitRate >= 50 ? theme.game.multiplier : theme.game.divider} />
+            <SharedStatCard label="Nodes Hit" value={`${result.nodesHit.length}/${totalNodes}`} color={theme.accent.purple} />
+            <SharedStatCard label="XP Earned" value={`+${result.xpGained}`} trend="up" color={theme.accent.purple} />
           </div>
 
           {/* Round summary */}
@@ -281,10 +282,15 @@ export function ResultScreen() {
           <div style={s.actions}>
             <button
               onClick={() => { playAgain(); go('setup'); }}
-              className="btn-3d btn-3d-primary"
               style={{
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
                 gap: '3px', padding: '14px 24px', fontSize: '16px', width: '100%',
+                background: theme.gradient.primary,
+                border: 'none',
+                borderRadius: theme.radius.md,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                transition: 'all 0.15s ease',
               }}
             >
               <span style={s.primaryBtnText}>Play again</span>
@@ -379,29 +385,6 @@ export function ResultScreen() {
 }
 
 // ─── Sub Components ──────────────────────────────────────────────────────────
-
-function StatCard({ label, value, accent }: { label: string; value: string; accent: string }) {
-  return (
-    <div style={{
-      flex: 1,
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: '2px',
-      padding: '10px 8px',
-      background: `${accent}08`,
-      border: `1px solid ${accent}20`,
-      borderRadius: '10px',
-    }}>
-      <span style={{ fontSize: '18px', fontWeight: 800, color: accent, fontFamily: "'JetBrains Mono', monospace" }}>
-        {value}
-      </span>
-      <span style={{ fontSize: '11px', fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-        {label}
-      </span>
-    </div>
-  );
-}
 
 function WaterfallStep({ icon, label, value, color, isFirst, missed, delay = 0 }: {
   icon?: React.ReactNode; label: string; value: string; color: string; isFirst?: boolean; missed?: boolean; delay?: number;
@@ -551,9 +534,9 @@ const s: Record<string, React.CSSProperties> = {
 
   // Panels
   panel: {
-    background: theme.bg.secondary,
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
   },
   panelHeader: {
@@ -627,7 +610,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   xpBarFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #7717ff, #c084fc)',
+    background: '#8b5cf6',
     borderRadius: '2px',
     transition: 'width 0.8s ease',
   },
@@ -669,9 +652,9 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '12px 14px',
-    background: theme.bg.secondary,
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
+    borderRadius: theme.radius.md,
   },
   balanceLabel: {
     fontSize: '14px',
@@ -681,7 +664,7 @@ const s: Record<string, React.CSSProperties> = {
   balanceValue: {
     fontSize: '18px',
     fontWeight: 700,
-    color: '#c084fc',
+    color: theme.accent.blue,
     display: 'flex',
     alignItems: 'center',
   },

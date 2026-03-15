@@ -18,7 +18,7 @@ interface ChatMessage {
 }
 
 // SVG Icons
-function ChatIcon({ size = 18, color = '#7717ff' }: { size?: number; color?: string }) {
+function ChatIcon({ size = 18, color = '#8b5cf6' }: { size?: number; color?: string }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
@@ -85,10 +85,10 @@ const emojiStyles: Record<string, React.CSSProperties> = {
     fontFamily: "inherit",
     letterSpacing: '0.5px',
     padding: '7px 4px',
-    background: 'rgba(119, 23, 255, 0.08)',
-    border: '1px solid rgba(119, 23, 255, 0.15)',
+    background: 'rgba(139, 92, 246, 0.08)',
+    border: '1px solid rgba(139, 92, 246, 0.15)',
     borderRadius: '6px',
-    color: '#c084fc',
+    color: '#3b82f6',
     cursor: 'pointer',
     transition: 'background 0.1s, transform 0.1s',
   },
@@ -342,7 +342,7 @@ export function ChatPanel() {
                   <div style={styles.messageHeader}>
                     <span style={{
                       ...styles.username,
-                      ...(isSupport ? { color: '#14b8a6' } : isOwn ? { color: theme.accent.green } : {}),
+                      ...(isSupport ? { color: '#14b8a6' } : isOwn ? { color: theme.accent.purple } : {}),
                     }}>
                       {msg.username}
                     </span>
@@ -477,14 +477,14 @@ const styles: Record<string, React.CSSProperties> = {
     width: '7px',
     height: '7px',
     borderRadius: '50%',
-    background: theme.accent.green,
-    boxShadow: `0 0 6px ${theme.accent.green}`,
+    background: theme.accent.purple,
+    boxShadow: `0 0 6px ${theme.accent.purple}`,
   },
   onlineCount: {
     fontFamily: '"JetBrains Mono", monospace',
     fontSize: '14px',
     fontWeight: 600,
-    color: theme.accent.green,
+    color: theme.accent.purple,
   },
   closeBtn: {
     background: 'none',
@@ -530,11 +530,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     gap: '10px',
     padding: '10px 14px',
-    borderBottom: `1px solid rgba(119, 23, 255, 0.06)`,
+    borderBottom: `1px solid rgba(139, 92, 246, 0.06)`,
     transition: 'background 0.15s',
   },
   messageItemOwn: {
-    background: 'rgba(119, 23, 255, 0.06)',
+    background: 'rgba(139, 92, 246, 0.06)',
   },
   avatar: {
     width: '36px',
@@ -577,7 +577,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     fontWeight: 700,
     color: '#fff',
-    background: 'rgba(119, 23, 255, 0.5)',
+    background: 'rgba(139, 92, 246, 0.5)',
     borderRadius: '4px',
     padding: '1px 5px',
     lineHeight: '14px',
@@ -651,7 +651,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 2px 8px rgba(119, 23, 255, 0.4)',
+    boxShadow: '0 2px 8px rgba(139, 92, 246, 0.4)',
     transition: 'opacity 0.2s',
     flexShrink: 0,
   },

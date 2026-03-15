@@ -5,6 +5,8 @@ import { useAuthStore } from '../../stores/authStore';
 import { theme } from '../../styles/theme';
 import { api, apiFetch } from '../../utils/api';
 import { formatSol, lamportsToSol, solToLamports } from '../../utils/sol';
+import { PageHeader } from '../ui/PageHeader';
+import { StatCard } from '../ui/StatCard';
 
 // ─── Module-level state for the profile target ──────────────────────────────
 
@@ -118,16 +120,10 @@ export function PlayerProfileScreen() {
       ...styles.container,
       ...(isMobile ? { padding: '12px' } : {}),
     }}>
-      {/* Header */}
-      <div style={styles.header}>
-        <button onClick={() => go('lobby')} style={styles.backBtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
-        <span style={styles.headerTitle}>Player Profile</span>
-        <div style={{ width: '36px' }} />
-      </div>
+      <PageHeader
+        title={profile.displayName || profile.username}
+        subtitle={`@${profile.username} · Level ${profile.level}`}
+      />
 
       <div style={styles.content}>
         {/* Profile Card */}
@@ -183,10 +179,7 @@ export function PlayerProfileScreen() {
           gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
         }}>
           {statsData.map((stat) => (
-            <div key={stat.label} style={styles.statCard}>
-              <span style={styles.statLabel}>{stat.label}</span>
-              <span style={styles.statValue} className="mono">{stat.value}</span>
-            </div>
+            <StatCard key={stat.label} label={stat.label} value={stat.value} />
           ))}
         </div>
 
@@ -219,21 +212,21 @@ export function PlayerProfileScreen() {
             </div>
 
             <span style={styles.modalSubtitle}>
-              Sending to <strong style={{ color: '#c084fc' }}>@{profile.username}</strong>
+              Sending to <strong style={{ color: '#3b82f6' }}>@{profile.username}</strong>
             </span>
 
             {tipResult ? (
               <div style={{
                 padding: '16px',
                 borderRadius: '10px',
-                background: tipResult.success ? 'rgba(20, 241, 149, 0.1)' : 'rgba(255, 69, 58, 0.1)',
-                border: `1px solid ${tipResult.success ? 'rgba(20, 241, 149, 0.3)' : 'rgba(255, 69, 58, 0.3)'}`,
+                background: tipResult.success ? 'rgba(46, 204, 113, 0.1)' : 'rgba(255, 69, 58, 0.1)',
+                border: `1px solid ${tipResult.success ? 'rgba(46, 204, 113, 0.3)' : 'rgba(255, 69, 58, 0.3)'}`,
                 textAlign: 'center',
               }}>
                 <span style={{
                   fontSize: '14px',
                   fontWeight: 600,
-                  color: tipResult.success ? '#14F195' : '#ff453a',
+                  color: tipResult.success ? '#2ecc71' : '#ff453a',
                 }}>{tipResult.message}</span>
               </div>
             ) : (
@@ -253,7 +246,7 @@ export function PlayerProfileScreen() {
                     {['0.01', '0.05', '0.1', '0.5'].map((amt) => (
                       <button key={amt} onClick={() => setTipAmount(amt)} style={{
                         ...styles.quickBtn,
-                        ...(tipAmount === amt ? { background: 'rgba(119, 23, 255, 0.2)', color: '#c084fc' } : {}),
+                        ...(tipAmount === amt ? { background: 'rgba(139, 92, 246, 0.2)', color: '#3b82f6' } : {}),
                       }}>{amt}</button>
                     ))}
                   </div>
@@ -340,10 +333,10 @@ const styles: Record<string, React.CSSProperties> = {
   backBtnLarge: {
     marginTop: '8px',
     padding: '10px 24px',
-    background: 'rgba(119, 23, 255, 0.15)',
-    border: '1px solid rgba(119, 23, 255, 0.3)',
+    background: 'rgba(139, 92, 246, 0.15)',
+    border: '1px solid rgba(139, 92, 246, 0.3)',
     borderRadius: '8px',
-    color: '#c084fc',
+    color: '#3b82f6',
     fontSize: '14px',
     fontWeight: 700,
     cursor: 'pointer',
@@ -399,10 +392,9 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '12px',
     padding: '24px 20px',
-    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.12), rgba(20, 241, 149, 0.06))',
-    border: '1px solid rgba(119, 23, 255, 0.2)',
-    borderRadius: '14px',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.lg,
   },
   avatarWrap: {
     position: 'relative',
@@ -411,18 +403,18 @@ const styles: Record<string, React.CSSProperties> = {
     width: '80px',
     height: '80px',
     borderRadius: '50%',
-    border: '3px solid rgba(119, 23, 255, 0.3)',
+    border: `3px solid ${theme.accent.purple}`,
     objectFit: 'cover',
   },
   avatarFallback: {
     width: '80px',
     height: '80px',
     borderRadius: '50%',
-    background: 'linear-gradient(135deg, #7717ff, #14F195)',
+    background: theme.gradient.primary,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    border: '3px solid rgba(119, 23, 255, 0.3)',
+    border: `3px solid ${theme.accent.purple}`,
   },
   avatarInitial: {
     fontSize: '32px',
@@ -437,12 +429,12 @@ const styles: Record<string, React.CSSProperties> = {
     width: '28px',
     height: '28px',
     borderRadius: '50%',
-    background: '#7717ff',
+    background: '#8b5cf6',
     border: '2px solid #0e0a16',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 0 8px rgba(119, 23, 255, 0.5)',
+    boxShadow: '0 0 8px rgba(139, 92, 246, 0.5)',
   },
   levelBadgeText: {
     fontSize: '12px',
@@ -495,7 +487,7 @@ const styles: Record<string, React.CSSProperties> = {
   streakText: {
     fontSize: '12px',
     fontWeight: 700,
-    color: '#fbbf24',
+    color: '#8b5cf6',
     fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
@@ -506,31 +498,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'grid',
     gap: '10px',
   },
-  statCard: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-    padding: '14px',
-    background: theme.bg.secondary,
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
-    alignItems: 'center',
-  },
-  statLabel: {
-    fontSize: '11px',
-    fontWeight: 600,
-    color: theme.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    textAlign: 'center',
-  },
-  statValue: {
-    fontSize: '18px',
-    fontWeight: 800,
-    color: theme.text.primary,
-    fontFamily: "inherit",
-    letterSpacing: '0.5px',
-  },
 
   // Tip Button
   tipBtn: {
@@ -539,10 +506,10 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'center',
     gap: '8px',
     padding: '14px',
-    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.2), rgba(20, 241, 149, 0.1))',
-    border: '1px solid rgba(119, 23, 255, 0.3)',
-    borderRadius: '10px',
-    color: '#c084fc',
+    background: theme.gradient.primary,
+    border: 'none',
+    borderRadius: theme.radius.md,
+    color: '#fff',
     fontSize: '15px',
     fontWeight: 700,
     cursor: 'pointer',
@@ -557,7 +524,6 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'fixed',
     inset: 0,
     background: 'rgba(0, 0, 0, 0.7)',
-    backdropFilter: 'blur(4px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -647,9 +613,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   sendBtn: {
     padding: '14px',
-    background: 'linear-gradient(135deg, #7717ff, #14F195)',
+    background: theme.gradient.primary,
     border: 'none',
-    borderRadius: '10px',
+    borderRadius: theme.radius.md,
     color: '#fff',
     fontSize: '15px',
     fontWeight: 700,

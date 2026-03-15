@@ -67,11 +67,11 @@ export function BottomNav() {
                     ...(isActive ? styles.moreItemActive : {}),
                   }}
                 >
-                  <NavIcon name={item.icon} size={20} color={isActive ? theme.accent.violet : theme.text.secondary} />
+                  <NavIcon name={item.icon} size={20} color={isActive ? theme.accent.purple : theme.text.secondary} />
                   <span style={{
                     fontSize: '14px',
-                    fontWeight: 500,
-                    color: isActive ? '#fff' : theme.text.primary,
+                    fontWeight: isActive ? 700 : 500,
+                    color: isActive ? theme.accent.purple : theme.text.primary,
                   }}>
                     {item.label}
                   </span>
@@ -94,14 +94,14 @@ export function BottomNav() {
             >
               <NavIcon
                 name={tab.icon}
-                size={22}
-                color={isActive ? '#fff' : theme.text.muted}
+                size={21}
+                color={isActive ? theme.accent.purple : theme.text.muted}
               />
               <span style={{
                 fontSize: '10px',
-                fontWeight: 600,
-                color: isActive ? '#fff' : theme.text.muted,
-                marginTop: '2px',
+                fontWeight: isActive ? 700 : 500,
+                color: isActive ? theme.accent.purple : theme.text.muted,
+                marginTop: '3px',
               }}>
                 {tab.label}
               </span>
@@ -127,6 +127,8 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.bg.secondary,
     borderTop: `1px solid ${theme.border.subtle}`,
     zIndex: 200,
+    backdropFilter: 'none',
+    WebkitBackdropFilter: 'none',
   },
   tab: {
     display: 'flex',
@@ -144,17 +146,18 @@ const styles: Record<string, React.CSSProperties> = {
   overlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(0,0,0,0.6)',
+    background: 'rgba(0,0,0,0.7)',
+    backdropFilter: 'none',
     zIndex: 199,
     display: 'flex',
     alignItems: 'flex-end',
     justifyContent: 'center',
-    paddingBottom: '72px',
+    paddingBottom: '76px',
   },
   moreMenu: {
-    background: theme.bg.card,
+    background: 'linear-gradient(160deg, #1a1c21 0%, #121418 100%)',
     border: `1px solid ${theme.border.medium}`,
-    borderRadius: '12px',
+    borderRadius: '16px',
     padding: '8px',
     display: 'flex',
     flexDirection: 'column',
@@ -162,19 +165,21 @@ const styles: Record<string, React.CSSProperties> = {
     width: 'calc(100% - 32px)',
     maxWidth: '400px',
     animation: 'slideUp 0.15s ease',
+    boxShadow: '0 -8px 40px rgba(0, 0, 0, 0.5)',
   },
   moreItem: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '12px 16px',
+    gap: '14px',
+    padding: '13px 18px',
     background: 'transparent',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: '10px',
     cursor: 'pointer',
     fontFamily: 'inherit',
+    transition: 'background 0.15s ease',
   },
   moreItemActive: {
-    background: 'rgba(52, 56, 67, 0.6)',
+    background: 'rgba(139, 92, 246, 0.06)',
   },
 };

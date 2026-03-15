@@ -144,14 +144,14 @@ type Area = { x: number; y: number; w: number; h: number };
 
 function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, _phase: RoundPhase, elapsed: number) {
   // Deep dark base
-  ctx.fillStyle = '#0a0a0f';
+  ctx.fillStyle = '#080808';
   ctx.fillRect(0, 0, w, h);
 
   // Radial vignette / glow from center
   const cx = w / 2;
   const cy = h / 2;
   const radGrad = ctx.createRadialGradient(cx, cy * 0.7, 0, cx, cy, Math.max(w, h) * 0.7);
-  radGrad.addColorStop(0, 'rgba(119, 23, 255, 0.07)');
+  radGrad.addColorStop(0, 'rgba(139, 92, 246, 0.07)');
   radGrad.addColorStop(0.4, 'rgba(80, 40, 180, 0.03)');
   radGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = radGrad;
@@ -160,16 +160,16 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, _ph
   // Animated horizontal scan beam (purple, slow)
   const scanY = ((elapsed * 0.12) % 1) * h;
   const scanGrad = ctx.createLinearGradient(0, scanY - 50, 0, scanY + 50);
-  scanGrad.addColorStop(0, 'rgba(119, 23, 255, 0)');
-  scanGrad.addColorStop(0.4, 'rgba(119, 23, 255, 0.045)');
-  scanGrad.addColorStop(0.5, 'rgba(119, 23, 255, 0.06)');
-  scanGrad.addColorStop(0.6, 'rgba(119, 23, 255, 0.045)');
-  scanGrad.addColorStop(1, 'rgba(119, 23, 255, 0)');
+  scanGrad.addColorStop(0, 'rgba(139, 92, 246, 0)');
+  scanGrad.addColorStop(0.4, 'rgba(139, 92, 246, 0.045)');
+  scanGrad.addColorStop(0.5, 'rgba(139, 92, 246, 0.06)');
+  scanGrad.addColorStop(0.6, 'rgba(139, 92, 246, 0.045)');
+  scanGrad.addColorStop(1, 'rgba(139, 92, 246, 0)');
   ctx.fillStyle = scanGrad;
   ctx.fillRect(0, scanY - 50, w, 100);
 
   // Scan line (thin bright line at center of beam)
-  ctx.strokeStyle = 'rgba(119, 23, 255, 0.08)';
+  ctx.strokeStyle = 'rgba(139, 92, 246, 0.08)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, scanY);
@@ -179,16 +179,16 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number, _ph
   // Second faster scan beam (teal accent)
   const scan2Y = ((elapsed * 0.2 + 0.5) % 1) * h;
   const scan2Grad = ctx.createLinearGradient(0, scan2Y - 35, 0, scan2Y + 35);
-  scan2Grad.addColorStop(0, 'rgba(20, 241, 149, 0)');
-  scan2Grad.addColorStop(0.4, 'rgba(20, 241, 149, 0.025)');
-  scan2Grad.addColorStop(0.5, 'rgba(20, 241, 149, 0.04)');
-  scan2Grad.addColorStop(0.6, 'rgba(20, 241, 149, 0.025)');
-  scan2Grad.addColorStop(1, 'rgba(20, 241, 149, 0)');
+  scan2Grad.addColorStop(0, 'rgba(46, 204, 113, 0)');
+  scan2Grad.addColorStop(0.4, 'rgba(46, 204, 113, 0.025)');
+  scan2Grad.addColorStop(0.5, 'rgba(46, 204, 113, 0.04)');
+  scan2Grad.addColorStop(0.6, 'rgba(46, 204, 113, 0.025)');
+  scan2Grad.addColorStop(1, 'rgba(46, 204, 113, 0)');
   ctx.fillStyle = scan2Grad;
   ctx.fillRect(0, scan2Y - 35, w, 70);
 
   // Teal scan line
-  ctx.strokeStyle = 'rgba(20, 241, 149, 0.05)';
+  ctx.strokeStyle = 'rgba(46, 204, 113, 0.05)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, scan2Y);
@@ -209,7 +209,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
     const pulse = Math.sin(time * 0.8 + i * 0.5) * 0.3 + 0.7;
     const alpha = (0.045 + (1 - distFromCenter) * 0.035) * pulse;
 
-    ctx.strokeStyle = `rgba(119, 23, 255, ${alpha})`;
+    ctx.strokeStyle = `rgba(139, 92, 246, ${alpha})`;
     ctx.lineWidth = i === hLines / 2 ? 1.0 : 0.6;
     ctx.beginPath();
     ctx.moveTo(area.x, y);
@@ -231,7 +231,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
     const basePulse = Math.sin(time * 0.6 + i * 0.4) * 0.25 + 0.75;
     const alpha = (0.035 + proximity * 0.06) * basePulse;
 
-    ctx.strokeStyle = `rgba(119, 23, 255, ${alpha})`;
+    ctx.strokeStyle = `rgba(139, 92, 246, ${alpha})`;
     ctx.lineWidth = 0.5;
     ctx.beginPath();
     ctx.moveTo(x, area.y);
@@ -254,7 +254,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
 
       ctx.beginPath();
       ctx.arc(x, y, dotSize, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(119, 23, 255, ${dotAlpha})`;
+      ctx.fillStyle = `rgba(139, 92, 246, ${dotAlpha})`;
       ctx.fill();
     }
   }
@@ -274,21 +274,21 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
     ctx.beginPath();
     ctx.arc(px, py, pSize, 0, Math.PI * 2);
     ctx.fillStyle = p % 3 === 0
-      ? `rgba(20, 241, 149, ${pAlpha})`
-      : `rgba(119, 23, 255, ${pAlpha})`;
+      ? `rgba(46, 204, 113, ${pAlpha})`
+      : `rgba(139, 92, 246, ${pAlpha})`;
     ctx.fill();
   }
 
   // ─── Edge glow borders ────────────────────────────────────
   // Top edge glow
   const topGrad = ctx.createLinearGradient(area.x, area.y, area.x, area.y + 40);
-  topGrad.addColorStop(0, 'rgba(119, 23, 255, 0.10)');
-  topGrad.addColorStop(1, 'rgba(119, 23, 255, 0)');
+  topGrad.addColorStop(0, 'rgba(139, 92, 246, 0.10)');
+  topGrad.addColorStop(1, 'rgba(139, 92, 246, 0)');
   ctx.fillStyle = topGrad;
   ctx.fillRect(area.x, area.y, area.w, 40);
 
   // Top border line
-  ctx.strokeStyle = `rgba(119, 23, 255, ${0.08 + Math.sin(time * 1.5) * 0.04})`;
+  ctx.strokeStyle = `rgba(139, 92, 246, ${0.08 + Math.sin(time * 1.5) * 0.04})`;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(area.x, area.y);
@@ -297,13 +297,13 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
 
   // Bottom edge glow
   const botGrad = ctx.createLinearGradient(area.x, area.y + area.h - 40, area.x, area.y + area.h);
-  botGrad.addColorStop(0, 'rgba(119, 23, 255, 0)');
-  botGrad.addColorStop(1, 'rgba(119, 23, 255, 0.08)');
+  botGrad.addColorStop(0, 'rgba(139, 92, 246, 0)');
+  botGrad.addColorStop(1, 'rgba(139, 92, 246, 0.08)');
   ctx.fillStyle = botGrad;
   ctx.fillRect(area.x, area.y + area.h - 40, area.w, 40);
 
   // Bottom border line
-  ctx.strokeStyle = `rgba(119, 23, 255, ${0.06 + Math.sin(time * 1.5 + 1) * 0.03})`;
+  ctx.strokeStyle = `rgba(139, 92, 246, ${0.06 + Math.sin(time * 1.5 + 1) * 0.03})`;
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(area.x, area.y + area.h);
@@ -312,22 +312,22 @@ function drawGrid(ctx: CanvasRenderingContext2D, area: Area, elapsed: number) {
 
   // Left edge glow
   const leftGrad = ctx.createLinearGradient(area.x, area.y, area.x + 25, area.y);
-  leftGrad.addColorStop(0, 'rgba(119, 23, 255, 0.06)');
-  leftGrad.addColorStop(1, 'rgba(119, 23, 255, 0)');
+  leftGrad.addColorStop(0, 'rgba(139, 92, 246, 0.06)');
+  leftGrad.addColorStop(1, 'rgba(139, 92, 246, 0)');
   ctx.fillStyle = leftGrad;
   ctx.fillRect(area.x, area.y, 25, area.h);
 
   // Right edge glow
   const rightGrad = ctx.createLinearGradient(area.x + area.w - 25, area.y, area.x + area.w, area.y);
-  rightGrad.addColorStop(0, 'rgba(119, 23, 255, 0)');
-  rightGrad.addColorStop(1, 'rgba(119, 23, 255, 0.04)');
+  rightGrad.addColorStop(0, 'rgba(139, 92, 246, 0)');
+  rightGrad.addColorStop(1, 'rgba(139, 92, 246, 0.04)');
   ctx.fillStyle = rightGrad;
   ctx.fillRect(area.x + area.w - 25, area.y, 25, area.h);
 
   // ─── Corner accents (futuristic bracket corners) ──────────
   const cornerLen = 20;
   const cornerAlpha = 0.15 + Math.sin(time * 2) * 0.05;
-  ctx.strokeStyle = `rgba(119, 23, 255, ${cornerAlpha})`;
+  ctx.strokeStyle = `rgba(139, 92, 246, ${cornerAlpha})`;
   ctx.lineWidth = 1.5;
 
   // Top-left
@@ -365,7 +365,7 @@ function drawPhaseZones(ctx: CanvasRenderingContext2D, area: Area, duration: num
     { start: 0, end: 2, color: '#4ade8008' },
     { start: 2, end: 6, color: '#facc1506' },
     { start: 6, end: 11, color: '#ef444408' },
-    { start: 11, end: 15, color: '#a855f706' },
+    { start: 11, end: 15, color: '#8b5cf606' },
   ];
 
   for (const p of phases) {
@@ -400,24 +400,24 @@ function drawChartPath(ctx: CanvasRenderingContext2D, config: RoundConfig, area:
   ctx.closePath();
 
   const fillGrad = ctx.createLinearGradient(area.x, 0, area.x + area.w, 0);
-  fillGrad.addColorStop(0, 'rgba(119, 23, 255, 0.08)');
-  fillGrad.addColorStop(0.5, 'rgba(140, 120, 255, 0.06)');
-  fillGrad.addColorStop(1, 'rgba(119, 23, 255, 0.04)');
+  fillGrad.addColorStop(0, 'rgba(0, 220, 130, 0.08)');
+  fillGrad.addColorStop(0.5, 'rgba(59, 130, 246, 0.06)');
+  fillGrad.addColorStop(1, 'rgba(0, 220, 130, 0.04)');
 
   const fillVertGrad = ctx.createLinearGradient(0, area.y, 0, area.y + area.h);
-  fillVertGrad.addColorStop(0, 'rgba(119, 23, 255, 0.10)');
-  fillVertGrad.addColorStop(1, 'rgba(119, 23, 255, 0)');
+  fillVertGrad.addColorStop(0, 'rgba(0, 220, 130, 0.10)');
+  fillVertGrad.addColorStop(1, 'rgba(0, 220, 130, 0)');
   ctx.fillStyle = fillVertGrad;
   ctx.fill();
 
   // Main line with blue→purple gradient
   const lineGrad = ctx.createLinearGradient(area.x, 0, area.x + area.w, 0);
-  lineGrad.addColorStop(0, '#7717ff');
-  lineGrad.addColorStop(0.5, '#8b7bff');
-  lineGrad.addColorStop(1, '#7717ff');
+  lineGrad.addColorStop(0, '#00dc82');
+  lineGrad.addColorStop(0.5, '#3b82f6');
+  lineGrad.addColorStop(1, '#00dc82');
 
   ctx.save();
-  ctx.shadowColor = 'rgba(119, 23, 255, 0.25)';
+  ctx.shadowColor = 'rgba(0, 220, 130, 0.25)';
   ctx.shadowBlur = 6;
 
   ctx.beginPath();
@@ -490,10 +490,10 @@ function drawNodes(
 
 function getNodeColor(node: GameNode): string {
   switch (node.type) {
-    case 'multiplier': return '#34d399';
+    case 'multiplier': return '#2ecc71';
     case 'divider': return '#f87171';
     case 'shield': return '#5b8def';
-    case 'fake_breakout': return '#fbbf24';
+    case 'fake_breakout': return '#8b5cf6';
     case 'volatility_spike': return '#8b8bf5';
     default: return '#fff';
   }
@@ -531,7 +531,7 @@ function drawGemShape(
 
   // Outer glow aura
   if (glowStrength > 0) {
-    ctx.shadowColor = '#34d399';
+    ctx.shadowColor = '#2ecc71';
     ctx.shadowBlur = glowStrength;
   }
 
@@ -555,7 +555,7 @@ function drawGemShape(
   // Gradient fill
   const grad = ctx.createLinearGradient(x - halfW, topY, x + halfW, botY);
   grad.addColorStop(0, '#6ff5b0');
-  grad.addColorStop(0.35, '#34d399');
+  grad.addColorStop(0.35, '#2ecc71');
   grad.addColorStop(0.7, '#1fa87a');
   grad.addColorStop(1, '#14654a');
   ctx.fillStyle = grad;
@@ -660,7 +660,7 @@ function drawBombShape(
     const sparkSize = 3 + Math.sin(elapsed * 18) * 1.5;
 
     ctx.save();
-    ctx.shadowColor = '#fbbf24';
+    ctx.shadowColor = '#8b5cf6';
     ctx.shadowBlur = 8;
 
     // Star-burst spark
@@ -820,7 +820,7 @@ function drawActivatedNode(ctx: CanvasRenderingContext2D, x: number, y: number, 
       ctx.moveTo(x, y);
       ctx.lineTo(ex, ey);
       const ra = Math.floor(rayFade * 60).toString(16).padStart(2, '0');
-      ctx.strokeStyle = `#34d399${ra}`;
+      ctx.strokeStyle = `#2ecc71${ra}`;
       ctx.lineWidth = 2;
       ctx.stroke();
 
@@ -833,12 +833,12 @@ function drawActivatedNode(ctx: CanvasRenderingContext2D, x: number, y: number, 
 
     // Core green flash
     ctx.save();
-    ctx.shadowColor = '#34d399';
+    ctx.shadowColor = '#2ecc71';
     ctx.shadowBlur = 15 * fade;
     ctx.beginPath();
     ctx.arc(x, y, 12 * fade, 0, Math.PI * 2);
     const fa = Math.floor(fade * 100).toString(16).padStart(2, '0');
-    ctx.fillStyle = `#34d399${fa}`;
+    ctx.fillStyle = `#2ecc71${fa}`;
     ctx.fill();
     ctx.restore();
 
@@ -853,7 +853,7 @@ function drawActivatedNode(ctx: CanvasRenderingContext2D, x: number, y: number, 
       ctx.beginPath();
       ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
       const ra = Math.floor(ringFade * 50).toString(16).padStart(2, '0');
-      ctx.strokeStyle = r === 0 ? `#fbbf24${ra}` : `#f87171${ra}`;
+      ctx.strokeStyle = r === 0 ? `#8b5cf6${ra}` : `#f87171${ra}`;
       ctx.lineWidth = r === 0 ? 2.5 : 1.5;
       ctx.stroke();
     }
@@ -975,18 +975,18 @@ function drawLeadingPoint(ctx: CanvasRenderingContext2D, config: RoundConfig, ar
 
   // Large outer glow
   ctx.save();
-  ctx.shadowColor = '#7717ff';
+  ctx.shadowColor = '#00dc82';
   ctx.shadowBlur = 8;
 
   ctx.beginPath();
   ctx.arc(x, y, 10, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(119, 23, 255, 0.15)';
+  ctx.fillStyle = 'rgba(0, 220, 130, 0.15)';
   ctx.fill();
 
   // Inner bright point
   ctx.beginPath();
   ctx.arc(x, y, 4.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#7717ff';
+  ctx.fillStyle = '#00dc82';
   ctx.fill();
   ctx.restore();
 
@@ -1000,7 +1000,7 @@ function drawLeadingPoint(ctx: CanvasRenderingContext2D, config: RoundConfig, ar
   ctx.beginPath();
   ctx.moveTo(area.x, y);
   ctx.lineTo(x - 14, y);
-  ctx.strokeStyle = 'rgba(119, 23, 255, 0.06)';
+  ctx.strokeStyle = 'rgba(0, 220, 130, 0.06)';
   ctx.lineWidth = 1;
   ctx.setLineDash([3, 3]);
   ctx.stroke();
@@ -1011,12 +1011,12 @@ function drawLeadingPoint(ctx: CanvasRenderingContext2D, config: RoundConfig, ar
   const badgeW = 38;
   const badgeH = 18;
 
-  ctx.fillStyle = 'rgba(119, 23, 255, 0.15)';
+  ctx.fillStyle = 'rgba(0, 220, 130, 0.15)';
   ctx.beginPath();
   ctx.roundRect(area.x - badgeW - 4, y - badgeH / 2, badgeW, badgeH, 3);
   ctx.fill();
 
-  ctx.fillStyle = '#7717ff';
+  ctx.fillStyle = '#00dc82';
   ctx.font = '600 10px "JetBrains Mono", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -1042,7 +1042,7 @@ function drawTimeScale(ctx: CanvasRenderingContext2D, area: Area, duration: numb
   for (let t = 0; t <= 15; t += 3) {
     const x = area.x + (t / duration) * area.w;
     const isPast = t <= elapsed;
-    ctx.fillStyle = isPast ? 'rgba(119, 23, 255, 0.25)' : 'rgba(255,255,255,0.12)';
+    ctx.fillStyle = isPast ? 'rgba(0, 220, 130, 0.25)' : 'rgba(255,255,255,0.12)';
     ctx.fillText(`${t}s`, x, area.y + area.h + 20);
   }
 
@@ -1052,7 +1052,7 @@ function drawTimeScale(ctx: CanvasRenderingContext2D, area: Area, duration: numb
     ctx.beginPath();
     ctx.moveTo(px, area.y + area.h + 2);
     ctx.lineTo(px, area.y + area.h + 8);
-    ctx.strokeStyle = '#7717ff';
+    ctx.strokeStyle = '#00dc82';
     ctx.lineWidth = 2;
     ctx.stroke();
   }

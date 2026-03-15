@@ -91,7 +91,9 @@ export function ActivityFeed() {
       <div style={styles.feedList}>
         {items.length === 0 ? (
           <div style={styles.emptyState}>
-            <span style={{ opacity: 0.6 }}>Waiting for bets...</span>
+            <div style={{ fontSize: '20px', marginBottom: '4px' }}>📡</div>
+            <span style={{ opacity: 0.6 }}>Waiting for live activity...</span>
+            <div style={{ fontSize: '11px', opacity: 0.4, marginTop: '4px' }}>Bets appear here in real-time</div>
           </div>
         ) : (
           items.map(item => {

@@ -74,7 +74,7 @@ export function getPhaseColor(phase: RoundPhase): string {
     case 'opening': return '#4ade80';
     case 'buildup': return '#facc15';
     case 'chaos': return '#ef4444';
-    case 'final': return '#a855f7';
+    case 'final': return '#8b5cf6';
     case 'frozen': return '#6366f1';
     default: return '#64748b';
   }

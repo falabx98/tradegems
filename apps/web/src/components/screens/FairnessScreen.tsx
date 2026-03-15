@@ -4,6 +4,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { api } from '../../utils/api';
+import { PageHeader } from '../ui/PageHeader';
 
 interface RoundSeedData {
   id: string;
@@ -101,14 +102,15 @@ export function FairnessScreen() {
       ...styles.container,
       ...(isMobile ? { padding: '12px' } : {}),
     }}>
-      {/* Header */}
-      <div style={styles.header}>
-        <button onClick={() => go('settings')} style={styles.backBtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
-        </button>
-        <span style={styles.headerTitle}>Provably Fair</span>
-        <div style={{ width: '36px' }} />
-      </div>
+      <PageHeader
+        title="Provable Fairness"
+        subtitle="Verify any round outcome is generated fairly"
+        icon={
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+        }
+      />
 
       <div style={{
         ...styles.content,
@@ -117,7 +119,7 @@ export function FairnessScreen() {
         {/* Verify Round Panel */}
         <div style={styles.panel}>
           <div style={styles.panelHeader}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7717ff" strokeWidth="2" strokeLinecap="round">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
             <span style={styles.panelTitle}>Verify a Round</span>
@@ -158,7 +160,7 @@ export function FairnessScreen() {
               <span style={styles.panelTitle}>Verification Result</span>
               {verified && (
                 <div style={styles.verifiedBadge}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                   <span>VERIFIED</span>
@@ -211,7 +213,7 @@ export function FairnessScreen() {
             style={styles.collapsibleHeader}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c084fc" strokeWidth="2" strokeLinecap="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round">
                 <circle cx="12" cy="12" r="10" />
                 <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
                 <line x1="12" y1="17" x2="12.01" y2="17" />
@@ -289,7 +291,7 @@ export function FairnessScreen() {
                 onClick={() => handleHistoryClick(round.id)}
                 style={{
                   ...styles.historyItem,
-                  ...(roundId === round.id ? { background: 'rgba(119, 23, 255, 0.08)' } : {}),
+                  ...(roundId === round.id ? { background: 'rgba(139, 92, 246, 0.08)' } : {}),
                 }}
               >
                 <div style={styles.historyLeft}>
@@ -376,16 +378,16 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Panels
   panel: {
-    background: theme.bg.secondary,
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '8px',
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
   },
   panelHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '8px 12px',
+    padding: '10px 14px',
     borderBottom: `1px solid ${theme.border.subtle}`,
     background: theme.bg.tertiary,
   },
@@ -418,9 +420,9 @@ const styles: Record<string, React.CSSProperties> = {
   },
   input: {
     flex: 1,
-    background: theme.bg.tertiary,
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '6px',
+    background: theme.bg.primary,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.md,
     padding: '10px 12px',
     fontFamily: '"JetBrains Mono", monospace',
     fontSize: '13px',
@@ -431,14 +433,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   verifyBtn: {
     padding: '10px 20px',
-    background: 'rgba(119, 23, 255, 0.15)',
-    border: '1px solid rgba(119, 23, 255, 0.3)',
-    borderRadius: '6px',
+    background: theme.gradient.primary,
+    border: 'none',
+    borderRadius: theme.radius.md,
     cursor: 'pointer',
     fontFamily: 'inherit',
     fontSize: '14px',
     fontWeight: 700,
-    color: '#c084fc',
+    color: '#fff',
     transition: 'all 0.12s ease',
     flexShrink: 0,
     textTransform: 'uppercase' as const,
@@ -461,12 +463,12 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '4px',
     padding: '3px 10px',
-    background: 'rgba(52, 211, 153, 0.1)',
-    border: '1px solid rgba(52, 211, 153, 0.25)',
+    background: 'rgba(46, 204, 113, 0.1)',
+    border: '1px solid rgba(46, 204, 113, 0.25)',
     borderRadius: '20px',
     fontSize: '11px',
     fontWeight: 700,
-    color: '#34d399',
+    color: '#2ecc71',
     fontFamily: "inherit",
     letterSpacing: '1px',
   },
@@ -489,7 +491,7 @@ const styles: Record<string, React.CSSProperties> = {
   seedValue: {
     fontSize: '13px',
     fontWeight: 500,
-    color: '#c084fc',
+    color: '#8b5cf6',
     fontFamily: '"JetBrains Mono", monospace',
     wordBreak: 'break-all' as const,
     lineHeight: 1.5,
@@ -500,12 +502,13 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '10px 12px',
+    padding: '10px 14px',
     background: theme.bg.tertiary,
     border: 'none',
     cursor: 'pointer',
     width: '100%',
     textAlign: 'left' as const,
+    color: theme.text.secondary,
   },
   infoBody: {
     padding: '12px',
@@ -522,14 +525,14 @@ const styles: Record<string, React.CSSProperties> = {
     width: '28px',
     height: '28px',
     borderRadius: '50%',
-    background: 'rgba(119, 23, 255, 0.12)',
-    border: '1px solid rgba(119, 23, 255, 0.25)',
+    background: 'rgba(139, 92, 246, 0.12)',
+    border: '1px solid rgba(139, 92, 246, 0.25)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '13px',
     fontWeight: 700,
-    color: '#7717ff',
+    color: '#8b5cf6',
     fontFamily: '"JetBrains Mono", monospace',
     flexShrink: 0,
   },
@@ -579,7 +582,7 @@ const styles: Record<string, React.CSSProperties> = {
   historyId: {
     fontSize: '13px',
     fontWeight: 600,
-    color: '#c084fc',
+    color: '#8b5cf6',
     fontFamily: '"JetBrains Mono", monospace',
   },
   historyDate: {

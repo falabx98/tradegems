@@ -5,6 +5,8 @@ import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { api } from '../../utils/api';
+import { PageHeader } from '../ui/PageHeader';
+import { StatCard } from '../ui/StatCard';
 
 // ─── Season Data ────────────────────────────────────────────────────────────
 
@@ -120,18 +122,25 @@ export function SeasonScreen() {
       ...styles.container,
       ...(isMobile ? { padding: '12px' } : {}),
     }}>
-      {/* Header */}
+      <PageHeader
+        title={`Season ${SEASON_NUMBER}`}
+        subtitle="Battle Pass — earn XP and claim tier rewards"
+        action={
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 500, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Ends in</span>
+            <span className="mono" style={{ fontSize: '15px', fontWeight: 700, color: theme.warning }}>
+              {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m
+            </span>
+          </div>
+        }
+      />
+
+      {/* Progress Card */}
       <div style={styles.headerCard} className="card-enter card-enter-1">
         <div style={styles.headerTop}>
           <div style={styles.headerLeft}>
             <span style={styles.seasonTitle}>Season {SEASON_NUMBER}</span>
             <span style={styles.seasonSubtitle}>Battle Pass</span>
-          </div>
-          <div style={styles.timerWrap}>
-            <span style={styles.timerLabel}>Ends in</span>
-            <span style={styles.timerValue} className="mono">
-              {timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m
-            </span>
           </div>
         </div>
 
@@ -191,24 +200,25 @@ export function SeasonScreen() {
 
       {/* Stats Row */}
       <div style={styles.statsRow} className="card-enter card-enter-3">
-        <div style={styles.statItem}>
-          <span style={styles.statLabel}>Season Rank</span>
-          <span style={styles.statValue} className="mono">#{seasonLevel > 0 ? Math.max(1, 100 - seasonLevel * 3) : '--'}</span>
-        </div>
-        <div style={styles.statItem}>
-          <span style={styles.statLabel}>Total XP</span>
-          <span style={styles.statValue} className="mono">{profile.xp}</span>
-        </div>
-        <div style={styles.statItem}>
-          <span style={styles.statLabel}>Claimed</span>
-          <span style={{ ...styles.statValue, color: theme.success }} className="mono">
-            {formatSol(totalFreeEarned)} SOL
-          </span>
-        </div>
-        <div style={styles.statItem}>
-          <span style={styles.statLabel}>Days Left</span>
-          <span style={styles.statValue} className="mono">{timeLeft.days}</span>
-        </div>
+        <StatCard
+          label="Season Rank"
+          value={`#${seasonLevel > 0 ? Math.max(1, 100 - seasonLevel * 3) : '--'}`}
+          color={theme.accent.purple}
+        />
+        <StatCard
+          label="Total XP"
+          value={profile.xp}
+        />
+        <StatCard
+          label="Claimed"
+          value={`${formatSol(totalFreeEarned)} SOL`}
+          trend="up"
+        />
+        <StatCard
+          label="Days Left"
+          value={timeLeft.days}
+          color={theme.warning}
+        />
       </div>
 
       {/* Reward Track */}
@@ -289,14 +299,14 @@ export function SeasonScreen() {
                       <div style={styles.rewardIconWrap}>
                         <img src="/sol-coin.png" alt="SOL" style={styles.rewardIcon} />
                       </div>
-                      <span style={{ ...styles.rewardAmount, color: '#c084fc' }} className="mono">
+                      <span style={{ ...styles.rewardAmount, color: '#3b82f6' }} className="mono">
                         {premiumReward.label}
                       </span>
                       {!hasPremium ? (
                         <span style={styles.premiumLockBadge}>Premium</span>
                       ) : isUnlocked && !claimedPremium.has(lvl) ? (
                         <button
-                          style={{ ...styles.claimBtn, background: 'rgba(119, 23, 255, 0.3)', borderColor: 'rgba(119, 23, 255, 0.5)' }}
+                          style={{ ...styles.claimBtn, background: 'rgba(139, 92, 246, 0.3)', borderColor: 'rgba(139, 92, 246, 0.5)' }}
                           onClick={() => handleClaimPremium(lvl)}
                         >
                           Claim
@@ -334,13 +344,10 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Header Card
   headerCard: {
-    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.18), rgba(20, 241, 149, 0.08))',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(119, 23, 255, 0.25)',
-    borderRadius: '14px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.lg,
     padding: '20px',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   },
   headerTop: {
     display: 'flex',
@@ -360,7 +367,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '2px',
-    background: 'linear-gradient(135deg, #c084fc, #7717ff)',
+    background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
   },
@@ -410,25 +417,25 @@ const styles: Record<string, React.CSSProperties> = {
   xpLabel: {
     fontSize: '13px',
     fontWeight: 600,
-    color: '#c084fc',
+    color: '#3b82f6',
   },
   progressBarOuter: {
     position: 'relative',
     height: '10px',
-    background: 'rgba(28, 20, 42, 0.9)',
+    background: 'rgba(22, 29, 45, 0.9)',
     borderRadius: '5px',
     overflow: 'visible',
-    border: '1px solid rgba(119, 23, 255, 0.15)',
+    border: '1px solid rgba(139, 92, 246, 0.15)',
   },
   progressBarInner: {
     position: 'absolute',
     top: 0,
     left: 0,
     height: '100%',
-    background: 'linear-gradient(90deg, #7717ff, #c084fc, #14F195)',
+    background: 'linear-gradient(90deg, #8b5cf6, #3b82f6, #a78bfa)',
     borderRadius: '5px',
     transition: 'width 0.5s ease',
-    boxShadow: '0 0 12px rgba(119, 23, 255, 0.4)',
+    boxShadow: '0 0 12px rgba(139, 92, 246, 0.4)',
   },
   levelMarker: {
     position: 'absolute',
@@ -442,14 +449,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   xpSubBar: {
     height: '3px',
-    background: 'rgba(28, 20, 42, 0.6)',
+    background: 'rgba(22, 29, 45, 0.6)',
     borderRadius: '2px',
     overflow: 'hidden',
     marginTop: '14px',
   },
   xpSubBarFill: {
     height: '100%',
-    background: '#7717ff',
+    background: '#8b5cf6',
     borderRadius: '2px',
     transition: 'width 0.3s ease',
   },
@@ -462,11 +469,10 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Premium Card
   premiumCard: {
-    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.12), rgba(192, 132, 252, 0.06))',
-    border: '1px solid rgba(119, 23, 255, 0.3)',
-    borderRadius: '12px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.accent}`,
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
-    boxShadow: '0 0 20px rgba(119, 23, 255, 0.1)',
   },
   premiumContent: {
     display: 'flex',
@@ -483,7 +489,7 @@ const styles: Record<string, React.CSSProperties> = {
   premiumTitle: {
     fontSize: '16px',
     fontWeight: 700,
-    color: '#c084fc',
+    color: '#3b82f6',
     fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
@@ -508,41 +514,15 @@ const styles: Record<string, React.CSSProperties> = {
   statsRow: {
     display: 'grid',
     gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: '1px',
-    background: 'linear-gradient(135deg, rgba(119, 23, 255, 0.2), rgba(20, 241, 149, 0.15))',
-    borderRadius: '10px',
-    overflow: 'hidden',
-  },
-  statItem: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '12px 8px',
-    background: theme.bg.secondary,
-  },
-  statLabel: {
-    fontSize: '12px',
-    fontWeight: 500,
-    color: theme.text.muted,
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-  },
-  statValue: {
-    fontSize: '16px',
-    fontWeight: 700,
-    color: theme.text.primary,
+    gap: '8px',
   },
 
   // Track Card
   trackCard: {
-    background: 'rgba(28, 20, 42, 0.85)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(119, 23, 255, 0.18)',
-    borderRadius: '14px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
@@ -553,8 +533,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: '12px 16px',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
-    background: 'rgba(32, 24, 48, 0.95)',
+    borderBottom: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.tertiary,
   },
   trackTitle: {
     fontSize: '15px',
@@ -574,18 +554,18 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: theme.success,
     padding: '2px 8px',
-    background: 'rgba(52, 211, 153, 0.1)',
+    background: 'rgba(46, 204, 113, 0.1)',
     borderRadius: '4px',
-    border: '1px solid rgba(52, 211, 153, 0.2)',
+    border: '1px solid rgba(46, 204, 113, 0.2)',
   },
   legendPremium: {
     fontSize: '12px',
     fontWeight: 600,
-    color: '#c084fc',
+    color: '#3b82f6',
     padding: '2px 8px',
-    background: 'rgba(119, 23, 255, 0.1)',
+    background: 'rgba(139, 92, 246, 0.1)',
     borderRadius: '4px',
-    border: '1px solid rgba(119, 23, 255, 0.2)',
+    border: '1px solid rgba(139, 92, 246, 0.2)',
   },
 
   // Track Scroll
@@ -602,16 +582,16 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '10px',
     padding: '8px 12px',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
+    borderBottom: `1px solid ${theme.border.subtle}`,
     transition: 'background-color 0.15s ease',
     minHeight: '56px',
   },
   tierRowCurrent: {
-    background: 'rgba(119, 23, 255, 0.08)',
-    borderLeft: '3px solid #7717ff',
+    background: 'rgba(139, 92, 246, 0.08)',
+    borderLeft: '3px solid #8b5cf6',
   },
   tierRowUnlocked: {
-    background: 'rgba(20, 241, 149, 0.03)',
+    background: 'rgba(46, 204, 113, 0.03)',
   },
 
   // Level Badge
@@ -622,18 +602,18 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(28, 20, 42, 0.9)',
-    border: '2px solid rgba(119, 23, 255, 0.15)',
+    background: theme.bg.elevated,
+    border: `2px solid ${theme.border.medium}`,
     flexShrink: 0,
   },
   tierLevelUnlocked: {
-    border: '2px solid rgba(20, 241, 149, 0.3)',
-    background: 'rgba(20, 241, 149, 0.06)',
+    border: '2px solid rgba(46, 204, 113, 0.3)',
+    background: 'rgba(46, 204, 113, 0.06)',
   },
   tierLevelCurrent: {
-    border: '2px solid #7717ff',
-    background: 'rgba(119, 23, 255, 0.15)',
-    boxShadow: '0 0 12px rgba(119, 23, 255, 0.3)',
+    border: '2px solid #8b5cf6',
+    background: 'rgba(139, 92, 246, 0.15)',
+    boxShadow: '0 0 12px rgba(139, 92, 246, 0.3)',
   },
   tierLevelText: {
     fontSize: '13px',
@@ -655,24 +635,24 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '6px 10px',
-    background: 'rgba(28, 20, 42, 0.6)',
-    border: '1px solid rgba(119, 23, 255, 0.1)',
-    borderRadius: '8px',
+    background: theme.bg.elevated,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.md,
     width: '100%',
     maxWidth: '200px',
     transition: 'all 0.15s ease',
   },
   rewardBoxUnlocked: {
-    border: '1px solid rgba(20, 241, 149, 0.2)',
-    background: 'rgba(20, 241, 149, 0.04)',
+    border: '1px solid rgba(46, 204, 113, 0.2)',
+    background: 'rgba(46, 204, 113, 0.04)',
   },
   rewardBoxClaimed: {
     opacity: 0.5,
-    border: '1px solid rgba(119, 23, 255, 0.06)',
+    border: '1px solid rgba(139, 92, 246, 0.06)',
   },
   rewardBoxPremium: {
-    border: '1px solid rgba(119, 23, 255, 0.15)',
-    background: 'rgba(119, 23, 255, 0.04)',
+    border: '1px solid rgba(139, 92, 246, 0.15)',
+    background: 'rgba(139, 92, 246, 0.04)',
   },
   premiumLockOverlay: {
     position: 'absolute',
@@ -700,10 +680,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   claimBtn: {
     padding: '4px 10px',
-    background: 'rgba(20, 241, 149, 0.15)',
-    border: '1px solid rgba(20, 241, 149, 0.35)',
+    background: 'rgba(46, 204, 113, 0.15)',
+    border: '1px solid rgba(46, 204, 113, 0.35)',
     borderRadius: '6px',
-    color: '#14F195',
+    color: '#2ecc71',
     fontSize: '12px',
     fontWeight: 700,
     cursor: 'pointer',
@@ -735,7 +715,7 @@ const styles: Record<string, React.CSSProperties> = {
   premiumLockBadge: {
     fontSize: '11px',
     fontWeight: 600,
-    color: '#c084fc',
+    color: '#3b82f6',
     opacity: 0.7,
     position: 'relative' as const,
     zIndex: 2,

@@ -5,6 +5,8 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { CheckIcon, PackageIcon, PartyIcon, GiftIcon } from '../ui/GameIcons';
+import { PageHeader } from '../ui/PageHeader';
+import { TabBar } from '../ui/TabBar';
 
 interface Mission {
   id: string;
@@ -43,17 +45,17 @@ interface DailyBoxInfo {
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#9ca3af',
-  uncommon: '#34d399',
+  uncommon: '#2ecc71',
   rare: '#5b8def',
-  epic: '#c084fc',
-  legendary: '#fbbf24',
+  epic: '#3b82f6',
+  legendary: '#8b5cf6',
 };
 
 const RARITY_GLOW: Record<string, string> = {
   common: 'rgba(156, 163, 175, 0.3)',
-  uncommon: 'rgba(52, 211, 153, 0.3)',
+  uncommon: 'rgba(46, 204, 113, 0.3)',
   rare: 'rgba(91, 141, 239, 0.3)',
-  epic: 'rgba(192, 132, 252, 0.4)',
+  epic: 'rgba(51, 227, 157, 0.4)',
   legendary: 'rgba(251, 191, 36, 0.5)',
 };
 
@@ -228,25 +230,20 @@ export function RewardsScreen() {
       ...styles.container,
       ...(isMobile ? { padding: '10px' } : {}),
     }}>
+      <PageHeader title="Rewards" subtitle="Missions, achievements, and daily bonuses" icon={<GiftIcon size={20} color={theme.accent.purple} />} />
+
       {/* Tabs */}
-      <div style={{
-        ...styles.tabBar,
-        ...(isMobile ? { overflowX: 'auto', WebkitOverflowScrolling: 'touch', gap: '2px' } : {}),
-      }} className="card-enter card-enter-1">
-        {(['missions', 'achievements', 'rakeback', 'daily-box', 'affiliates'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              ...styles.tab,
-              ...(tab === t ? styles.tabActive : {}),
-              ...(isMobile ? { fontSize: '12px', padding: '8px 10px', whiteSpace: 'nowrap' } : {}),
-            }}
-          >
-            {t === 'daily-box' ? 'Box' : t === 'affiliates' ? 'Affiliates' : t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        tabs={[
+          { id: 'missions', label: 'Missions' },
+          { id: 'achievements', label: 'Achievements' },
+          { id: 'rakeback', label: 'Rakeback' },
+          { id: 'daily-box', label: 'Daily Box' },
+          { id: 'affiliates', label: 'Affiliates' },
+        ]}
+        active={tab}
+        onChange={(id) => setTab(id as typeof tab)}
+      />
 
       {claimMsg && <div style={styles.claimMsg}>{claimMsg}</div>}
 
@@ -261,7 +258,22 @@ export function RewardsScreen() {
               {loading ? (
                 <div style={styles.empty}>Loading missions...</div>
               ) : missions.length === 0 ? (
-                <div style={styles.empty}>No missions available</div>
+                <div style={{ ...styles.empty, flexDirection: 'column', display: 'flex', alignItems: 'center', gap: '12px', padding: '40px 20px' }}>
+                  <div style={{ fontSize: '32px' }}>🎯</div>
+                  <div style={{ fontSize: '16px', fontWeight: 700, color: theme.text.secondary }}>Missions Coming Soon</div>
+                  <div style={{ fontSize: '13px', color: theme.text.muted, textAlign: 'center', maxWidth: '300px', lineHeight: 1.5 }}>
+                    Complete daily challenges to earn XP, SOL rewards, and climb the ranks. Check back soon!
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+                    {['Play 5 rounds', 'Win 3 bets', 'Bet 1 SOL'].map((m) => (
+                      <div key={m} style={{
+                        padding: '6px 12px', borderRadius: '8px', fontSize: '11px',
+                        background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)',
+                        color: theme.text.muted,
+                      }}>{m}</div>
+                    ))}
+                  </div>
+                </div>
               ) : (
                 missions.map((m) => (
                   <div key={m.id} className="table-row-hover" style={{
@@ -270,7 +282,7 @@ export function RewardsScreen() {
                   }}>
                     <div style={styles.missionLeft}>
                       <div style={styles.missionTitle}>
-                        {m.completed && <span style={styles.checkMark}><CheckIcon size={12} color="#34d399" /></span>}
+                        {m.completed && <span style={styles.checkMark}><CheckIcon size={12} color="#2ecc71" /></span>}
                         {m.title}
                       </div>
                       <div style={styles.missionDesc}>{m.description}</div>
@@ -278,10 +290,7 @@ export function RewardsScreen() {
                         <div style={{
                           ...styles.progressFill,
                           width: `${Math.min((m.progress / m.target) * 100, 100)}%`,
-                          background: m.completed ? theme.success : '#7717ff',
-                          boxShadow: m.completed
-                            ? '0 0 8px rgba(52, 211, 153, 0.3)'
-                            : '0 0 8px rgba(119, 23, 255, 0.3)',
+                          background: m.completed ? theme.success : theme.gradient.primary,
                         }} />
                       </div>
                       <div style={styles.progressLabel} className="mono">
@@ -307,7 +316,7 @@ export function RewardsScreen() {
                         </button>
                       )}
                       {m.completed && m.claimed && (
-                        <span style={{ fontSize: 13, color: '#34d399', fontWeight: 600 }}>Claimed ✓</span>
+                        <span style={{ fontSize: 13, color: '#2ecc71', fontWeight: 600 }}>Claimed ✓</span>
                       )}
                     </div>
                   </div>
@@ -407,7 +416,7 @@ export function RewardsScreen() {
                     return (
                       <div key={t.tier} className="table-row-hover" style={{
                         ...styles.tierRow,
-                        color: isActive ? '#c084fc' : theme.text.muted,
+                        color: isActive ? '#3b82f6' : theme.text.muted,
                         ...(isActive ? styles.tierRowActive : {}),
                       }}>
                         <span>{t.tier}</span>
@@ -450,7 +459,7 @@ export function RewardsScreen() {
                             {copied ? 'Copied!' : 'Copy'}
                           </button>
                           <button
-                            style={{ ...affStyles.copyBtn, background: 'rgba(119, 23, 255, 0.15)', color: '#c084fc', border: '1px solid rgba(119, 23, 255, 0.3)' }}
+                            style={{ ...affStyles.copyBtn, background: 'rgba(139, 92, 246, 0.15)', color: '#3b82f6', border: '1px solid rgba(139, 92, 246, 0.3)' }}
                             onClick={() => { setEditingCode(true); setCustomCode(referralStats.referralCode); setCodeMsg(null); }}
                           >
                             Edit
@@ -470,7 +479,7 @@ export function RewardsScreen() {
                               flex: 1,
                               padding: '8px 12px',
                               background: 'rgba(15, 10, 25, 0.6)',
-                              border: '1px solid rgba(119, 23, 255, 0.3)',
+                              border: '1px solid rgba(139, 92, 246, 0.3)',
                               borderRadius: '8px',
                               color: '#fff',
                               fontSize: '16px',
@@ -481,7 +490,7 @@ export function RewardsScreen() {
                             }}
                           />
                           <button
-                            style={{ ...affStyles.copyBtn, background: 'rgba(20, 241, 149, 0.15)', color: '#14F195', border: '1px solid rgba(20, 241, 149, 0.3)' }}
+                            style={{ ...affStyles.copyBtn, background: 'rgba(46, 204, 113, 0.15)', color: '#2ecc71', border: '1px solid rgba(46, 204, 113, 0.3)' }}
                             disabled={savingCode || customCode.length < 3}
                             onClick={async () => {
                               setSavingCode(true);
@@ -513,7 +522,7 @@ export function RewardsScreen() {
                       </>
                     )}
                     {codeMsg && (
-                      <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '6px', color: codeMsg.type === 'success' ? '#14F195' : '#f87171' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '6px', color: codeMsg.type === 'success' ? '#2ecc71' : '#f87171' }}>
                         {codeMsg.text}
                       </div>
                     )}
@@ -624,8 +633,8 @@ export function RewardsScreen() {
                     {isOpening && !boxResult ? (
                       /* Opening animation */
                       <div style={dbStyles.boxOpening}>
-                        <div className="mystery-box-shake" style={{ lineHeight: 1 }}><PackageIcon size={60} color="#c084fc" /></div>
-                        <div style={{ marginTop: '4px', animation: 'glowPulse 0.5s ease-in-out infinite', opacity: 0.8 }}><GiftIcon size={22} color="#fbbf24" /></div>
+                        <div className="mystery-box-shake" style={{ lineHeight: 1 }}><PackageIcon size={60} color="#3b82f6" /></div>
+                        <div style={{ marginTop: '4px', animation: 'glowPulse 0.5s ease-in-out infinite', opacity: 0.8 }}><GiftIcon size={22} color="#8b5cf6" /></div>
                         <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '8px' }}>Opening...</div>
                       </div>
                     ) : boxResult ? (
@@ -669,7 +678,7 @@ export function RewardsScreen() {
                     ) : (
                       /* Idle state */
                       <div style={dbStyles.boxIdle}>
-                        <div style={{ lineHeight: 1 }}><GiftIcon size={60} color="#c084fc" /></div>
+                        <div style={{ lineHeight: 1 }}><GiftIcon size={60} color="#3b82f6" /></div>
                         <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '6px' }}>
                           Daily Mystery Box
                         </div>
@@ -687,8 +696,8 @@ export function RewardsScreen() {
                             <div className="mono" style={{
                               fontSize: '20px',
                               fontWeight: 700,
-                              color: '#c084fc',
-                              textShadow: '0 0 12px rgba(192, 132, 252, 0.4)',
+                              color: '#3b82f6',
+                              textShadow: '0 0 12px rgba(51, 227, 157, 0.4)',
                             }}>
                               {countdown || '...'}
                             </div>
@@ -738,14 +747,14 @@ export function RewardsScreen() {
                     return (
                       <div style={dbStyles.nextTierBox}>
                         <div style={{ fontSize: '13px', color: theme.text.muted }}>
-                          Level up to <span style={{ color: '#c084fc', fontWeight: 600 }}>
+                          Level up to <span style={{ color: '#3b82f6', fontWeight: 600 }}>
                             {dailyBoxInfo.nextTierRewards!.tier.charAt(0).toUpperCase() + dailyBoxInfo.nextTierRewards!.tier.slice(1)}
                           </span> for better rewards
                         </div>
                         <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           Legendary: {formatSol(cur.amountLamports)} →{' '}
                           <img src="/sol-coin.png" alt="SOL" style={{ width: 14, height: 14 }} />
-                          <span className="mono" style={{ color: '#fbbf24', fontWeight: 700 }}>
+                          <span className="mono" style={{ color: '#8b5cf6', fontWeight: 700 }}>
                             {formatSol(nxt.amountLamports)} SOL
                           </span>
                         </div>
@@ -806,9 +815,7 @@ const styles: Record<string, React.CSSProperties> = {
   tabBar: {
     display: 'flex',
     gap: '4px',
-    background: 'rgba(28, 20, 42, 0.85)',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
+    background: 'rgba(22, 29, 45, 0.85)',
     border: '1px solid rgba(255, 255, 255, 0.06)',
     borderRadius: '12px',
     padding: '4px',
@@ -829,30 +836,27 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '0.5px',
   },
   tabActive: {
-    background: 'rgba(119, 23, 255, 0.15)',
+    background: 'rgba(139, 92, 246, 0.15)',
     border: 'none',
-    color: '#c084fc',
-    boxShadow: '0 0 12px rgba(119, 23, 255, 0.3)',
+    color: '#3b82f6',
+    boxShadow: '0 0 12px rgba(139, 92, 246, 0.3)',
   },
   panel: {
-    background: 'rgba(28, 20, 42, 0.85)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(119, 23, 255, 0.18)',
-    borderRadius: '14px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   },
   panelHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     padding: '10px 14px',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
-    background: 'rgba(32, 24, 48, 0.95)',
+    borderBottom: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.tertiary,
   },
   panelTitle: {
     fontSize: '14px',
@@ -886,7 +890,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     padding: '14px',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
+    borderBottom: `1px solid ${theme.border.subtle}`,
     gap: '16px',
     transition: 'background-color 0.15s ease',
   },
@@ -907,7 +911,7 @@ const styles: Record<string, React.CSSProperties> = {
   checkMark: {
     color: theme.success,
     fontSize: '15px',
-    textShadow: '0 0 8px rgba(52, 211, 153, 0.5)',
+    textShadow: '0 0 8px rgba(46, 204, 113, 0.5)',
   },
   missionDesc: {
     fontSize: '13px',
@@ -944,14 +948,14 @@ const styles: Record<string, React.CSSProperties> = {
   rewardValue: {
     fontSize: '15px',
     fontWeight: 700,
-    color: '#c084fc',
+    color: '#3b82f6',
     display: 'flex',
     alignItems: 'center',
-    textShadow: '0 0 8px rgba(192, 132, 252, 0.3)',
+    textShadow: '0 0 8px rgba(51, 227, 157, 0.3)',
   },
   claimBtn: {
     padding: '5px 14px',
-    background: '#14F195',
+    background: '#2ecc71',
     border: 'none',
     borderRadius: '8px',
     color: '#0e0a16',
@@ -961,7 +965,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'inherit',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.3px',
-    boxShadow: '0 3px 0 #0ec47a, 0 4px 8px rgba(20, 241, 149, 0.3)',
+    boxShadow: '0 3px 0 #27ae60, 0 4px 8px rgba(46, 204, 113, 0.3)',
     transition: 'all 0.1s ease',
   },
 
@@ -971,7 +975,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '12px',
     padding: '12px 14px',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
+    borderBottom: `1px solid ${theme.border.subtle}`,
     transition: 'background-color 0.15s ease',
   },
   achieveIcon: {
@@ -979,7 +983,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: theme.warning,
     width: '48px',
     height: '48px',
-    background: 'rgba(28, 20, 42, 0.85)',
+    background: 'rgba(22, 29, 45, 0.85)',
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
@@ -1005,11 +1009,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     fontWeight: 600,
     color: theme.success,
-    background: 'rgba(52, 211, 153, 0.1)',
-    border: '1px solid rgba(52, 211, 153, 0.2)',
+    background: 'rgba(46, 204, 113, 0.1)',
+    border: '1px solid rgba(46, 204, 113, 0.2)',
     padding: '2px 8px',
     borderRadius: '10px',
-    boxShadow: '0 0 8px rgba(52, 211, 153, 0.15)',
+    boxShadow: '0 0 8px rgba(46, 204, 113, 0.15)',
   },
   statusLocked: {
     fontSize: '12px',
@@ -1034,11 +1038,9 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '4px',
     padding: '24px',
-    background: 'rgba(28, 20, 42, 0.85)',
-    backdropFilter: 'blur(16px)',
-    border: '1px solid rgba(119, 23, 255, 0.15)',
-    borderRadius: '14px',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+    background: theme.bg.tertiary,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.lg,
     position: 'relative',
     overflow: 'hidden',
   },
@@ -1050,9 +1052,9 @@ const styles: Record<string, React.CSSProperties> = {
   rakebackRate: {
     fontSize: '38px',
     fontWeight: 900,
-    color: '#c084fc',
+    color: '#3b82f6',
     lineHeight: 1,
-    textShadow: '0 0 20px rgba(192, 132, 252, 0.5), 0 0 40px rgba(192, 132, 252, 0.2)',
+    textShadow: '0 0 20px rgba(51, 227, 157, 0.5), 0 0 40px rgba(51, 227, 157, 0.2)',
   },
   rakebackTier: {
     fontSize: '14px',
@@ -1067,7 +1069,7 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '6px',
     marginTop: '16px',
     paddingTop: '16px',
-    borderTop: '1px solid rgba(119, 23, 255, 0.18)',
+    borderTop: '1px solid rgba(139, 92, 246, 0.18)',
     width: '100%',
   },
   claimableLabel: {
@@ -1079,11 +1081,11 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '22px',
     fontWeight: 800,
     color: theme.success,
-    textShadow: '0 0 12px rgba(52, 211, 153, 0.4)',
+    textShadow: '0 0 12px rgba(46, 204, 113, 0.4)',
   },
   claimRakebackBtn: {
     padding: '12px 28px',
-    background: '#14F195',
+    background: '#2ecc71',
     border: 'none',
     borderRadius: '12px',
     color: '#0e0a16',
@@ -1093,7 +1095,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: 'inherit',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
-    boxShadow: '0 4px 0 #0ec47a, 0 6px 12px rgba(20, 241, 149, 0.3)',
+    boxShadow: '0 4px 0 #27ae60, 0 6px 12px rgba(46, 204, 113, 0.3)',
     transition: 'all 0.1s ease',
     marginTop: '4px',
   },
@@ -1119,15 +1121,14 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 600,
     padding: '8px 12px',
-    background: 'rgba(28, 20, 42, 0.6)',
-    borderRadius: '8px',
-    transition: 'background-color 0.15s ease, transform 0.1s ease',
-    border: '1px solid transparent',
+    background: theme.bg.elevated,
+    borderRadius: theme.radius.md,
+    transition: 'background-color 0.15s ease',
+    border: `1px solid ${theme.border.subtle}`,
   },
   tierRowActive: {
-    border: '1px solid rgba(119, 23, 255, 0.2)',
-    boxShadow: '0 0 8px rgba(119, 23, 255, 0.15)',
-    background: 'rgba(119, 23, 255, 0.08)',
+    border: `1px solid ${theme.border.accent}`,
+    background: 'rgba(139, 92, 246, 0.08)',
   },
 };
 
@@ -1156,8 +1157,8 @@ const dbStyles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '28px 36px',
-    background: 'rgba(28, 20, 42, 0.95)',
-    borderRadius: '16px',
+    background: theme.bg.card,
+    borderRadius: theme.radius.xl,
     border: '2px solid',
   },
   section: {
@@ -1174,11 +1175,11 @@ const dbStyles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '8px 12px',
-    background: 'rgba(28, 20, 42, 0.6)',
-    borderRadius: '8px',
+    background: theme.bg.elevated,
+    borderRadius: theme.radius.md,
     marginBottom: '4px',
-    border: '1px solid transparent',
-    transition: 'background-color 0.15s ease, transform 0.1s ease',
+    border: `1px solid ${theme.border.subtle}`,
+    transition: 'background-color 0.15s ease',
   },
   rarityDot: {
     width: '8px',
@@ -1189,16 +1190,16 @@ const dbStyles: Record<string, React.CSSProperties> = {
   nextTierBox: {
     marginTop: '12px',
     padding: '12px',
-    background: 'rgba(119, 23, 255, 0.06)',
+    background: 'rgba(139, 92, 246, 0.06)',
     borderRadius: '8px',
-    border: '1px solid rgba(119, 23, 255, 0.12)',
+    border: '1px solid rgba(139, 92, 246, 0.12)',
   },
   historyRow: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     padding: '6px 12px',
-    background: 'rgba(28, 20, 42, 0.4)',
+    background: 'rgba(22, 29, 45, 0.4)',
     borderRadius: '6px',
     marginBottom: '3px',
     transition: 'background-color 0.15s ease, transform 0.1s ease',
@@ -1213,10 +1214,9 @@ const affStyles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '20px',
-    background: 'rgba(28, 20, 42, 0.85)',
-    borderRadius: '14px',
-    border: '1px solid rgba(119, 23, 255, 0.15)',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
+    background: theme.bg.tertiary,
+    borderRadius: theme.radius.lg,
+    border: `1px solid ${theme.border.medium}`,
   },
   codeRow: {
     display: 'flex',
@@ -1226,16 +1226,16 @@ const affStyles: Record<string, React.CSSProperties> = {
   code: {
     fontSize: '22px',
     fontWeight: 900,
-    color: '#c084fc',
+    color: '#3b82f6',
     letterSpacing: '2px',
-    textShadow: '0 0 12px rgba(192, 132, 252, 0.4)',
+    textShadow: '0 0 12px rgba(51, 227, 157, 0.4)',
   },
   copyBtn: {
     padding: '6px 14px',
-    background: 'rgba(119, 23, 255, 0.1)',
-    border: '1px solid rgba(119, 23, 255, 0.25)',
+    background: 'rgba(139, 92, 246, 0.1)',
+    border: '1px solid rgba(139, 92, 246, 0.25)',
     borderRadius: '8px',
-    color: '#c084fc',
+    color: '#3b82f6',
     fontSize: '13px',
     fontWeight: 700,
     cursor: 'pointer',
@@ -1254,9 +1254,9 @@ const affStyles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '4px',
     padding: '14px 8px',
-    background: 'rgba(28, 20, 42, 0.6)',
-    borderRadius: '10px',
-    border: '1px solid rgba(119, 23, 255, 0.08)',
+    background: theme.bg.card,
+    borderRadius: theme.radius.md,
+    border: `1px solid ${theme.border.subtle}`,
   },
   statLabel: {
     fontSize: '12px',
@@ -1277,15 +1277,15 @@ const affStyles: Record<string, React.CSSProperties> = {
     gap: '8px',
     padding: '16px',
     marginTop: '12px',
-    background: 'rgba(52, 211, 153, 0.05)',
+    background: 'rgba(46, 204, 113, 0.05)',
     borderRadius: '12px',
-    border: '1px solid rgba(52, 211, 153, 0.15)',
+    border: '1px solid rgba(46, 204, 113, 0.15)',
   },
   claimableAmount: {
     fontSize: '26px',
     fontWeight: 900,
     color: theme.success,
-    textShadow: '0 0 12px rgba(52, 211, 153, 0.4)',
+    textShadow: '0 0 12px rgba(46, 204, 113, 0.4)',
     display: 'flex',
     alignItems: 'center',
   },
@@ -1293,7 +1293,7 @@ const affStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     padding: '10px 12px',
-    background: 'rgba(28, 20, 42, 0.4)',
+    background: 'rgba(22, 29, 45, 0.4)',
     borderRadius: '8px',
     marginBottom: '4px',
     transition: 'background-color 0.15s ease, transform 0.1s ease',

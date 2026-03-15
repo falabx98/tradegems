@@ -23,18 +23,18 @@ const STEPS: TutorialStep[] = [
     accent: theme.accent.purple,
   },
   {
-    icon: <GemIcon size={26} color="#34d399" />,
+    icon: <GemIcon size={26} color="#2ecc71" />,
     title: 'Collect Gems',
     desc: 'Green emerald gems boost your multiplier. Avoid red bombs that divide your gains. Shields protect you once.',
     visual: 'gems',
-    accent: '#34d399',
+    accent: '#2ecc71',
   },
   {
-    icon: <ChartBarIcon size={26} color="#fbbf24" />,
+    icon: <ChartBarIcon size={26} color="#8b5cf6" />,
     title: 'Choose Your Risk',
     desc: 'Pick your bet size and risk tier before each round. Safe, Standard, or Degen — higher risk, higher reward.',
     visual: 'bet',
-    accent: '#fbbf24',
+    accent: '#8b5cf6',
   },
   {
     icon: <SwordsIcon size={26} color="#f87171" />,
@@ -44,18 +44,18 @@ const STEPS: TutorialStep[] = [
     accent: '#f87171',
   },
   {
-    icon: <MoneyIcon size={26} color={theme.accent.green} />,
+    icon: <MoneyIcon size={26} color={theme.accent.purple} />,
     title: 'Win & Withdraw SOL',
     desc: 'Winnings hit your balance instantly. Deposit and withdraw SOL anytime using your Phantom wallet.',
     visual: 'wallet',
-    accent: theme.accent.green,
+    accent: theme.accent.purple,
   },
 ];
 
 /* ────────── mini canvas illustrations ────────── */
 
 const PURPLE = theme.accent.purple;
-const PURPLE_ALPHA = (a: number) => `rgba(119, 23, 255, ${a})`;
+const PURPLE_ALPHA = (a: number) => `rgba(139, 92, 246, ${a})`;
 
 function drawChartVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
   ctx.clearRect(0, 0, w, h);
@@ -96,8 +96,8 @@ function drawChartVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t:
   const [tx, ty] = points[tipIdx];
   ctx.beginPath();
   ctx.arc(tx, ty, 5, 0, Math.PI * 2);
-  ctx.fillStyle = theme.accent.violet;
-  ctx.shadowColor = theme.accent.violet;
+  ctx.fillStyle = theme.accent.purple;
+  ctx.shadowColor = theme.accent.purple;
   ctx.shadowBlur = 12;
   ctx.fill();
   ctx.shadowBlur = 0;
@@ -119,7 +119,7 @@ function drawGemsVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: 
     const halfW = r * 0.65;
 
     ctx.save();
-    ctx.shadowColor = '#34d399';
+    ctx.shadowColor = '#2ecc71';
     ctx.shadowBlur = 14;
 
     ctx.beginPath();
@@ -133,7 +133,7 @@ function drawGemsVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: 
 
     const grad = ctx.createLinearGradient(gem.x - halfW, cy - r, gem.x + halfW, cy + r);
     grad.addColorStop(0, '#6ff5b0');
-    grad.addColorStop(0.4, '#34d399');
+    grad.addColorStop(0.4, '#2ecc71');
     grad.addColorStop(1, '#14654a');
     ctx.fillStyle = grad;
     ctx.fill();
@@ -151,7 +151,7 @@ function drawGemsVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: 
     ctx.fill();
     ctx.restore();
 
-    ctx.fillStyle = '#34d399';
+    ctx.fillStyle = '#2ecc71';
     ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(`x${(1.5 + gem.size * 0.05).toFixed(1)}`, gem.x, cy + r + 16);
@@ -194,8 +194,8 @@ function drawGemsVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: 
       const sy = cy - r - r * 0.6;
       ctx.beginPath();
       ctx.arc(sx, sy, 2, 0, Math.PI * 2);
-      ctx.fillStyle = '#fbbf24';
-      ctx.shadowColor = '#fbbf24';
+      ctx.fillStyle = '#8b5cf6';
+      ctx.shadowColor = '#8b5cf6';
       ctx.shadowBlur = 6;
       ctx.fill();
     }
@@ -229,8 +229,8 @@ function drawBetVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: n
   ctx.clearRect(0, 0, w, h);
 
   const tiers = [
-    { label: 'SAFE', color: '#34d399', x: w * 0.18, gain: '0.80x', loss: '0.85x' },
-    { label: 'STANDARD', color: '#fbbf24', x: w * 0.5, gain: '1.00x', loss: '1.00x' },
+    { label: 'SAFE', color: '#2ecc71', x: w * 0.18, gain: '0.80x', loss: '0.85x' },
+    { label: 'STANDARD', color: '#8b5cf6', x: w * 0.5, gain: '1.00x', loss: '1.00x' },
     { label: 'DEGEN', color: '#f87171', x: w * 0.82, gain: '1.25x', loss: '1.40x' },
   ];
 
@@ -272,7 +272,7 @@ function drawBetVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: n
     ctx.fillText(tier.label, cx, cy - cardH * 0.1);
 
     ctx.font = '10px monospace';
-    ctx.fillStyle = '#34d399';
+    ctx.fillStyle = '#2ecc71';
     ctx.fillText(`gain ${tier.gain}`, cx, cy + cardH * 0.1);
     ctx.fillStyle = '#f87171';
     ctx.fillText(`loss ${tier.loss}`, cx, cy + cardH * 0.25);
@@ -291,7 +291,7 @@ function drawBetVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: n
   const selectedBet = Math.floor(((t * 0.4) % bets.length));
   for (let i = 0; i < bets.length; i++) {
     const bx = w * 0.1 + ((w * 0.8) / bets.length) * (i + 0.5);
-    ctx.fillStyle = i === selectedBet ? theme.accent.violet : theme.text.muted;
+    ctx.fillStyle = i === selectedBet ? theme.accent.purple : theme.text.muted;
     ctx.font = `${i === selectedBet ? 'bold ' : ''}10px monospace`;
     ctx.textAlign = 'center';
     ctx.fillText(bets[i], bx, barY + 16);
@@ -320,7 +320,7 @@ function drawBattleVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t
   ctx.restore();
 
   const players = [
-    { name: 'You', mult: '2.4x', color: theme.accent.green },
+    { name: 'You', mult: '2.4x', color: theme.accent.purple },
     { name: 'Player2', mult: '1.8x', color: theme.accent.purple },
     { name: 'Player3', mult: '1.2x', color: theme.accent.purple },
     { name: 'Player4', mult: '0.7x', color: '#f87171' },
@@ -333,19 +333,19 @@ function drawBattleVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t
 
     ctx.save();
     if (i === 0) {
-      ctx.shadowColor = theme.accent.green;
+      ctx.shadowColor = theme.accent.purple;
       ctx.shadowBlur = 10;
     }
     ctx.beginPath();
     ctx.arc(px, py, 14, 0, Math.PI * 2);
-    ctx.fillStyle = i === 0 ? 'rgba(0, 189, 113, 0.15)' : PURPLE_ALPHA(0.08);
+    ctx.fillStyle = i === 0 ? 'rgba(46, 204, 113, 0.15)' : PURPLE_ALPHA(0.08);
     ctx.fill();
     ctx.strokeStyle = players[i].color;
     ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.restore();
 
-    ctx.fillStyle = i === 0 ? theme.accent.green : theme.text.muted;
+    ctx.fillStyle = i === 0 ? theme.accent.purple : theme.text.muted;
     ctx.font = `${i === 0 ? 'bold ' : ''}9px Inter, sans-serif`;
     ctx.textAlign = 'center';
     ctx.fillText(players[i].name, px, py + 26);
@@ -359,13 +359,13 @@ function drawBattleVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t
   ctx.beginPath();
   ctx.arc(cx, cy, 18, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = theme.accent.violet;
+  ctx.fillStyle = theme.accent.purple;
   ctx.font = 'bold 14px Inter, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('VS', cx, cy);
 
-  ctx.fillStyle = '#fbbf24';
+  ctx.fillStyle = '#8b5cf6';
   ctx.font = 'bold 12px Inter, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('POOL: 0.40 SOL', cx, h * 0.88);
@@ -380,16 +380,16 @@ function drawWalletVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t
   const cardY = h * 0.12;
 
   ctx.save();
-  ctx.shadowColor = theme.accent.green;
+  ctx.shadowColor = theme.accent.purple;
   ctx.shadowBlur = 12;
   ctx.beginPath();
   ctx.roundRect(cardX, cardY, cardW, cardH, 8);
   const walletGrad = ctx.createLinearGradient(cardX, cardY, cardX + cardW, cardY + cardH);
-  walletGrad.addColorStop(0, 'rgba(0, 189, 113, 0.08)');
+  walletGrad.addColorStop(0, 'rgba(46, 204, 113, 0.08)');
   walletGrad.addColorStop(1, PURPLE_ALPHA(0.05));
   ctx.fillStyle = walletGrad;
   ctx.fill();
-  ctx.strokeStyle = 'rgba(0, 189, 113, 0.25)';
+  ctx.strokeStyle = 'rgba(46, 204, 113, 0.25)';
   ctx.lineWidth = 1;
   ctx.stroke();
   ctx.restore();
@@ -398,7 +398,7 @@ function drawWalletVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t
   ctx.arc(cardX + 24, cardY + cardH / 2, 10, 0, Math.PI * 2);
   ctx.fillStyle = PURPLE_ALPHA(0.2);
   ctx.fill();
-  ctx.fillStyle = theme.accent.violet;
+  ctx.fillStyle = theme.accent.purple;
   ctx.font = 'bold 10px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -420,12 +420,12 @@ function drawWalletVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t
 
   ctx.beginPath();
   ctx.roundRect(cardX, btnY, btnW, btnH, 6);
-  ctx.fillStyle = 'rgba(0, 189, 113, 0.1)';
+  ctx.fillStyle = 'rgba(46, 204, 113, 0.1)';
   ctx.fill();
-  ctx.strokeStyle = 'rgba(0, 189, 113, 0.3)';
+  ctx.strokeStyle = 'rgba(46, 204, 113, 0.3)';
   ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.fillStyle = theme.accent.green;
+  ctx.fillStyle = theme.accent.purple;
   ctx.font = 'bold 11px Inter, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('DEPOSIT', cardX + btnW / 2, btnY + 20);
@@ -437,13 +437,13 @@ function drawWalletVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t
   ctx.strokeStyle = PURPLE_ALPHA(0.3);
   ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.fillStyle = theme.accent.violet;
+  ctx.fillStyle = theme.accent.purple;
   ctx.font = 'bold 11px Inter, sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('WITHDRAW', cardX + cardW - btnW / 2, btnY + 20);
 
   const txY = btnY + btnH + 24;
-  ctx.fillStyle = '#34d399';
+  ctx.fillStyle = '#2ecc71';
   ctx.font = '10px monospace';
   ctx.textAlign = 'left';
   ctx.fillText('+0.2500 SOL', cardX + 8, txY);
@@ -632,8 +632,6 @@ const s: Record<string, React.CSSProperties> = {
     inset: 0,
     zIndex: 9999,
     background: 'rgba(0, 0, 0, 0.8)',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',

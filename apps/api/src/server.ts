@@ -33,6 +33,7 @@ import { rugGameRoutes } from './routes/rug-game.routes.js';
 import { startRugRoundManager } from './modules/round-manager/rugRoundManager.js';
 import { startCandleflipRoundManager } from './modules/round-manager/candleflipRoundManager.js';
 import { startSweepWorker } from './workers/sweepWorker.js';
+import { startOrphanCleanupWorker } from './workers/orphanCleanup.worker.js';
 
 
 export async function buildServer() {
@@ -165,6 +166,7 @@ export async function buildServer() {
   try { startLotteryDrawWorker(); } catch (e) { server.log.error(e, 'Failed to start lottery draw worker'); }
   try { startTradingSimWorker(); } catch (e) { server.log.error(e, 'Failed to start trading sim worker'); }
   try { startSweepWorker(); } catch (e) { server.log.error(e, 'Failed to start sweep worker'); }
+  try { startOrphanCleanupWorker(); } catch (e) { server.log.error(e, 'Failed to start orphan cleanup worker'); }
 
   return server;
 }

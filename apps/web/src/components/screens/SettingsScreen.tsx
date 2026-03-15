@@ -9,6 +9,8 @@ import { isMuted, setMuted, getVolume, setVolume } from '../../utils/sounds';
 import { isPhotoAvatar, getAvatarGradient, getInitials, resizeImageToBase64 } from '../../utils/avatars';
 import { api } from '../../utils/api';
 import { UploadIcon } from '../ui/GameIcons';
+import { PageHeader } from '../ui/PageHeader';
+import { StatCard } from '../ui/StatCard';
 
 export function SettingsScreen() {
   const profile = useGameStore((s) => s.profile);
@@ -117,6 +119,8 @@ export function SettingsScreen() {
 
   return (
     <div style={styles.container}>
+      <PageHeader title="Settings" subtitle="Account, preferences & security" />
+
       {/* Profile Card */}
       <div style={styles.card} className="card-enter card-enter-1">
         <div style={styles.cardHeader}>
@@ -152,10 +156,10 @@ export function SettingsScreen() {
                   fontSize: '13px',
                   fontWeight: 700,
                   color: theme.vip[profile.vipTier as keyof typeof theme.vip] || theme.text.secondary,
-                  background: 'rgba(119, 23, 255, 0.18)',
+                  background: 'rgba(139, 92, 246, 0.18)',
                   padding: '2px 10px',
                   borderRadius: '10px',
-                  border: '1px solid rgba(119, 23, 255, 0.2)',
+                  border: '1px solid rgba(139, 92, 246, 0.2)',
                   position: 'relative' as const,
                   overflow: 'hidden',
                 }}
@@ -241,12 +245,12 @@ export function SettingsScreen() {
           ...styles.statsGrid,
           ...(isMobile ? { gridTemplateColumns: 'repeat(2, 1fr)' } : {}),
         }}>
-          <StatBox label="Rounds played" value={`${profile.roundsPlayed}`} />
-          <StatBox label="Total wagered" value={`${formatSol(profile.totalWagered)} SOL`} icon />
-          <StatBox label="Total won" value={`${formatSol(profile.totalWon)} SOL`} color={theme.success} icon />
-          <StatBox label="Win rate" value={`${(profile.winRate * 100).toFixed(1)}%`} />
-          <StatBox label="Best mult" value={`${profile.bestMultiplier.toFixed(2)}x`} color="#c084fc" />
-          <StatBox label="Balance" value={`${formatSol(profile.balance)} SOL`} color="#c084fc" icon />
+          <StatCard label="Rounds Played" value={`${profile.roundsPlayed}`} />
+          <StatCard label="Total Wagered" value={`${formatSol(profile.totalWagered)} SOL`} />
+          <StatCard label="Total Won" value={`${formatSol(profile.totalWon)} SOL`} color={theme.success} trend="up" />
+          <StatCard label="Win Rate" value={`${(profile.winRate * 100).toFixed(1)}%`} />
+          <StatCard label="Best Mult" value={`${profile.bestMultiplier.toFixed(2)}x`} color={theme.accent.blue} />
+          <StatCard label="Balance" value={`${formatSol(profile.balance)} SOL`} color={theme.accent.blue} />
         </div>
       </div>
 
@@ -269,9 +273,9 @@ export function SettingsScreen() {
               }}
               style={{
                 ...styles.prefToggle,
-                background: soundOn ? 'rgba(20, 241, 149, 0.15)' : 'rgba(255, 75, 75, 0.1)',
-                color: soundOn ? '#14F195' : '#FF4B4B',
-                border: `1px solid ${soundOn ? 'rgba(20, 241, 149, 0.3)' : 'rgba(255, 75, 75, 0.2)'}`,
+                background: soundOn ? `rgba(0, 220, 130, 0.12)` : `rgba(255, 71, 87, 0.1)`,
+                color: soundOn ? theme.success : theme.accent.red,
+                border: `1px solid ${soundOn ? 'rgba(0, 220, 130, 0.25)' : 'rgba(255, 71, 87, 0.2)'}`,
               }}
             >
               {soundOn ? 'On' : 'Off'}
@@ -291,7 +295,7 @@ export function SettingsScreen() {
                     setVol(v);
                     setVolume(v / 100);
                   }}
-                  style={{ width: '80px', accentColor: '#7717ff' }}
+                  style={{ width: '80px', accentColor: '#8b5cf6' }}
                 />
                 <span style={styles.prefValue} className="mono">{volume}%</span>
               </div>
@@ -346,7 +350,7 @@ export function SettingsScreen() {
           {secMsg && (
             <p style={{
               fontSize: '13px', margin: 0, fontWeight: 600,
-              color: secMsg.type === 'success' ? '#14F195' : '#f87171',
+              color: secMsg.type === 'success' ? '#2ecc71' : '#f87171',
             }}>
               {secMsg.text}
             </p>
@@ -462,24 +466,23 @@ const styles: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box' as const,
   },
   card: {
-    background: theme.bg.tertiary,
-    border: '1px solid rgba(119, 23, 255, 0.18)',
-    borderRadius: '14px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   },
   cardHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     padding: '10px 14px',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
-    background: '#201830',
+    borderBottom: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.tertiary,
   },
   cardTitle: {
-    fontSize: '15px',
+    fontSize: '12px',
     fontWeight: 700,
-    color: theme.text.secondary,
+    color: theme.text.muted,
     fontFamily: "inherit",
     textTransform: 'uppercase' as const,
     letterSpacing: '1px',
@@ -501,7 +504,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontFamily: "inherit",
     color: '#fff',
     flexShrink: 0,
-    boxShadow: '0 0 16px rgba(119, 23, 255, 0.3)',
+    boxShadow: '0 0 16px rgba(139, 92, 246, 0.3)',
   },
   avatarImg: {
     width: '48px',
@@ -509,7 +512,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '50%',
     objectFit: 'cover' as const,
     flexShrink: 0,
-    boxShadow: '0 0 16px rgba(119, 23, 255, 0.3)',
+    boxShadow: '0 0 16px rgba(139, 92, 246, 0.3)',
   },
   profileInfo: {
     flex: 1,
@@ -533,8 +536,7 @@ const styles: Record<string, React.CSSProperties> = {
     height: '80px',
     borderRadius: '50%',
     objectFit: 'cover' as const,
-    border: '3px solid rgba(119, 23, 255, 0.4)',
-    boxShadow: '0 0 20px rgba(119, 23, 255, 0.3)',
+    border: `3px solid ${theme.accent.purple}`,
   },
   avatarPreviewGradient: {
     width: '80px',
@@ -547,8 +549,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 900,
     fontFamily: "inherit",
     color: '#fff',
-    border: '3px solid rgba(119, 23, 255, 0.4)',
-    boxShadow: '0 0 20px rgba(119, 23, 255, 0.3)',
+    border: `3px solid ${theme.accent.purple}`,
   },
   avatarControls: {
     display: 'flex',
@@ -561,11 +562,11 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '10px 18px',
-    background: 'rgba(119, 23, 255, 0.2)',
-    border: '1px solid rgba(119, 23, 255, 0.4)',
-    borderRadius: '10px',
-    color: '#c084fc',
-    fontSize: '15px',
+    background: theme.gradient.primary,
+    border: 'none',
+    borderRadius: theme.radius.md,
+    color: '#fff',
+    fontSize: '14px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'inherit',
@@ -608,35 +609,35 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     width: '100%',
-    padding: '8px 0',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
-    transition: 'background-color 0.15s ease, transform 0.1s ease',
+    padding: '10px 0',
+    borderBottom: `1px solid ${theme.border.subtle}`,
+    transition: 'background-color 0.15s ease',
   },
   prefLabel: {
-    fontSize: '15px',
+    fontSize: '14px',
     color: theme.text.secondary,
     fontWeight: 500,
   },
   prefValue: {
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 600,
-    color: '#c084fc',
-    textShadow: '0 0 8px rgba(192, 132, 252, 0.3)',
+    color: theme.accent.purple,
   },
   prefToggle: {
-    padding: '4px 12px',
-    borderRadius: '8px',
-    fontSize: '14px',
+    padding: '5px 14px',
+    borderRadius: theme.radius.md,
+    fontSize: '13px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'inherit',
+    transition: 'all 0.15s ease',
   },
   secInput: {
     padding: '10px 14px',
     background: theme.bg.primary,
-    border: '1px solid rgba(119, 23, 255, 0.2)',
-    borderRadius: '8px',
-    color: '#fff',
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.md,
+    color: theme.text.primary,
     fontSize: '14px',
     fontFamily: 'inherit',
     outline: 'none',
@@ -647,11 +648,11 @@ const styles: Record<string, React.CSSProperties> = {
   logoutBtn: {
     width: '100%',
     padding: '14px',
-    background: 'rgba(248, 113, 113, 0.08)',
-    border: '1px solid rgba(248, 113, 113, 0.25)',
-    borderRadius: '12px',
-    color: '#f87171',
-    fontSize: '16px',
+    background: 'rgba(255, 71, 87, 0.08)',
+    border: `1px solid rgba(255, 71, 87, 0.25)`,
+    borderRadius: theme.radius.md,
+    color: theme.accent.red,
+    fontSize: '15px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'inherit',

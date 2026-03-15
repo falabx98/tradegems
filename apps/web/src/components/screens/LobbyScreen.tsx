@@ -10,6 +10,8 @@ import { GiftIcon } from '../ui/GameIcons';
 import { LiveDot, GameTypeBadge, timeAgo } from '../ui/LiveIndicators';
 import { ActivityFeed } from '../ActivityFeed';
 import { getAvatarGradient, getInitials } from '../../utils/avatars';
+import { TabBar } from '../ui/TabBar';
+import { StatCard } from '../ui/StatCard';
 
 interface BannerData {
   id: string;
@@ -24,7 +26,7 @@ const BANNERS: BannerData[] = [
     id: 'welcome-bonus',
     image: '/Welcome-Bonus.png',
     cta: 'Claim Now',
-    accentColor: theme.accent.green,
+    accentColor: theme.accent.purple,
     action: 'bonus',
   },
   {
@@ -38,8 +40,88 @@ const BANNERS: BannerData[] = [
     id: 'daily-rewards',
     image: '/Daily-Rewards.jpg',
     cta: 'Claim',
-    accentColor: '#fbbf24',
+    accentColor: '#8b5cf6',
     action: 'rewards',
+  },
+];
+
+type GameCategory = 'all' | 'pvp' | 'solo' | 'jackpot';
+
+const CATEGORY_TABS = [
+  { id: 'all', label: 'All Games' },
+  { id: 'pvp', label: 'PvP' },
+  { id: 'solo', label: 'Solo' },
+  { id: 'jackpot', label: 'Jackpot' },
+];
+
+interface GameCardDef {
+  id: string;
+  route: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  category: GameCategory[];
+  gradientOverlay: string;
+  isLive?: boolean;
+}
+
+const GAME_DEFS: GameCardDef[] = [
+  {
+    id: 'solo',
+    route: 'setup',
+    title: 'Solo',
+    subtitle: 'Trade vs. the chart',
+    image: '/game-solo.png',
+    category: ['solo'],
+    gradientOverlay: 'linear-gradient(135deg, rgba(139,92,246,0.35) 0%, rgba(59,130,246,0.20) 100%)',
+  },
+  {
+    id: 'predictions',
+    route: 'prediction',
+    title: 'Predictions',
+    subtitle: 'Up or Down?',
+    image: '/game-predictions.png',
+    category: ['solo'],
+    gradientOverlay: 'linear-gradient(135deg, rgba(59,130,246,0.35) 0%, rgba(139,92,246,0.20) 100%)',
+  },
+  {
+    id: 'trading-sim',
+    route: 'trading-sim',
+    title: 'Trading Sim',
+    subtitle: 'PvP Trading Arena',
+    image: '/game-trading-sim.png',
+    category: ['pvp'],
+    gradientOverlay: 'linear-gradient(135deg, rgba(6,78,59,0.55) 0%, rgba(5,150,105,0.30) 100%)',
+    isLive: true,
+  },
+  {
+    id: 'candleflip',
+    route: 'candleflip',
+    title: 'Candleflip',
+    subtitle: 'Over/Under 1.00x',
+    image: '/game-candleflip.png',
+    category: ['pvp'],
+    gradientOverlay: 'linear-gradient(135deg, rgba(146,64,14,0.55) 0%, rgba(217,119,6,0.30) 100%)',
+    isLive: true,
+  },
+  {
+    id: 'rug-game',
+    route: 'rug-game',
+    title: 'Rug Game',
+    subtitle: 'Cash Out or Get Rugged',
+    image: '/game-rug-game.png',
+    category: ['pvp'],
+    gradientOverlay: 'linear-gradient(135deg, rgba(127,29,29,0.55) 0%, rgba(220,38,38,0.30) 100%)',
+    isLive: true,
+  },
+  {
+    id: 'lottery',
+    route: 'lottery',
+    title: 'Lottery',
+    subtitle: 'Jackpot Draws',
+    image: '/game-lottery.png',
+    category: ['jackpot'],
+    gradientOverlay: 'linear-gradient(135deg, rgba(161,139,40,0.55) 0%, rgba(255,170,0,0.30) 100%)',
   },
 ];
 
@@ -53,6 +135,8 @@ export function LobbyScreen() {
   const [rugRecent, setRugRecent] = useState<any[]>([]);
   const [candleRecent, setCandleRecent] = useState<any[]>([]);
   const [tradingRooms, setTradingRooms] = useState<any[]>([]);
+  const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchLiveData = async () => {
@@ -115,31 +199,210 @@ export function LobbyScreen() {
     }
   };
 
-  const quickStatsBar = (
-    <div style={styles.quickStats}>
-      <div style={styles.quickStatItem}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.text.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-        <span style={styles.quickStatLabel}>Players</span>
-        <span style={styles.quickStatValue} className="mono">{liveStats.active}</span>
-      </div>
-      <div style={styles.quickStatItem}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.text.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="12" y1="20" x2="12" y2="10" /><line x1="18" y1="20" x2="18" y2="4" /><line x1="6" y1="20" x2="6" y2="16" />
-        </svg>
-        <span style={styles.quickStatLabel}>24h vol</span>
-        <span style={styles.quickStatValue} className="mono">
-          <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', marginRight: '3px' }} />
-          {liveStats.volume}
+  // Filter games by category
+  const filteredGames = GAME_DEFS.filter(g =>
+    activeCategory === 'all' || g.category.includes(activeCategory as GameCategory)
+  );
+
+  // Determine live state per game
+  const isGameLive = (id: string): boolean => {
+    if (id === 'candleflip') return candleRecent.length > 0;
+    if (id === 'rug-game') return rugRecent.length > 0;
+    if (id === 'trading-sim') return activeRoomCount > 0;
+    return false;
+  };
+
+  const getLiveExtra = (id: string) => {
+    if (id === 'candleflip' && candleRecent.length > 0) {
+      return (
+        <span style={s.liveDataRow}>
+          {candleRecent.slice(0, 5).map((r: any, i: number) => (
+            <span
+              key={i}
+              style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: r.result === 'bullish' ? theme.accent.green : theme.accent.red,
+                display: 'inline-block',
+              }}
+            />
+          ))}
         </span>
+      );
+    }
+    if (id === 'rug-game' && rugRecent.length > 0) {
+      const last = rugRecent[0];
+      const won = last.status === 'cashed_out';
+      return (
+        <span style={{ ...s.liveDataRow, marginTop: '3px' }}>
+          <span style={{ fontSize: '10px', fontWeight: 700, color: won ? theme.accent.green : theme.accent.red }} className="mono">
+            {won ? 'CASHED' : 'RUGGED'}{last.multiplier ? ` ${Number(last.multiplier).toFixed(2)}x` : ''}
+          </span>
+        </span>
+      );
+    }
+    if (id === 'trading-sim' && activeRoomCount > 0) {
+      return (
+        <span style={{ ...s.liveDataRow, marginTop: '3px' }}>
+          <span style={{ fontSize: '10px', fontWeight: 700, color: theme.accent.green }} className="mono">
+            {activeRoomCount} room{activeRoomCount !== 1 ? 's' : ''} live
+          </span>
+        </span>
+      );
+    }
+    return null;
+  };
+
+  const statsRow = (
+    <div style={s.statsRow}>
+      <StatCard
+        label="Players Online"
+        value={liveStats.active}
+        icon={
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
+        }
+        color={theme.accent.lavender}
+      />
+      <StatCard
+        label="24h Volume"
+        value={`${liveStats.volume} SOL`}
+        icon={
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="20" x2="12" y2="10" />
+            <line x1="18" y1="20" x2="18" y2="4" />
+            <line x1="6" y1="20" x2="6" y2="16" />
+          </svg>
+        }
+        color={theme.accent.blue}
+      />
+      <StatCard
+        label="Top Win"
+        value={liveStats.topWin}
+        icon={
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+          </svg>
+        }
+        color={theme.accent.amber}
+      />
+      {isAuthenticated && (
+        <StatCard
+          label="Your Balance"
+          value={`${formatSol(profile.balance)} SOL`}
+          color={theme.accent.purple}
+        />
+      )}
+    </div>
+  );
+
+  const gameGrid = (columns: string) => (
+    <div style={{ ...s.gameGrid, gridTemplateColumns: columns }}>
+      {filteredGames.map((game) => {
+        const live = isGameLive(game.id);
+        const hovered = hoveredCard === game.id;
+        return (
+          <div
+            key={game.id}
+            onClick={() => go(game.route as any)}
+            onMouseEnter={() => setHoveredCard(game.id)}
+            onMouseLeave={() => setHoveredCard(null)}
+            style={{
+              ...s.gameCard,
+              border: hovered
+                ? `1px solid rgba(139, 92, 246, 0.45)`
+                : `1px solid ${theme.border.subtle}`,
+              transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+              boxShadow: hovered
+                ? `0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(139,92,246,0.15)`
+                : `0 2px 8px rgba(0,0,0,0.3)`,
+            }}
+          >
+            {/* Image fill */}
+            <img
+              src={game.image}
+              alt={game.title}
+              draggable={false}
+              style={s.gameCardImg}
+            />
+            {/* Gradient overlay top half */}
+            <div style={{ ...s.gameCardGradTop, background: game.gradientOverlay }} />
+            {/* Bottom fade for text legibility */}
+            <div style={s.gameCardGradBottom} />
+
+            {/* LIVE / NEW badge */}
+            {live && (
+              <div style={s.liveBadge}>
+                <LiveDot size={5} color={theme.accent.green} />
+                <span style={s.liveBadgeText}>LIVE</span>
+              </div>
+            )}
+
+            {/* Content */}
+            <div style={s.gameCardContent}>
+              <span style={s.gameCardTitle}>{game.title}</span>
+              <span style={s.gameCardSub}>{game.subtitle}</span>
+              {getLiveExtra(game.id)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const liveActivitySection = allRecent.length > 0 && (
+    <div style={s.liveSection}>
+      <div style={s.liveSectionHeader}>
+        <LiveDot size={6} />
+        <span style={s.liveSectionTitle}>Live Action</span>
       </div>
-      <div style={styles.quickStatItem}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.text.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-        <span style={styles.quickStatLabel}>Top win</span>
-        <span style={styles.quickStatValue} className="mono">{liveStats.topWin}</span>
+      {allRecent.map((item, i) => (
+        <div key={i} style={{ ...s.liveRow, borderBottom: i < allRecent.length - 1 ? `1px solid ${theme.border.subtle}` : 'none' }}>
+          <GameTypeBadge type={item.gameType === 'rug' ? 'rug' : 'candle'} />
+          <span style={s.liveRowText}>
+            {item.gameType === 'rug'
+              ? `${item.status === 'cashed_out' ? 'Cashed' : 'Rugged'}${item.multiplier ? ` at ${Number(item.multiplier).toFixed(2)}x` : ''}`
+              : `${item.result === 'bullish' ? 'Bull' : 'Bear'} flip${item.betAmount ? ` — ${(Number(item.betAmount) / 1e9).toFixed(3)} SOL` : ''}`
+            }
+          </span>
+          {item.time && <span style={s.liveRowTime}>{timeAgo(item.time)}</span>}
+        </div>
+      ))}
+    </div>
+  );
+
+  const bonusCard = isAuthenticated && (
+    <div
+      style={s.bonusCard}
+      className="card-enter card-enter-1"
+      onClick={() => go('wallet')}
+    >
+      <div style={s.bonusInner}>
+        <div style={s.bonusIconWrap}>
+          <GiftIcon size={isMobile ? 20 : 24} color={theme.accent.purple} />
+        </div>
+        <div style={s.bonusText}>
+          <span style={s.bonusTitle}>100% Deposit Bonus</span>
+          <span style={s.bonusDesc}>{isMobile ? 'Double your first deposit!' : 'Double your first deposit — we match it 100%!'}</span>
+        </div>
+        <span style={s.bonusArrow}>Deposit →</span>
+      </div>
+    </div>
+  );
+
+  const authModal = showAuthPrompt && (
+    <div style={s.authOverlay} onClick={() => setShowAuthPrompt(false)}>
+      <div style={s.authModal} onClick={(e) => e.stopPropagation()}>
+        <div style={s.authModalGlow} />
+        <span style={s.authTitle}>Sign in to play</span>
+        <span style={s.authDesc}>Create an account or sign in to start trading rounds.</span>
+        <button style={s.authBtn} onClick={() => { setShowAuthPrompt(false); go('auth'); }}>
+          Sign in / Register
+        </button>
+        <button style={s.authDismiss} onClick={() => setShowAuthPrompt(false)}>Maybe later</button>
       </div>
     </div>
   );
@@ -147,346 +410,147 @@ export function LobbyScreen() {
   /* ─── MOBILE LAYOUT ─── */
   if (isMobile) {
     return (
-      <div style={{ ...styles.container, padding: '10px' }}>
+      <div style={{ ...s.container, padding: '10px', gap: '12px' }}>
         <BannerCarousel isMobile={isMobile} onBannerClick={handleBannerClick} />
 
-        {/* Game cards — 2x2 grid */}
-        <div style={styles.sectionTitle}>Games</div>
-        <div style={{ ...styles.gameCardsGrid, gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-          <div onClick={() => go('setup')} style={styles.gameCard} className="game-card">
-            <img src="/game-solo.png" alt="Solo" draggable={false} style={styles.gameCardImg} />
-            <div style={styles.gameCardOverlay} />
-            <div style={styles.gameCardContent}>
-              <span style={styles.gameCardTitle}>Solo</span>
-              <span style={styles.gameCardSub}>Trade vs. the chart</span>
-            </div>
-          </div>
-          <div onClick={() => go('prediction')} style={styles.gameCard} className="game-card">
-            <img src="/game-predictions.png" alt="Predictions" draggable={false} style={styles.gameCardImg} />
-            <div style={styles.gameCardOverlay} />
-            <div style={styles.gameCardContent}>
-              <span style={styles.gameCardTitle}>Predictions</span>
-              <span style={styles.gameCardSub}>Up or Down?</span>
-            </div>
-          </div>
-          <div onClick={() => go('trading-sim')} style={styles.gameCard} className="game-card">
-            <img src="/game-trading-sim.png" alt="Trading Sim" draggable={false} style={styles.gameCardImg} />
-            <div style={styles.gameCardOverlay} />
-            {activeRoomCount > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#0d9488" /></span>}
-            <div style={styles.gameCardContent}>
-              <span style={styles.gameCardTitle}>Trading Sim</span>
-              <span style={styles.gameCardSub}>PvP Trading Arena</span>
-              {activeRoomCount > 0 && (
-                <span style={styles.liveDataRow}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: '#0d9488' }} className="mono">{activeRoomCount} room{activeRoomCount !== 1 ? 's' : ''} live</span>
-                </span>
-              )}
-            </div>
-          </div>
-          <div onClick={() => go('lottery')} style={styles.gameCard} className="game-card">
-            <img src="/game-lottery.png" alt="Lottery" draggable={false} style={styles.gameCardImg} />
-            <div style={styles.gameCardOverlay} />
-            <div style={styles.gameCardContent}>
-              <span style={styles.gameCardTitle}>Lottery</span>
-              <span style={styles.gameCardSub}>Jackpot Draws</span>
-            </div>
-          </div>
-
-          <div onClick={() => go('candleflip')} style={styles.gameCard} className="game-card">
-            <img src="/game-candleflip.png" alt="Candleflip" draggable={false} style={styles.gameCardImg} />
-            <div style={styles.gameCardOverlay} />
-            {candleRecent.length > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#eab308" /></span>}
-            <div style={styles.gameCardContent}>
-              <span style={styles.gameCardTitle}>Candleflip</span>
-              <span style={styles.gameCardSub}>Over/Under 1.00x</span>
-              {candleRecent.length > 0 && (
-                <span style={styles.liveDataRow}>
-                  {candleRecent.slice(0, 5).map((r: any, i: number) => (
-                    <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: r.result === 'bullish' ? '#34d399' : '#f87171', display: 'inline-block' }} />
-                  ))}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div onClick={() => go('rug-game')} style={styles.gameCard} className="game-card">
-            <img src="/game-rug-game.png" alt="Rug Game" draggable={false} style={styles.gameCardImg} />
-            <div style={styles.gameCardOverlay} />
-            {rugRecent.length > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#f87171" /></span>}
-            <div style={styles.gameCardContent}>
-              <span style={styles.gameCardTitle}>Rug Game</span>
-              <span style={styles.gameCardSub}>Cash Out or Get Rugged</span>
-              {rugRecent.length > 0 && (
-                <span style={styles.liveDataRow}>
-                  <span style={{ fontSize: '11px', fontWeight: 700, color: rugRecent[0].status === 'cashed_out' ? '#34d399' : '#f87171' }} className="mono">
-                    {rugRecent[0].status === 'cashed_out' ? 'CASHED' : 'RUGGED'} {rugRecent[0].multiplier ? `${Number(rugRecent[0].multiplier).toFixed(2)}x` : ''}
-                  </span>
-                </span>
-              )}
-            </div>
-          </div>
+        {/* Quick Stats — 2x2 compact on mobile */}
+        <div style={{ ...s.statsRow, gridTemplateColumns: 'repeat(2, 1fr)' }}>
+          <StatCard label="Players" value={liveStats.active} color={theme.accent.lavender} />
+          <StatCard label="24h Volume" value={`${liveStats.volume} SOL`} color={theme.accent.blue} />
+          <StatCard label="Top Win" value={liveStats.topWin} color={theme.accent.amber} />
+          {isAuthenticated
+            ? <StatCard label="Balance" value={`${formatSol(profile.balance)} SOL`} color={theme.accent.purple} />
+            : <StatCard label="Games" value={GAME_DEFS.length} color={theme.accent.purple} />
+          }
         </div>
 
-        {allRecent.length > 0 && (
-          <div style={styles.liveActionSection}>
-            <div style={styles.liveActionHeader}>
-              <LiveDot size={6} />
-              <span style={{ fontSize: '12px', fontWeight: 700, color: theme.text.muted, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Live Action</span>
-            </div>
-            {allRecent.map((item, i) => (
-              <div key={i} style={styles.liveActionRow}>
-                <GameTypeBadge type={item.gameType === 'rug' ? 'rug' : 'candle'} />
-                <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: theme.text.secondary }}>
-                  {item.gameType === 'rug'
-                    ? `${item.status === 'cashed_out' ? 'Cashed' : 'Rugged'}${item.multiplier ? ` at ${Number(item.multiplier).toFixed(2)}x` : ''}`
-                    : `${item.result === 'bullish' ? 'Bull' : 'Bear'} flip${item.betAmount ? ` - ${(Number(item.betAmount) / 1e9).toFixed(3)} SOL` : ''}`
-                  }
-                </span>
-                {item.time && <span style={{ fontSize: '10px', color: theme.text.muted }}>{timeAgo(item.time)}</span>}
-              </div>
-            ))}
-          </div>
-        )}
+        {/* Category Filter */}
+        <div style={s.tabBarWrap}>
+          <TabBar tabs={CATEGORY_TABS} active={activeCategory} onChange={setActiveCategory} />
+        </div>
+
+        {/* Game Cards — 2 column */}
+        {gameGrid('repeat(2, 1fr)')}
+
+        {/* Live Activity */}
+        {liveActivitySection}
 
         <LiveWinsTicker />
         <TopPlayers />
 
-        {/* Quick stats bar — compact */}
-        {quickStatsBar}
-
-        {/* Compact stats row */}
-        <div style={styles.mobileStatsRow}>
-          <div style={styles.mobileStatBox}>
-            <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px' }} />
-            <span style={styles.mobileStatVal} className="mono">{formatSol(profile.balance)}</span>
+        {/* Mobile Profile Stats */}
+        <div style={s.mobileStatsRow}>
+          <div style={s.mobileStatBox}>
+            <img src="/sol-coin.png" alt="SOL" style={{ width: '14px', height: '14px' }} />
+            <span style={s.mobileStatVal} className="mono">{formatSol(profile.balance)}</span>
           </div>
-          <div style={styles.mobileStatBox}>
-            <span style={styles.mobileStatLabel}>LVL</span>
-            <span style={styles.mobileStatVal} className="mono">{profile.level}</span>
+          <div style={s.mobileStatBox}>
+            <span style={s.mobileStatLabel}>LVL</span>
+            <span style={s.mobileStatVal} className="mono">{profile.level}</span>
           </div>
           <div style={{
-            ...styles.mobileStatBox,
+            ...s.mobileStatBox,
             background: `${(theme.vip as any)[profile.vipTier] || theme.accent.purple}12`,
           }}>
             <span style={{
-              ...styles.mobileStatVal,
+              ...s.mobileStatVal,
               color: (theme.vip as any)[profile.vipTier] || theme.text.secondary,
               fontSize: '12px',
             }}>{profile.vipTier}</span>
           </div>
-          <div style={styles.mobileStatBox}>
-            <span style={styles.mobileStatLabel}>Best</span>
-            <span style={{ ...styles.mobileStatVal, color: theme.game.multiplier }} className="mono">{profile.bestMultiplier.toFixed(1)}x</span>
+          <div style={s.mobileStatBox}>
+            <span style={s.mobileStatLabel}>Best</span>
+            <span style={{ ...s.mobileStatVal, color: theme.game.multiplier }} className="mono">
+              {profile.bestMultiplier.toFixed(1)}x
+            </span>
           </div>
         </div>
 
-        {/* Deposit bonus promo */}
-        {isAuthenticated && (
-          <div style={styles.bonusCard} className="card-enter card-enter-1" onClick={() => go('wallet')}>
-            <div style={styles.bonusContent}>
-              <div style={styles.bonusIcon}><GiftIcon size={20} color={theme.accent.green} /></div>
-              <div style={styles.bonusTextWrap}>
-                <span style={styles.bonusTitle}>100% Deposit Bonus</span>
-                <span style={styles.bonusDesc}>Double your first deposit!</span>
-              </div>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: theme.accent.green, whiteSpace: 'nowrap' as const }}>Deposit →</span>
-            </div>
-          </div>
-        )}
-
+        {bonusCard}
         <ActivityFeed />
-
-        {showAuthPrompt && (
-          <div style={styles.authOverlay} onClick={() => setShowAuthPrompt(false)}>
-            <div style={styles.authModal} onClick={(e) => e.stopPropagation()}>
-              <span style={styles.authTitle}>Sign in to play</span>
-              <span style={styles.authDesc}>Create an account or sign in to start trading rounds.</span>
-              <button style={styles.authBtn} onClick={() => { setShowAuthPrompt(false); go('auth'); }}>Sign in / Register</button>
-              <button style={styles.authDismiss} onClick={() => setShowAuthPrompt(false)}>Maybe later</button>
-            </div>
-          </div>
-        )}
+        {authModal}
       </div>
     );
   }
 
   /* ─── DESKTOP LAYOUT ─── */
   return (
-    <div style={styles.container}>
+    <div style={s.container}>
       <BannerCarousel isMobile={false} onBannerClick={handleBannerClick} />
 
-      <div style={styles.columns}>
-        {/* Left column */}
-        <div style={styles.leftCol}>
-          <div style={styles.sectionTitle}>Games</div>
+      {/* Quick Stats Row */}
+      {statsRow}
 
-          <div style={styles.gameCardsGrid}>
-            <div onClick={() => go('setup')} style={{ ...styles.gameCard, aspectRatio: '4 / 3' }} className="game-card">
-              <img src="/game-solo.png" alt="Solo" draggable={false} style={styles.gameCardImg} />
-              <div style={styles.gameCardOverlay} />
-              <div style={styles.gameCardContent}>
-                <span style={styles.gameCardTitle}>Solo</span>
-                <span style={styles.gameCardSub}>Trade vs. the chart</span>
-              </div>
-            </div>
-            <div onClick={() => go('prediction')} style={{ ...styles.gameCard, aspectRatio: '4 / 3' }} className="game-card">
-              <img src="/game-predictions.png" alt="Predictions" draggable={false} style={styles.gameCardImg} />
-              <div style={styles.gameCardOverlay} />
-              <div style={styles.gameCardContent}>
-                <span style={styles.gameCardTitle}>Predictions</span>
-                <span style={styles.gameCardSub}>Up or Down?</span>
-              </div>
-            </div>
-            <div onClick={() => go('trading-sim')} style={{ ...styles.gameCard, aspectRatio: '4 / 3' }} className="game-card">
-              <img src="/game-trading-sim.png" alt="Trading Sim" draggable={false} style={styles.gameCardImg} />
-              <div style={styles.gameCardOverlay} />
-              {activeRoomCount > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#0d9488" /></span>}
-              <div style={styles.gameCardContent}>
-                <span style={styles.gameCardTitle}>Trading Sim</span>
-                <span style={styles.gameCardSub}>PvP Trading Arena</span>
-                {activeRoomCount > 0 && (
-                  <span style={styles.liveDataRow}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#0d9488' }} className="mono">{activeRoomCount} room{activeRoomCount !== 1 ? 's' : ''} live</span>
-                  </span>
-                )}
-              </div>
-            </div>
-            <div onClick={() => go('lottery')} style={{ ...styles.gameCard, aspectRatio: '4 / 3' }} className="game-card">
-              <img src="/game-lottery.png" alt="Lottery" draggable={false} style={styles.gameCardImg} />
-              <div style={styles.gameCardOverlay} />
-              <div style={styles.gameCardContent}>
-                <span style={styles.gameCardTitle}>Lottery</span>
-                <span style={styles.gameCardSub}>Jackpot Draws</span>
-              </div>
-            </div>
-            <div onClick={() => go('candleflip')} style={{ ...styles.gameCard, aspectRatio: '4 / 3' }} className="game-card">
-              <img src="/game-candleflip.png" alt="Candleflip" draggable={false} style={styles.gameCardImg} />
-              <div style={styles.gameCardOverlay} />
-              {candleRecent.length > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#eab308" /></span>}
-              <div style={styles.gameCardContent}>
-                <span style={styles.gameCardTitle}>Candleflip</span>
-                <span style={styles.gameCardSub}>Over/Under 1.00x</span>
-                {candleRecent.length > 0 && (
-                  <span style={styles.liveDataRow}>
-                    {candleRecent.slice(0, 5).map((r: any, i: number) => (
-                      <span key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: r.result === 'bullish' ? '#34d399' : '#f87171', display: 'inline-block' }} />
-                    ))}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div onClick={() => go('rug-game')} style={{ ...styles.gameCard, aspectRatio: '4 / 3' }} className="game-card">
-              <img src="/game-rug-game.png" alt="Rug Game" draggable={false} style={styles.gameCardImg} />
-              <div style={styles.gameCardOverlay} />
-              {rugRecent.length > 0 && <span style={styles.liveCorner}><LiveDot size={6} color="#f87171" /></span>}
-              <div style={styles.gameCardContent}>
-                <span style={styles.gameCardTitle}>Rug Game</span>
-                <span style={styles.gameCardSub}>Cash Out or Get Rugged</span>
-                {rugRecent.length > 0 && (
-                  <span style={styles.liveDataRow}>
-                    <span style={{ fontSize: '11px', fontWeight: 700, color: rugRecent[0].status === 'cashed_out' ? '#34d399' : '#f87171' }} className="mono">
-                      {rugRecent[0].status === 'cashed_out' ? 'CASHED' : 'RUGGED'} {rugRecent[0].multiplier ? `${Number(rugRecent[0].multiplier).toFixed(2)}x` : ''}
-                    </span>
-                  </span>
-                )}
-              </div>
-            </div>
+      <div style={s.columns}>
+        {/* Left column */}
+        <div style={s.leftCol}>
+          {/* Section header + category tabs */}
+          <div style={s.sectionHeaderRow}>
+            <span style={s.sectionTitle}>Games</span>
           </div>
 
-          {allRecent.length > 0 && (
-            <div style={styles.liveActionSection}>
-              <div style={styles.liveActionHeader}>
-                <LiveDot size={6} />
-                <span style={{ fontSize: '12px', fontWeight: 700, color: theme.text.muted, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>Live Action</span>
-              </div>
-              {allRecent.map((item, i) => (
-                <div key={i} style={styles.liveActionRow}>
-                  <GameTypeBadge type={item.gameType === 'rug' ? 'rug' : 'candle'} />
-                  <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: theme.text.secondary }}>
-                    {item.gameType === 'rug'
-                      ? `${item.status === 'cashed_out' ? 'Cashed' : 'Rugged'}${item.multiplier ? ` at ${Number(item.multiplier).toFixed(2)}x` : ''}`
-                      : `${item.result === 'bullish' ? 'Bull' : 'Bear'} flip${item.betAmount ? ` - ${(Number(item.betAmount) / 1e9).toFixed(3)} SOL` : ''}`
-                    }
-                  </span>
-                  {item.time && <span style={{ fontSize: '10px', color: theme.text.muted }}>{timeAgo(item.time)}</span>}
-                </div>
-              ))}
-            </div>
-          )}
+          <div style={s.tabBarWrap}>
+            <TabBar tabs={CATEGORY_TABS} active={activeCategory} onChange={setActiveCategory} />
+          </div>
+
+          {/* Game Cards — 3 columns desktop */}
+          {gameGrid('repeat(3, 1fr)')}
+
+          {/* Live Activity */}
+          {liveActivitySection}
 
           <LiveWinsTicker />
           <TopPlayers />
-          {quickStatsBar}
         </div>
 
         {/* Right column */}
-        <div style={styles.rightCol}>
-          <div style={styles.panel}>
-            <div style={styles.panelHeader}>
-              <span style={styles.panelTitle}>Stats</span>
+        <div style={s.rightCol}>
+          {/* Profile Stats Panel */}
+          <div style={s.panel}>
+            <div style={s.panelHeader}>
+              <span style={s.panelTitle}>Stats</span>
             </div>
-            <div style={styles.statsBody}>
-              <div style={styles.balanceRow}>
+            <div style={s.statsBody}>
+              <div style={s.balanceRow}>
                 <img src="/sol-coin.png" alt="SOL" style={{ width: '22px', height: '22px', flexShrink: 0 }} />
-                <span style={styles.balanceBig} className="mono">{formatSol(profile.balance)} SOL</span>
+                <span style={s.balanceBig} className="mono">{formatSol(profile.balance)} SOL</span>
               </div>
-              <div style={styles.statDivider} />
-              <div style={styles.levelVipRow}>
-                <div style={styles.statChip}>
-                  <span style={styles.statChipLabel}>LVL</span>
-                  <span style={styles.statChipValue} className="mono">{profile.level}</span>
+              <div style={s.statDivider} />
+              <div style={s.levelVipRow}>
+                <div style={s.statChip}>
+                  <span style={s.statChipLabel}>LVL</span>
+                  <span style={s.statChipValue} className="mono">{profile.level}</span>
                 </div>
                 <div style={{
-                  ...styles.statChip,
+                  ...s.statChip,
                   background: `${(theme.vip as any)[profile.vipTier] || theme.accent.purple}15`,
                   border: `1px solid ${(theme.vip as any)[profile.vipTier] || theme.accent.purple}30`,
                 }}>
                   <span style={{
-                    ...styles.statChipValue,
+                    ...s.statChipValue,
                     color: (theme.vip as any)[profile.vipTier] || theme.text.secondary,
                     fontSize: '12px',
                     fontWeight: 700,
                   }}>{profile.vipTier}</span>
                 </div>
               </div>
-              <div style={styles.statDivider} />
+              <div style={s.statDivider} />
               <StatRow label="Rounds" value={`${profile.roundsPlayed}`} />
               <StatRow label="Best" value={`${profile.bestMultiplier.toFixed(1)}x`} color={theme.game.multiplier} />
-              <div style={styles.statDivider} />
+              <div style={s.statDivider} />
               <StatRow label="XP" value={`${profile.xp}/${profile.xpToNext}`} color={theme.accent.purple} />
-              <div style={styles.xpBarContainer}>
-                <div style={{ ...styles.xpBar, width: `${(profile.xp / profile.xpToNext) * 100}%` }} />
+              <div style={s.xpBarContainer}>
+                <div style={{ ...s.xpBar, width: `${(profile.xp / profile.xpToNext) * 100}%` }} />
               </div>
             </div>
           </div>
 
-          {isAuthenticated && (
-            <div style={styles.bonusCard} className="card-enter card-enter-1" onClick={() => go('wallet')}>
-              <div style={styles.bonusContent}>
-                <div style={styles.bonusIcon}><GiftIcon size={24} color={theme.accent.green} /></div>
-                <div style={styles.bonusTextWrap}>
-                  <span style={styles.bonusTitle}>100% Deposit Bonus</span>
-                  <span style={styles.bonusDesc}>Double your first deposit — we match it 100%!</span>
-                </div>
-                <span style={{ fontSize: '14px', fontWeight: 700, color: theme.accent.green, whiteSpace: 'nowrap' as const, cursor: 'pointer' }}>Deposit →</span>
-              </div>
-            </div>
-          )}
-
+          {bonusCard}
           <ActivityFeed />
         </div>
       </div>
 
-      {showAuthPrompt && (
-        <div style={styles.authOverlay} onClick={() => setShowAuthPrompt(false)}>
-          <div style={styles.authModal} onClick={(e) => e.stopPropagation()}>
-            <span style={styles.authTitle}>Sign in to play</span>
-            <span style={styles.authDesc}>Create an account or sign in to start trading rounds.</span>
-            <button style={styles.authBtn} onClick={() => { setShowAuthPrompt(false); go('auth'); }}>Sign in / Register</button>
-            <button style={styles.authDismiss} onClick={() => setShowAuthPrompt(false)}>Maybe later</button>
-          </div>
-        </div>
-      )}
+      {authModal}
     </div>
   );
 }
@@ -495,9 +559,9 @@ export function LobbyScreen() {
 
 function StatRow({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div style={styles.statRow}>
-      <span style={styles.statLabel}>{label}</span>
-      <span style={{ ...styles.statValue, color: color || theme.text.primary }} className="mono">
+    <div style={s.statRow}>
+      <span style={s.statLabel}>{label}</span>
+      <span style={{ ...s.statValue, color: color || theme.text.primary }} className="mono">
         {value}
       </span>
     </div>
@@ -522,42 +586,43 @@ function TopPlayers() {
 
   if (players.length === 0) return null;
 
-  const medals = ['#fbbf24', '#94a3b8', '#cd7f32'];
+  const medals = ['#8b5cf6', '#94a3b8', '#cd7f32'];
 
   return (
     <div style={{
-      background: theme.bg.secondary,
+      background: theme.bg.card,
       border: `1px solid ${theme.border.subtle}`,
-      borderRadius: '8px',
+      borderRadius: theme.radius.lg,
       overflow: 'hidden',
     }}>
       <div style={{
-        display: 'flex', alignItems: 'center', gap: '6px',
-        padding: '6px 10px',
+        display: 'flex', alignItems: 'center', gap: '8px',
+        padding: '10px 14px',
         borderBottom: `1px solid ${theme.border.subtle}`,
+        background: theme.bg.secondary,
       }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.accent.violet} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.accent.purple} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
         </svg>
-        <span style={{ fontSize: '11px', fontWeight: 700, color: theme.text.muted, textTransform: 'uppercase' as const, letterSpacing: '0.5px' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: theme.text.muted, textTransform: 'uppercase' as const, letterSpacing: '0.8px' }}>
           Top Players
         </span>
       </div>
       {players.map((p, i) => (
         <div key={i} style={{
-          display: 'flex', alignItems: 'center', gap: '8px',
-          padding: '6px 10px',
+          display: 'flex', alignItems: 'center', gap: '10px',
+          padding: '8px 14px',
           borderBottom: i < players.length - 1 ? `1px solid ${theme.border.subtle}` : 'none',
         }}>
           <span style={{
-            width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+            width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
             background: i < 3 ? `${medals[i]}20` : theme.bg.tertiary,
             color: i < 3 ? medals[i] : theme.text.muted,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '10px', fontWeight: 700,
           }}>{i + 1}</span>
           <div style={{
-            width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+            width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
             background: getAvatarGradient(null, p.username),
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '8px', fontWeight: 700, color: '#fff',
@@ -565,7 +630,7 @@ function TopPlayers() {
           <span style={{ flex: 1, fontSize: '12px', fontWeight: 600, color: theme.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
             {p.username}
           </span>
-          <span style={{ fontSize: '12px', fontWeight: 700, color: theme.accent.green }} className="mono">
+          <span style={{ fontSize: '12px', fontWeight: 700, color: theme.accent.purple }} className="mono">
             {(p.score / 1e9).toFixed(2)}
           </span>
         </div>
@@ -644,35 +709,38 @@ function LiveWinsTicker() {
 
 const tickerStyles: Record<string, React.CSSProperties> = {
   container: {
-    background: theme.bg.secondary,
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '8px',
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    padding: '6px 10px',
+    gap: '8px',
+    padding: '10px 14px',
     borderBottom: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.secondary,
   },
   dot: {
-    width: 6, height: 6, borderRadius: '50%',
+    width: 7, height: 7, borderRadius: '50%',
     background: theme.success,
     display: 'inline-block',
+    boxShadow: `0 0 6px ${theme.success}80`,
   },
   title: {
     fontSize: '11px',
     fontWeight: 700,
     color: theme.text.muted,
     textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+    letterSpacing: '0.8px',
   },
   track: {
     display: 'flex',
     gap: '16px',
-    padding: '8px 0',
+    padding: '10px 14px',
     whiteSpace: 'nowrap' as const,
+    overflow: 'hidden',
   },
   entry: {
     display: 'inline-flex',
@@ -692,8 +760,8 @@ const tickerStyles: Record<string, React.CSSProperties> = {
   badge: {
     fontSize: '9px',
     fontWeight: 700,
-    padding: '1px 5px',
-    borderRadius: '3px',
+    padding: '2px 5px',
+    borderRadius: '4px',
     letterSpacing: '0.5px',
   },
   mult: {
@@ -793,7 +861,7 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
 
   return (
     <div
-      style={styles.bannerRow}
+      style={s.bannerRow}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
@@ -813,7 +881,7 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
             onClick={() => onBannerClick(banner)}
             className="banner-card"
             style={{
-              ...styles.bannerCard,
+              ...s.bannerCard,
               flex: `0 0 calc(${100 / extendedCount}% - ${gap * (extendedCount - 1) / extendedCount}px)`,
             }}
           >
@@ -833,20 +901,21 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
         ))}
       </div>
       {/* Dot indicators */}
-      <div style={styles.dotsRow}>
+      <div style={s.dotsRow}>
         {BANNERS.map((_, i) => (
           <button
             key={i}
             onClick={() => goTo(i)}
             style={{
-              width: dotIndex === i ? '20px' : '8px',
-              height: '8px',
+              width: dotIndex === i ? '22px' : '7px',
+              height: '7px',
               borderRadius: '4px',
               border: 'none',
-              background: dotIndex === i ? theme.accent.purple : 'rgba(255,255,255,0.2)',
+              background: dotIndex === i ? theme.accent.purple : 'rgba(255,255,255,0.15)',
               cursor: 'pointer',
               padding: 0,
               transition: 'all 0.3s ease',
+              boxShadow: dotIndex === i ? `0 0 8px ${theme.accent.purple}80` : 'none',
             }}
           />
         ))}
@@ -857,11 +926,11 @@ function BannerCarousel({ isMobile, onBannerClick }: { isMobile: boolean; onBann
 
 // --- Styles ---
 
-const styles: Record<string, React.CSSProperties> = {
+const s: Record<string, React.CSSProperties> = {
   container: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '10px',
+    gap: '14px',
     minHeight: '100%',
     padding: '16px',
     boxSizing: 'border-box',
@@ -874,26 +943,25 @@ const styles: Record<string, React.CSSProperties> = {
   leftCol: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '14px',
     minWidth: 0,
     overflow: 'hidden',
   },
   rightCol: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '14px',
   },
 
-  // Banner Row (Carousel)
+  // Banner
   bannerRow: {
     position: 'relative',
-    marginBottom: '12px',
     overflow: 'hidden',
-    borderRadius: '8px',
+    borderRadius: theme.radius.lg,
     background: 'transparent',
   },
   bannerCard: {
-    borderRadius: '8px',
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
     cursor: 'pointer',
     flexShrink: 0,
@@ -908,62 +976,51 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'center',
     gap: '6px',
-    marginTop: '8px',
     position: 'absolute' as const,
-    bottom: '10px',
+    bottom: '12px',
     left: 0,
     right: 0,
   },
 
-  // Panels
-  panel: {
-    background: theme.bg.secondary,
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '8px',
-    overflow: 'hidden',
+  // Quick Stats
+  statsRow: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: '10px',
   },
-  panelHeader: {
+
+  // Category Tab wrapper
+  tabBarWrap: {
+    marginBottom: '-4px',
+  },
+
+  // Section header
+  sectionHeaderRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '8px 12px',
-    borderBottom: `1px solid ${theme.border.subtle}`,
-    background: theme.bg.tertiary,
+    justifyContent: 'space-between',
   },
-  panelTitle: {
-    fontSize: '13px',
-    fontWeight: 600,
-    color: theme.text.secondary,
-    flex: 1,
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-  },
-
-  // Section Title
   sectionTitle: {
-    fontSize: '16px',
+    fontSize: '17px',
     fontWeight: 700,
     color: theme.text.primary,
-    letterSpacing: '0.5px',
-    marginBottom: '6px',
+    letterSpacing: '0.3px',
   },
 
-  // Game Cards
-  gameCardsGrid: {
+  // Game Cards Grid
+  gameGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
     gap: '12px',
   },
   gameCard: {
     position: 'relative',
-    borderRadius: '10px',
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
     cursor: 'pointer',
     aspectRatio: '4 / 3',
     minWidth: 0,
-    minHeight: 0,
-    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-    border: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.card,
+    transition: 'transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease',
   },
   gameCardImg: {
     position: 'absolute',
@@ -972,11 +1029,21 @@ const styles: Record<string, React.CSSProperties> = {
     height: '100%',
     objectFit: 'cover' as const,
   },
-  gameCardOverlay: {
+  // Top half colored gradient
+  gameCardGradTop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: '55%',
+    zIndex: 1,
+  },
+  // Bottom fade for text
+  gameCardGradBottom: {
     position: 'absolute',
     inset: 0,
-    background: 'linear-gradient(0deg, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 40%, transparent 70%)',
-    zIndex: 1,
+    background: 'linear-gradient(0deg, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.3) 45%, transparent 70%)',
+    zIndex: 2,
   },
   gameCardContent: {
     position: 'absolute',
@@ -984,7 +1051,7 @@ const styles: Record<string, React.CSSProperties> = {
     left: 0,
     right: 0,
     padding: '14px 12px',
-    zIndex: 2,
+    zIndex: 3,
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '2px',
@@ -994,53 +1061,112 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 700,
     color: '#fff',
     letterSpacing: '0.3px',
-    textShadow: '0 2px 8px rgba(0,0,0,0.6)',
+    textShadow: '0 2px 8px rgba(0,0,0,0.7)',
   },
   gameCardSub: {
-    fontSize: '12px',
+    fontSize: '11px',
     fontWeight: 500,
-    color: 'rgba(255,255,255,0.65)',
-    textShadow: '0 1px 4px rgba(0,0,0,0.5)',
+    color: 'rgba(255,255,255,0.6)',
+    textShadow: '0 1px 4px rgba(0,0,0,0.6)',
   },
-  liveCorner: {
+
+  // Live badge
+  liveBadge: {
     position: 'absolute',
-    top: '8px',
-    left: '8px',
-    zIndex: 3,
+    top: '10px',
+    left: '10px',
+    zIndex: 4,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    background: 'rgba(0,0,0,0.65)',
+    backdropFilter: 'blur(6px)',
+    border: `1px solid rgba(0, 220, 130, 0.3)`,
+    borderRadius: '6px',
+    padding: '3px 7px',
+  },
+  liveBadgeText: {
+    fontSize: '9px',
+    fontWeight: 800,
+    color: theme.accent.green,
+    letterSpacing: '0.8px',
   },
   liveDataRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px',
-    marginTop: '4px',
-  },
-  liveActionSection: {
-    background: theme.bg.secondary,
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '8px',
-    overflow: 'hidden',
-  },
-  liveActionHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '6px 10px',
-    borderBottom: `1px solid ${theme.border.subtle}`,
-  },
-  liveActionRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 10px',
-    borderBottom: `1px solid ${theme.border.subtle}`,
+    gap: '3px',
+    marginTop: '2px',
   },
 
-  // Stats
+  // Live Activity Section
+  liveSection: {
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+  },
+  liveSectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 14px',
+    borderBottom: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.secondary,
+  },
+  liveSectionTitle: {
+    fontSize: '11px',
+    fontWeight: 700,
+    color: theme.text.muted,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.8px',
+  },
+  liveRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '9px 14px',
+  },
+  liveRowText: {
+    flex: 1,
+    fontSize: '12px',
+    fontWeight: 600,
+    color: theme.text.secondary,
+  },
+  liveRowTime: {
+    fontSize: '10px',
+    color: theme.text.muted,
+  },
+
+  // Panels (right col)
+  panel: {
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.lg,
+    overflow: 'hidden',
+  },
+  panelHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 14px',
+    borderBottom: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.secondary,
+  },
+  panelTitle: {
+    fontSize: '11px',
+    fontWeight: 700,
+    color: theme.text.muted,
+    flex: 1,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.8px',
+  },
+
+  // Stats body
   statsBody: {
-    padding: '12px',
+    padding: '14px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '10px',
   },
   balanceRow: {
     display: 'flex',
@@ -1051,7 +1177,7 @@ const styles: Record<string, React.CSSProperties> = {
   balanceBig: {
     fontSize: '20px',
     fontWeight: 800,
-    color: theme.accent.violet,
+    color: theme.accent.purple,
   },
   statDivider: {
     height: '1px',
@@ -1066,10 +1192,10 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '5px',
-    padding: '4px 10px',
+    padding: '5px 10px',
     background: `${theme.accent.purple}12`,
     border: `1px solid ${theme.accent.purple}25`,
-    borderRadius: '6px',
+    borderRadius: theme.radius.md,
   },
   statChipLabel: {
     fontSize: '11px',
@@ -1100,77 +1226,111 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
   },
   xpBarContainer: {
-    height: '6px',
+    height: '5px',
     background: theme.bg.tertiary,
     borderRadius: '3px',
-    marginTop: '2px',
     overflow: 'hidden',
   },
   xpBar: {
     height: '100%',
-    background: `linear-gradient(90deg, ${theme.accent.purple}, ${theme.accent.violet})`,
+    background: `linear-gradient(90deg, ${theme.accent.violet}, ${theme.accent.purple}, ${theme.accent.lavender})`,
     borderRadius: '3px',
-    transition: 'width 0.3s ease',
+    transition: 'width 0.4s ease',
     boxShadow: `0 0 8px ${theme.accent.purple}60`,
   },
 
-  // Quick Stats
-  quickStats: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '1px',
-    background: theme.border.subtle,
-    borderRadius: '8px',
+  // Bonus card
+  bonusCard: {
+    position: 'relative',
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
-    border: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.card,
+    border: `1px solid rgba(139, 92, 246, 0.2)`,
+    cursor: 'pointer',
+    transition: 'border-color 0.15s ease',
   },
-  quickStatItem: {
+  bonusInner: {
+    position: 'relative',
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
-    gap: '3px',
-    padding: '10px 6px',
-    background: theme.bg.elevated,
+    gap: '12px',
+    padding: '14px 16px',
+    zIndex: 1,
+    background: 'linear-gradient(135deg, rgba(124,58,237,0.08) 0%, rgba(139,92,246,0.04) 100%)',
   },
-  quickStatLabel: {
-    fontSize: '10px',
-    fontWeight: 600,
-    color: theme.text.muted,
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
+  bonusIconWrap: {
+    flexShrink: 0,
+    width: 40,
+    height: 40,
+    borderRadius: theme.radius.md,
+    background: `${theme.accent.purple}15`,
+    border: `1px solid ${theme.accent.purple}25`,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  quickStatValue: {
-    fontSize: '16px',
+  bonusText: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column' as const,
+    gap: '2px',
+  },
+  bonusTitle: {
+    fontSize: '14px',
     fontWeight: 700,
-    color: theme.text.primary,
-    display: 'flex',
-    alignItems: 'center',
+    color: theme.accent.lavender,
+  },
+  bonusDesc: {
+    fontSize: '12px',
+    fontWeight: 500,
+    color: theme.text.muted,
+    lineHeight: 1.3,
+  },
+  bonusArrow: {
+    fontSize: '13px',
+    fontWeight: 700,
+    color: theme.accent.purple,
+    whiteSpace: 'nowrap' as const,
+    flexShrink: 0,
   },
 
-  // Auth prompt
+  // Auth modal
   authOverlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(0,0,0,0.7)',
+    background: 'rgba(0,0,0,0.75)',
+    backdropFilter: 'blur(4px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
   },
   authModal: {
+    position: 'relative',
     background: theme.bg.card,
     border: `1px solid ${theme.border.medium}`,
-    borderRadius: '12px',
-    padding: '24px',
+    borderRadius: theme.radius.xl,
+    padding: '28px 24px',
     maxWidth: '340px',
     width: '90%',
     display: 'flex',
     flexDirection: 'column' as const,
     gap: '12px',
     textAlign: 'center' as const,
+    overflow: 'hidden',
+  },
+  authModalGlow: {
+    position: 'absolute',
+    top: '-40px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    width: '180px',
+    height: '180px',
+    background: `radial-gradient(circle, ${theme.accent.purple}18 0%, transparent 70%)`,
+    pointerEvents: 'none',
   },
   authTitle: {
-    fontSize: '17px',
+    fontSize: '18px',
     fontWeight: 700,
     color: theme.text.primary,
   },
@@ -1178,17 +1338,17 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '14px',
     fontWeight: 500,
     color: theme.text.muted,
-    lineHeight: 1.4,
+    lineHeight: 1.5,
   },
   authBtn: {
-    padding: '12px 24px',
+    padding: '13px 24px',
     fontSize: '15px',
     fontWeight: 600,
     width: '100%',
-    background: theme.accent.purple,
+    background: theme.gradient.primary,
     color: '#fff',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: theme.radius.md,
     cursor: 'pointer',
     fontFamily: 'inherit',
   },
@@ -1203,122 +1363,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: theme.text.muted,
   },
 
-  // Bonus card
-  bonusCard: {
-    position: 'relative',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    background: theme.bg.elevated,
-    border: `1px solid rgba(0, 189, 113, 0.2)`,
-  },
-  bonusContent: {
-    position: 'relative',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    padding: '14px 16px',
-    zIndex: 1,
-  },
-  bonusIcon: {
-    fontSize: '30px',
-    flexShrink: 0,
-  },
-  bonusTextWrap: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '2px',
-  },
-  bonusTitle: {
-    fontSize: '15px',
-    fontWeight: 700,
-    color: theme.accent.green,
-  },
-  bonusDesc: {
-    fontSize: '13px',
-    fontWeight: 500,
-    color: theme.text.muted,
-    lineHeight: 1.3,
-  },
-  bonusBtn: {
-    padding: '8px 16px',
-    fontSize: '14px',
-    fontWeight: 600,
-    whiteSpace: 'nowrap' as const,
-    flexShrink: 0,
-    background: theme.accent.green,
-    color: '#fff',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-  },
-
-  // Bonus status (after claim)
-  bonusStatusCard: {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '6px',
-    padding: '10px 12px',
-    background: 'rgba(251, 191, 36, 0.04)',
-    border: '1px solid rgba(251, 191, 36, 0.12)',
-    borderRadius: '8px',
-  },
-  bonusStatusRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-  },
-  bonusStatusTextWrap: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '1px',
-  },
-  bonusStatusTitle: {
-    fontSize: '13px',
-    fontWeight: 700,
-    color: '#fbbf24',
-  },
-  bonusStatusDesc: {
-    fontSize: '12px',
-    fontWeight: 500,
-    color: theme.text.muted,
-  },
-  bonusStatusProgress: {
-    fontSize: '13px',
-    fontWeight: 700,
-    flexShrink: 0,
-  },
-  bonusProgressBarSmall: {
-    height: '3px',
-    background: 'rgba(255,255,255,0.06)',
-    borderRadius: '2px',
-    overflow: 'hidden',
-  },
-  bonusProgressFillSmall: {
-    height: '100%',
-    background: `linear-gradient(90deg, ${theme.accent.purple}, ${theme.accent.green})`,
-    borderRadius: '2px',
-    transition: 'width 0.3s ease',
-    minWidth: '2px',
-  },
-  bonusUnlockedCard: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 12px',
-    background: 'rgba(52, 211, 153, 0.04)',
-    border: '1px solid rgba(52, 211, 153, 0.12)',
-    borderRadius: '8px',
-  },
-  bonusUnlockedText: {
-    fontSize: '13px',
-    fontWeight: 600,
-    color: '#34d399',
-  },
-
-  // Mobile stats
+  // Mobile profile stats
   mobileStatsRow: {
     display: 'flex',
     gap: '6px',
@@ -1328,11 +1373,11 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: '5px',
-    padding: '8px 6px',
-    background: theme.bg.secondary,
+    gap: '4px',
+    padding: '9px 6px',
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '6px',
+    borderRadius: theme.radius.md,
   },
   mobileStatLabel: {
     fontSize: '10px',

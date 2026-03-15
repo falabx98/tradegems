@@ -67,12 +67,13 @@ export function SideNav() {
             >
               <NavIcon
                 name={item.icon}
-                size={20}
-                color={isActive ? '#fff' : theme.accent.violet}
+                size={19}
+                color={isActive ? theme.accent.purple : theme.text.muted}
               />
               <span style={{
                 ...styles.navLabel,
-                color: isActive ? '#fff' : theme.text.muted,
+                color: isActive ? theme.accent.purple : theme.text.muted,
+                fontWeight: isActive ? 700 : 500,
               }}>
                 {item.label}
               </span>
@@ -92,10 +93,10 @@ export function SideNav() {
             }}
             title="Admin"
           >
-            <NavIcon name="shield" size={20} color={activeId === 'admin' ? '#f87171' : '#f87171'} />
+            <NavIcon name="shield" size={19} color={activeId === 'admin' ? '#ef4444' : '#ef4444'} />
             <span style={{
               ...styles.navLabel,
-              color: activeId === 'admin' ? '#f87171' : theme.text.muted,
+              color: activeId === 'admin' ? '#ef4444' : theme.text.muted,
             }}>
               Admin
             </span>
@@ -115,12 +116,13 @@ export function SideNav() {
             >
               <NavIcon
                 name={item.icon}
-                size={20}
-                color={isActive ? '#fff' : theme.accent.violet}
+                size={19}
+                color={isActive ? theme.accent.purple : theme.text.muted}
               />
               <span style={{
                 ...styles.navLabel,
-                color: isActive ? '#fff' : theme.text.muted,
+                color: isActive ? theme.accent.purple : theme.text.muted,
+                fontWeight: isActive ? 700 : 500,
               }}>
                 {item.label}
               </span>
@@ -139,7 +141,7 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     width: theme.layout.sidebarWidth,
     background: theme.bg.secondary,
-    borderRight: `1px solid ${theme.border.subtle}`,
+    borderRight: 'none',
     padding: '8px 0',
     flexShrink: 0,
     overflow: 'hidden',
@@ -147,39 +149,40 @@ const styles: Record<string, React.CSSProperties> = {
   topSection: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
-    padding: '0 8px',
+    gap: '1px',
+    padding: '0 6px',
   },
   bottomSection: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '2px',
-    padding: '0 8px',
+    gap: '1px',
+    padding: '0 6px',
   },
   divider: {
     height: '1px',
     background: theme.border.subtle,
-    margin: '4px 4px 8px',
+    margin: '4px 6px 8px',
   },
   navItem: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '2px',
+    gap: '3px',
     padding: '8px 2px 6px',
     background: 'transparent',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: '8px',
     cursor: 'pointer',
-    transition: 'background 0.15s ease',
+    transition: 'all 0.15s ease',
     fontFamily: 'inherit',
   },
   navItemActive: {
-    background: 'rgba(52, 56, 67, 0.8)', // shuffle active tab color
+    background: 'rgba(139, 92, 246, 0.1)',
+    borderRadius: '8px',
   },
   navLabel: {
     fontSize: '9px',
-    fontWeight: 600,
+    fontWeight: 500,
     textAlign: 'center' as const,
     letterSpacing: '0.3px',
     lineHeight: 1.2,

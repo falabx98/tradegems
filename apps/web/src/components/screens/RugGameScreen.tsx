@@ -6,17 +6,9 @@ import { api } from '../../utils/api';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { getAvatarGradient, getInitials } from '../../utils/avatars';
-import { playButtonClick, playBetPlaced, playRoundEnd, hapticLight, hapticMedium } from '../../utils/sounds';
+import { playBetPlaced, playRoundEnd, hapticMedium } from '../../utils/sounds';
 import { useIsMobile } from '../../hooks/useIsMobile';
-
-const BET_AMOUNTS = [
-  { lamports: 10_000_000, label: '0.01' },
-  { lamports: 50_000_000, label: '0.05' },
-  { lamports: 100_000_000, label: '0.1' },
-  { lamports: 250_000_000, label: '0.25' },
-  { lamports: 500_000_000, label: '0.5' },
-  { lamports: 1_000_000_000, label: '1' },
-];
+import { BetPanel } from '../ui/BetPanel';
 
 interface Candle {
   open: number;
@@ -108,10 +100,10 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
       ctx.stroke();
       ctx.setLineDash([]);
 
-      ctx.fillStyle = '#fbbf24';
+      ctx.fillStyle = '#8b5cf6';
       ctx.font = `900 ${isMobile ? 20 : 28}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(251,191,36,0.4)';
+      ctx.shadowColor = 'rgba(139,92,246,0.4)';
       ctx.shadowBlur = 12;
       ctx.fillText('PRESALE', w / 2, h * 0.38);
       ctx.shadowBlur = 0;
@@ -193,7 +185,7 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
 
     // Current multiplier overlay
     if (status === 'active') {
-      const multColor = currentMultiplier >= 2 ? '#34d399' : currentMultiplier >= 1.5 ? '#22c55e' : '#fbbf24';
+      const multColor = currentMultiplier >= 2 ? '#2ecc71' : currentMultiplier >= 1.5 ? '#22c55e' : '#00dc82';
       ctx.fillStyle = multColor;
       ctx.font = `900 ${isMobile ? 28 : 36}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
@@ -217,7 +209,7 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
       ctx.fillText('RUGGED', w / 2, h * 0.4);
       ctx.shadowBlur = 0;
 
-      ctx.fillStyle = '#fbbf24';
+      ctx.fillStyle = '#8b5cf6';
       ctx.font = `800 ${isMobile ? 20 : 26}px 'JetBrains Mono', monospace`;
       ctx.fillText(`at ${rugMultiplier.toFixed(2)}x`, w / 2, h * 0.4 + (isMobile ? 30 : 36));
     }
@@ -247,10 +239,10 @@ export function RugGameScreen() {
   const userId = useAuthStore((s) => s.userId);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const syncProfile = useGameStore((s) => s.syncProfile);
+  const profile = useGameStore((s) => s.profile);
 
   const [round, setRound] = useState<RoundState | null>(null);
   const [betAmount, setBetAmount] = useState(100_000_000);
-  const [customBet, setCustomBet] = useState('0.1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recentRounds, setRecentRounds] = useState<any[]>([]);
@@ -370,9 +362,9 @@ export function RugGameScreen() {
         {round && (
           <div style={{
             padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 700,
-            background: round.status === 'waiting' ? 'rgba(251,191,36,0.12)' : round.status === 'active' ? 'rgba(52,211,153,0.12)' : 'rgba(239,68,68,0.12)',
-            color: round.status === 'waiting' ? '#fbbf24' : round.status === 'active' ? '#34d399' : '#ef4444',
-            border: `1px solid ${round.status === 'waiting' ? 'rgba(251,191,36,0.2)' : round.status === 'active' ? 'rgba(52,211,153,0.2)' : 'rgba(239,68,68,0.2)'}`,
+            background: round.status === 'waiting' ? 'rgba(139,92,246,0.12)' : round.status === 'active' ? 'rgba(46,204,113,0.12)' : 'rgba(239,68,68,0.12)',
+            color: round.status === 'waiting' ? '#8b5cf6' : round.status === 'active' ? '#2ecc71' : '#ef4444',
+            border: `1px solid ${round.status === 'waiting' ? 'rgba(139,92,246,0.2)' : round.status === 'active' ? 'rgba(46,204,113,0.2)' : 'rgba(239,68,68,0.2)'}`,
             letterSpacing: '1px',
           }}>
             {round.status === 'waiting' ? `PRESALE ${waitRemaining}s` : round.status === 'active' ? 'LIVE' : 'RUGGED'}
@@ -395,14 +387,14 @@ export function RugGameScreen() {
       {isCashedOut && cashOutDone && round?.status === 'active' && (
         <div style={{
           padding: '12px 16px', borderRadius: '12px',
-          background: 'rgba(52,211,153,0.08)', border: '1px solid rgba(52,211,153,0.2)',
+          background: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <div>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#34d399', textTransform: 'uppercase', letterSpacing: '1px' }}>
+            <div style={{ fontSize: '12px', fontWeight: 600, color: '#2ecc71', textTransform: 'uppercase', letterSpacing: '1px' }}>
               Cashed Out!
             </div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: '#34d399' }} className="mono">
+            <div style={{ fontSize: '16px', fontWeight: 800, color: '#2ecc71' }} className="mono">
               {cashOutDone.multiplier.toFixed(2)}x — +{formatSol(cashOutDone.payout)} SOL
             </div>
           </div>
@@ -418,13 +410,13 @@ export function RugGameScreen() {
         }}>
           {round.bets.map((bet) => {
             const isMe = bet.userId === userId;
-            const statusColor = bet.status === 'cashed_out' ? '#34d399' : bet.status === 'rugged' ? '#ef4444' : '#fbbf24';
+            const statusColor = bet.status === 'cashed_out' ? '#2ecc71' : bet.status === 'rugged' ? '#ef4444' : '#8b5cf6';
             return (
               <div key={bet.userId} style={{
                 display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',
                 borderRadius: '10px', flexShrink: 0,
-                background: isMe ? 'rgba(119,23,255,0.1)' : theme.bg.secondary,
-                border: `1px solid ${isMe ? 'rgba(119,23,255,0.3)' : theme.border.subtle}`,
+                background: isMe ? 'rgba(139,92,246,0.1)' : theme.bg.secondary,
+                border: `1px solid ${isMe ? 'rgba(139,92,246,0.3)' : theme.border.subtle}`,
               }}>
                 <div style={{
                   width: 24, height: 24, borderRadius: '50%',
@@ -437,7 +429,7 @@ export function RugGameScreen() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
                   <span style={{ fontSize: '10px', fontWeight: 700, color: theme.text.primary }}>{bet.username}</span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span className="mono" style={{ fontSize: '10px', fontWeight: 700, color: '#fbbf24' }}>
+                    <span className="mono" style={{ fontSize: '10px', fontWeight: 700, color: '#8b5cf6' }}>
                       {formatSol(bet.betAmount)}
                     </span>
                     {bet.cashOutMultiplier && (
@@ -461,7 +453,7 @@ export function RugGameScreen() {
         }}>
           {recentRounds.slice(0, 12).map((r: any) => {
             const mult = parseFloat(r.rugMultiplier || '1');
-            const color = mult >= 3 ? '#34d399' : mult >= 1.5 ? '#fbbf24' : '#ef4444';
+            const color = mult >= 3 ? '#2ecc71' : mult >= 1.5 ? '#8b5cf6' : '#ef4444';
             return (
               <div key={r.id} style={{
                 padding: '4px 10px', borderRadius: '8px', flexShrink: 0,
@@ -479,62 +471,32 @@ export function RugGameScreen() {
 
       {/* Betting Controls */}
       {round?.status === 'waiting' && !hasBet && (
-        <>
-          <div style={s.sectionLabel}>Bet Amount</div>
-          <div style={s.betGrid}>
-            {BET_AMOUNTS.map(b => (
-              <button
-                key={b.lamports}
-                style={{ ...s.betBtn, ...(betAmount === b.lamports ? s.betBtnActive : {}) }}
-                onClick={() => { setBetAmount(b.lamports); setCustomBet(b.label); playButtonClick(); }}
-              >
-                <span className="mono" style={{ fontSize: '14px', fontWeight: 700 }}>{b.label}</span>
-                <span style={{ fontSize: '10px', color: theme.text.muted }}>SOL</span>
-              </button>
-            ))}
-          </div>
-
-          <div style={s.customBetRow}>
-            <input
-              type="number"
-              value={customBet}
-              onChange={e => {
-                setCustomBet(e.target.value);
-                const val = parseFloat(e.target.value);
-                if (!isNaN(val) && val > 0) {
-                  const lamports = Math.floor(val * 1_000_000_000);
-                  if (lamports < 1_000_000) {
-                    setError('Minimum bet is 0.001 SOL');
-                    setTimeout(() => setError(''), 3000);
-                  } else {
-                    setBetAmount(lamports);
-                  }
-                }
-              }}
-              style={s.customBetInput}
-              placeholder="Custom SOL (min 0.001)"
-              className="mono"
-            />
-          </div>
-
-          <button
-            style={s.buyBtn}
-            onClick={handleJoin}
-            disabled={loading || betAmount <= 0}
-            className="hover-scale"
-          >
-            {loading ? 'Joining...' : 'BUY NOW'}
-          </button>
-        </>
+        <BetPanel
+          presets={[
+            { label: '0.01', lamports: 10_000_000 },
+            { label: '0.05', lamports: 50_000_000 },
+            { label: '0.1', lamports: 100_000_000 },
+            { label: '0.25', lamports: 250_000_000 },
+            { label: '0.5', lamports: 500_000_000 },
+            { label: '1', lamports: 1_000_000_000 },
+          ]}
+          selectedAmount={betAmount}
+          onAmountChange={setBetAmount}
+          balance={profile.balance}
+          submitLabel="JOIN RUG GAME"
+          onSubmit={handleJoin}
+          submitDisabled={betAmount <= 0}
+          submitLoading={loading}
+        />
       )}
 
       {/* Already joined waiting */}
       {round?.status === 'waiting' && hasBet && (
         <div style={{
           padding: '16px', textAlign: 'center', borderRadius: '12px',
-          background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)',
+          background: 'rgba(46,204,113,0.06)', border: '1px solid rgba(46,204,113,0.15)',
         }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: '#34d399' }}>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: '#2ecc71' }}>
             You're in! Bet: {formatSol(myBet!.betAmount)} SOL
           </div>
           <div style={{ fontSize: '12px', color: theme.text.muted, marginTop: '4px' }}>
@@ -564,18 +526,18 @@ export function RugGameScreen() {
       {round?.status === 'resolved' && hasBet && (
         <div style={{
           padding: '16px', textAlign: 'center', borderRadius: '12px',
-          background: isCashedOut ? 'rgba(52,211,153,0.08)' : 'rgba(239,68,68,0.08)',
-          border: `1px solid ${isCashedOut ? 'rgba(52,211,153,0.2)' : 'rgba(239,68,68,0.2)'}`,
+          background: isCashedOut ? 'rgba(46,204,113,0.08)' : 'rgba(239,68,68,0.08)',
+          border: `1px solid ${isCashedOut ? 'rgba(46,204,113,0.2)' : 'rgba(239,68,68,0.2)'}`,
         }}>
           <div style={{
             fontSize: '18px', fontWeight: 900,
-            color: isCashedOut ? '#34d399' : '#ef4444',
+            color: isCashedOut ? '#2ecc71' : '#ef4444',
           }}>
             {isCashedOut ? 'YOU WON!' : 'RUGGED!'}
           </div>
           <div style={{
             fontSize: '24px', fontWeight: 900, marginTop: '4px',
-            color: isCashedOut ? '#34d399' : '#ef4444',
+            color: isCashedOut ? '#2ecc71' : '#ef4444',
           }} className="mono">
             {isCashedOut && cashOutDone
               ? `+${formatSol(cashOutDone.payout - (myBet?.betAmount || 0))} SOL`
@@ -585,12 +547,44 @@ export function RugGameScreen() {
           {round.seed && (
             <div style={{
               marginTop: '8px', padding: '6px 10px', borderRadius: '8px',
-              background: 'rgba(119,23,255,0.06)', fontSize: '10px', color: theme.text.muted,
+              background: 'rgba(139,92,246,0.06)', fontSize: '10px', color: theme.text.muted,
               fontFamily: "'JetBrains Mono', monospace", wordBreak: 'break-all',
             }}>
               Seed: {round.seed.slice(0, 16)}...
             </div>
           )}
+        </div>
+      )}
+
+      {/* No active round — waiting state */}
+      {!round && (
+        <div style={{
+          padding: '24px', textAlign: 'center', borderRadius: '14px',
+          background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`,
+        }}>
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>🚀</div>
+          <div style={{ fontSize: '16px', fontWeight: 700, color: theme.text.secondary }}>
+            Waiting for next round...
+          </div>
+          <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '6px' }}>
+            A new rug game starts automatically every 30 seconds
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '14px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#2ecc71' }}>BET</div>
+              <div style={{ fontSize: '11px', color: theme.text.muted }}>Place during presale</div>
+            </div>
+            <div style={{ width: '1px', background: theme.border.subtle }} />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#f59e0b' }}>WATCH</div>
+              <div style={{ fontSize: '11px', color: theme.text.muted }}>Multiplier rises</div>
+            </div>
+            <div style={{ width: '1px', background: theme.border.subtle }} />
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444' }}>CASH OUT</div>
+              <div style={{ fontSize: '11px', color: theme.text.muted }}>Before the rug!</div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -651,32 +645,12 @@ const s: Record<string, React.CSSProperties> = {
     padding: '10px 14px', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)',
     borderRadius: '10px', color: '#f87171', fontSize: '14px', fontWeight: 600, textAlign: 'center',
   },
-  sectionLabel: {
-    fontSize: '12px', fontWeight: 700, color: theme.text.muted,
-    textTransform: 'uppercase', letterSpacing: '0.5px',
-  },
-  betGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' },
-  betBtn: {
-    padding: '12px 8px', borderRadius: '10px', border: `1px solid ${theme.border.subtle}`,
-    background: theme.bg.secondary, cursor: 'pointer', fontFamily: 'inherit',
-    display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: '2px',
-    transition: 'all 0.15s', color: theme.text.primary,
-  },
-  betBtnActive: {
-    background: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.4)', color: '#fbbf24',
-  },
-  customBetRow: { display: 'flex', gap: '10px' },
-  customBetInput: {
-    flex: 1, padding: '12px 14px', borderRadius: '10px', border: `1px solid ${theme.border.subtle}`,
-    background: theme.bg.secondary, color: theme.text.primary, fontSize: '15px', fontWeight: 700,
-    outline: 'none', fontFamily: "'JetBrains Mono', monospace", minWidth: 0,
-  },
   buyBtn: {
     width: '100%', padding: '16px',
-    background: 'linear-gradient(135deg, #22c55e, #16a34a)',
+    background: 'linear-gradient(135deg, #7c3aed, #8b5cf6, #a78bfa)',
     border: 'none', borderRadius: '14px', color: '#fff',
     fontSize: '18px', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
-    boxShadow: '0 4px 20px rgba(34, 197, 94, 0.3)', letterSpacing: '2px',
+    boxShadow: '0 4px 20px rgba(139, 92, 246, 0.3)', letterSpacing: '2px',
   },
   cashOutBtn: {
     width: '100%', padding: '16px',

@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import { getDb } from '../config/database.js';
-import { users, userProfiles, chatMessages, activityFeedItems, rounds, bets, betResults, predictionRounds, candleflipGames, rugGames, tradingSimRooms, tradingSimParticipants } from '@tradingarena/db';
+import { users, userProfiles, chatMessages, activityFeedItems, rounds, bets, betResults, predictionRounds, candleflipGames, rugGames, tradingSimRooms, tradingSimParticipants, lotteryDraws, lotteryTickets } from '@tradingarena/db';
+import { desc } from 'drizzle-orm';
 import { eq, sql, and, inArray } from 'drizzle-orm';
 import { trackOnline } from '../routes/chat.routes.js';
 import { generateSimulatedChart } from '../utils/chartGenerator.js';
@@ -44,6 +45,7 @@ let lastOnlineTrackAt = 0;
 let lastCandleflipAt = 0;
 let lastRugGameAt = 0;
 let lastSimMaintenanceAt = 0;
+let lastLotteryAt = 0;
 
 // Randomized cooldowns (ms)
 let soloCooldown = randomBetween(5000, 15000);
@@ -52,6 +54,7 @@ let predictionCooldown = randomBetween(15000, 45000);
 const onlineCooldown = 60000;
 let candleflipCooldown = randomBetween(15000, 30000);
 let rugGameCooldown = randomBetween(10000, 20000);
+let lotteryCooldown = randomBetween(30000, 90000);
 
 // ─── Chat Messages Pool (120+ messages) ─────────────────────
 
@@ -599,6 +602,77 @@ async function autoStartPendingSimRooms(): Promise<void> {
   }
 }
 
+// ─── Lottery — Bot Ticket Purchases ─────────────────────────
+
+const LOTTERY_STANDARD_PRICE = 100_000_000; // 0.10 SOL
+const LOTTERY_POWER_PRICE = 500_000_000;    // 0.50 SOL
+const LOTTERY_MAIN_MAX = 36;
+const LOTTERY_GEMBALL_MAX = 9;
+
+function generateLotteryNumbers(): number[] {
+  const nums = new Set<number>();
+  while (nums.size < 5) {
+    nums.add(randomBetween(1, LOTTERY_MAIN_MAX));
+  }
+  return Array.from(nums).sort((a, b) => a - b);
+}
+
+async function botBuyLotteryTickets(bot: BotUser): Promise<void> {
+  try {
+    const db = getDb();
+
+    // Get current open draw
+    const draw = await db.query.lotteryDraws.findFirst({
+      where: eq(lotteryDraws.status, 'open'),
+      orderBy: [desc(lotteryDraws.drawDate)],
+    });
+    if (!draw) return;
+
+    // Generate 1-3 random tickets
+    const ticketCount = randomBetween(1, 3);
+    const ticketValues: {
+      drawId: string;
+      userId: string;
+      entryType: string;
+      numbers: number[];
+      gemBall: number;
+      cost: number;
+    }[] = [];
+
+    let totalCost = 0;
+    for (let i = 0; i < ticketCount; i++) {
+      const isPower = Math.random() < 0.15; // 15% chance of power entry
+      const cost = isPower ? LOTTERY_POWER_PRICE : LOTTERY_STANDARD_PRICE;
+      totalCost += cost;
+
+      ticketValues.push({
+        drawId: draw.id,
+        userId: bot.id,
+        entryType: isPower ? 'power' : 'standard',
+        numbers: generateLotteryNumbers(),
+        gemBall: randomBetween(1, LOTTERY_GEMBALL_MAX),
+        cost,
+      });
+    }
+
+    // Insert tickets directly (bots don't use real balance)
+    await db.insert(lotteryTickets).values(ticketValues);
+
+    // Update draw counters
+    await db
+      .update(lotteryDraws)
+      .set({
+        totalTickets: sql`${lotteryDraws.totalTickets} + ${ticketCount}`,
+        prizePool: sql`${lotteryDraws.prizePool} + ${totalCost}`,
+      })
+      .where(eq(lotteryDraws.id, draw.id));
+
+    console.log(`[BotEngine] ${bot.username} bought ${ticketCount} lottery ticket(s) for draw #${draw.drawNumber}`);
+  } catch (err) {
+    // Silently ignore errors
+  }
+}
+
 // ─── Main Engine Tick ───────────────────────────────────────
 
 async function engineTick(): Promise<void> {
@@ -654,6 +728,18 @@ async function engineTick(): Promise<void> {
     const selectedBots = pickRandomN(botUsers, count);
     for (const bot of selectedBots) {
       botJoinRugRound(bot).catch(() => {});
+    }
+  }
+
+  // Lottery — bots buy tickets (cooldown 30-90s)
+  if (now - lastLotteryAt >= lotteryCooldown) {
+    lastLotteryAt = now;
+    lotteryCooldown = randomBetween(30000, 90000);
+
+    const count = randomBetween(1, 3);
+    const selectedBots = pickRandomN(botUsers, count);
+    for (const bot of selectedBots) {
+      botBuyLotteryTickets(bot).catch(() => {});
     }
   }
 
@@ -772,6 +858,7 @@ export async function startBotEngine(): Promise<void> {
   lastOnlineTrackAt = now;
   lastCandleflipAt = now;
   lastRugGameAt = now;
+  lastLotteryAt = now;
   lastSimMaintenanceAt = 0; // Run immediately on first tick
 
   // Track initial online bots immediately

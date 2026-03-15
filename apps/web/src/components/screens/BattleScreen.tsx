@@ -16,15 +16,9 @@ import {
 } from '../../utils/sounds';
 import { MedalIcon, TrophyIcon, UserIcon, CheckIcon } from '../ui/GameIcons';
 import { isPhotoAvatar, getAvatarGradient, getInitials } from '../../utils/avatars';
+import { BetPanel } from '../ui/BetPanel';
 
 const ROUND_DURATION = 15;
-const BUYIN_LABELS: Record<number, string> = {
-  100_000_000: '0.1',
-  250_000_000: '0.25',
-  500_000_000: '0.5',
-  1_000_000_000: '1',
-  2_000_000_000: '2',
-};
 
 function rankBadge(rank: number): React.ReactNode {
   if (rank >= 1 && rank <= 3) return <MedalIcon rank={rank as 1 | 2 | 3} size={20} />;
@@ -38,6 +32,7 @@ export function BattleScreen() {
     leaveTournament,
     resetTournament,
     syncProfile,
+    profile,
   } = useGameStore();
   const go = useAppNavigate();
 
@@ -45,6 +40,7 @@ export function BattleScreen() {
   const [roomState, setRoomState] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [joining, setJoining] = useState(false);
+  const [betAmount, setBetAmount] = useState(0);
   const [countdown, setCountdown] = useState(0);
   const [feeRate, setFeeRate] = useState<number>((globalThis as any).__serverFeeRate ?? 0.05);
 
@@ -200,11 +196,11 @@ export function BattleScreen() {
 
   // ─── Join Handler ─────────────────────────────────────────────────────────
 
-  const handleJoin = async (buyIn: number) => {
+  const handleJoin = async () => {
     setJoining(true);
     setError(null);
     try {
-      await joinTournament(buyIn);
+      await joinTournament(betAmount);
       playBattleJoin();
     } catch (err: any) {
       setError(err.message || 'Failed to join tournament');
@@ -233,7 +229,7 @@ export function BattleScreen() {
             height: `${size}px`,
             borderRadius: '50%',
             objectFit: 'cover' as const,
-            border: '2px solid rgba(119, 23, 255, 0.4)',
+            border: '2px solid rgba(139, 92, 246, 0.4)',
           }}
         />
       );
@@ -269,34 +265,37 @@ export function BattleScreen() {
           <div style={styles.errorBox}>{error}</div>
         )}
 
-        <div style={styles.tierGrid}>
-          {Object.entries(BUYIN_LABELS).map(([lamStr, label]) => {
-            const lam = parseInt(lamStr);
-            return (
-              <button
-                key={lam}
-                onClick={() => handleJoin(lam)}
-                disabled={joining}
-                className="btn-3d btn-3d-primary"
-                style={styles.tierButton}
-              >
-                <span style={styles.tierAmount} className="mono">{label} SOL</span>
-                <span style={styles.tierLabel}>Join</span>
-              </button>
-            );
-          })}
+        <div style={{ padding: '0 20px 8px' }}>
+          <BetPanel
+            presets={[
+              { label: '0.1', lamports: 100_000_000 },
+              { label: '0.25', lamports: 250_000_000 },
+              { label: '0.5', lamports: 500_000_000 },
+              { label: '1', lamports: 1_000_000_000 },
+              { label: '2', lamports: 2_000_000_000 },
+            ]}
+            selectedAmount={betAmount}
+            onAmountChange={setBetAmount}
+            balance={profile.balance}
+            allowCustom={false}
+            showModifiers={false}
+            submitLabel="JOIN BATTLE"
+            onSubmit={handleJoin}
+            submitDisabled={betAmount <= 0}
+            submitLoading={joining}
+          />
         </div>
 
         <div style={styles.rulesBox}>
           <div style={styles.ruleRow}>
             <span style={styles.ruleIcon}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c084fc" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             </span>
             <span>4-8 players per tournament</span>
           </div>
           <div style={styles.ruleRow}>
             <span style={styles.ruleIcon}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c084fc" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             </span>
             <span>3 rounds × 15 seconds each</span>
           </div>
@@ -475,7 +474,7 @@ export function BattleScreen() {
                 <span style={styles.rankEmoji}>{rankBadge(idx + 1)}</span>
                 <span style={{
                   ...styles.rankName,
-                  color: isMe ? '#c084fc' : theme.text.primary,
+                  color: isMe ? '#8b5cf6' : theme.text.primary,
                 }}>
                   {p.username} {isMe && <span style={styles.youTag}>you</span>}
                 </span>
@@ -550,7 +549,7 @@ export function BattleScreen() {
                   flex: 1,
                   fontSize: '14px',
                   fontWeight: 600,
-                  color: isMe ? '#c084fc' : theme.text.primary,
+                  color: isMe ? '#8b5cf6' : theme.text.primary,
                 }}>
                   {p.username} {isMe && <span style={styles.youTag}>you</span>}
                 </span>
@@ -568,7 +567,7 @@ export function BattleScreen() {
                   textAlign: 'right' as const,
                   fontSize: '14px',
                   fontWeight: 700,
-                  color: '#c084fc',
+                  color: '#8b5cf6',
                 }} className="mono">
                   {p.cumulativeScore.toFixed(1)}
                 </span>
@@ -626,7 +625,7 @@ export function BattleScreen() {
                   <span style={{
                     fontSize: '14px',
                     fontWeight: 600,
-                    color: isMe ? '#c084fc' : theme.text.primary,
+                    color: isMe ? '#8b5cf6' : theme.text.primary,
                   }}>
                     {p.username} {isMe && <span style={styles.youTag}>you</span>}
                   </span>
@@ -637,7 +636,7 @@ export function BattleScreen() {
                 <span style={{
                   fontSize: '16px',
                   fontWeight: 700,
-                  color: idx === 0 ? '#FFD700' : '#c084fc',
+                  color: idx === 0 ? '#FFD700' : '#8b5cf6',
                 }} className="mono">
                   {p.cumulativeScore.toFixed(2)}
                 </span>
@@ -731,8 +730,8 @@ const styles: Record<string, React.CSSProperties> = {
   roomBadge: {
     padding: '4px 10px',
     borderRadius: '20px',
-    background: 'rgba(119, 23, 255, 0.15)',
-    color: '#c084fc',
+    background: 'rgba(139, 92, 246, 0.15)',
+    color: '#8b5cf6',
     fontSize: '12px',
     fontWeight: 600,
     fontFamily: 'monospace',
@@ -757,45 +756,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 500,
   },
 
-  // Buy-in Tier Grid
-  tierGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '10px',
-    padding: '8px 20px',
-    flex: 0,
-  },
-  tierButton: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '18px 12px',
-    borderRadius: '12px',
-    border: 'none',
-    cursor: 'pointer',
-    width: '100%',
-  },
-  tierAmount: {
-    fontSize: '20px',
-    fontWeight: 900,
-    color: '#fff',
-    fontFamily: "inherit",
-  },
-  tierLabel: {
-    fontSize: '13px',
-    fontWeight: 600,
-    color: 'rgba(255,255,255,0.7)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '1px',
-  },
-
   // Rules box
   rulesBox: {
     margin: '12px 20px',
     padding: '12px 16px',
     borderRadius: '10px',
-    background: 'rgba(28, 20, 42, 0.85)',
+    background: '#1a1c21',
     border: `1px solid ${theme.border.subtle}`,
     display: 'flex',
     flexDirection: 'column',
@@ -841,7 +807,7 @@ const styles: Record<string, React.CSSProperties> = {
     width: '100%',
     background: theme.bg.tertiary,
     borderRadius: '16px',
-    border: '1px solid rgba(119, 23, 255, 0.2)',
+    border: '1px solid rgba(139, 92, 246, 0.2)',
     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
   },
   waitingTitle: {
@@ -865,8 +831,8 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '4px',
     padding: '12px 24px',
     borderRadius: '12px',
-    background: 'rgba(119, 23, 255, 0.08)',
-    border: '1px solid rgba(119, 23, 255, 0.15)',
+    background: 'rgba(139, 92, 246, 0.08)',
+    border: '1px solid rgba(139, 92, 246, 0.15)',
   },
   waitingStatLabel: {
     fontSize: '12px',
@@ -881,13 +847,13 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '6px',
     fontSize: '20px',
     fontWeight: 800,
-    color: '#c084fc',
+    color: '#8b5cf6',
   },
   waitingNotice: {
     textAlign: 'center' as const,
     padding: '8px 20px',
     fontSize: '15px',
-    color: '#c084fc',
+    color: '#8b5cf6',
     fontWeight: 600,
   },
   leaveBtn: {
@@ -908,18 +874,18 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '8px 20px',
     padding: '12px 16px',
     borderRadius: '12px',
-    background: 'rgba(28, 20, 42, 0.85)',
+    background: '#1a1c21',
     border: `1px solid ${theme.border.medium}`,
     overflow: 'hidden',
   },
   countdownLabel: { fontSize: '13px', color: theme.text.muted, marginBottom: '4px' },
-  countdownValue: { fontSize: '34px', fontWeight: 900, color: '#c084fc', fontFamily: "inherit" },
+  countdownValue: { fontSize: '34px', fontWeight: 900, color: '#8b5cf6', fontFamily: "inherit" },
   countdownProgress: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     height: '3px',
-    background: 'linear-gradient(90deg, #7717ff, #14F195)',
+    background: 'linear-gradient(90deg, #7c3aed, #8b5cf6)',
     transition: 'width 0.2s linear',
   },
 
@@ -939,12 +905,12 @@ const styles: Record<string, React.CSSProperties> = {
     gap: '4px',
     padding: '12px 6px',
     borderRadius: '12px',
-    background: 'rgba(28, 20, 42, 0.85)',
+    background: '#1a1c21',
     border: `1px solid ${theme.border.subtle}`,
   },
   playerCardYou: {
-    border: '1px solid rgba(119, 23, 255, 0.4)',
-    background: 'rgba(119, 23, 255, 0.08)',
+    border: '1px solid rgba(139, 92, 246, 0.4)',
+    background: 'rgba(139, 92, 246, 0.08)',
   },
   youBadge: {
     position: 'absolute',
@@ -952,8 +918,8 @@ const styles: Record<string, React.CSSProperties> = {
     right: '6px',
     fontSize: '10px',
     fontWeight: 700,
-    color: '#c084fc',
-    background: 'rgba(119, 23, 255, 0.2)',
+    color: '#8b5cf6',
+    background: 'rgba(139, 92, 246, 0.2)',
     padding: '1px 5px',
     borderRadius: '4px',
   },
@@ -1002,15 +968,15 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '10px 14px',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
-    background: 'rgba(32, 24, 48, 0.95)',
+    borderBottom: '1px solid rgba(139, 92, 246, 0.08)',
+    background: '#1a1c21',
     color: theme.text.primary,
     fontSize: '16px',
   },
   timer: {
     fontSize: '26px',
     fontWeight: 900,
-    color: '#c084fc',
+    color: '#8b5cf6',
   },
   progressBarBg: {
     height: '3px',
@@ -1021,7 +987,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressBarFill: {
     height: '100%',
-    background: 'linear-gradient(90deg, #7717ff, #14F195)',
+    background: 'linear-gradient(90deg, #7c3aed, #8b5cf6)',
     transition: 'width 0.1s linear',
     borderRadius: '2px',
   },
@@ -1057,8 +1023,8 @@ const styles: Record<string, React.CSSProperties> = {
   hudRound: {
     padding: '2px 8px',
     borderRadius: '6px',
-    background: 'rgba(119, 23, 255, 0.2)',
-    color: '#c084fc',
+    background: 'rgba(139, 92, 246, 0.2)',
+    color: '#8b5cf6',
     fontSize: '12px',
     fontWeight: 700,
   },
@@ -1086,8 +1052,8 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '2px',
   },
   rankRowMe: {
-    background: 'rgba(119, 23, 255, 0.08)',
-    border: '1px solid rgba(119, 23, 255, 0.15)',
+    background: 'rgba(139, 92, 246, 0.08)',
+    border: '1px solid rgba(139, 92, 246, 0.15)',
   },
   rankEmoji: { width: '24px', textAlign: 'center' as const, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   rankName: { flex: 1, fontSize: '14px', fontWeight: 600 },
@@ -1095,8 +1061,8 @@ const styles: Record<string, React.CSSProperties> = {
   youTag: {
     fontSize: '10px',
     fontWeight: 700,
-    color: '#c084fc',
-    background: 'rgba(119, 23, 255, 0.2)',
+    color: '#8b5cf6',
+    background: 'rgba(139, 92, 246, 0.2)',
     padding: '1px 4px',
     borderRadius: '3px',
     marginLeft: '4px',
@@ -1146,7 +1112,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '8px 10px',
     borderRadius: '8px',
     marginBottom: '2px',
-    background: 'rgba(28, 20, 42, 0.5)',
+    background: 'rgba(22, 29, 45, 0.5)',
   },
 
   // Final results
@@ -1168,7 +1134,7 @@ const styles: Record<string, React.CSSProperties> = {
   winnerScore: {
     fontSize: '20px',
     fontWeight: 700,
-    color: '#c084fc',
+    color: '#8b5cf6',
   },
   winnerPayout: {
     fontSize: '36px',
@@ -1190,7 +1156,7 @@ const styles: Record<string, React.CSSProperties> = {
     margin: '12px 20px',
     padding: '10px 14px',
     borderRadius: '10px',
-    background: 'rgba(28, 20, 42, 0.85)',
+    background: '#1a1c21',
     border: `1px solid ${theme.border.subtle}`,
   },
   poolRow: {
@@ -1205,7 +1171,7 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center' as const,
     padding: '12px',
     fontSize: '15px',
-    color: '#c084fc',
+    color: '#8b5cf6',
     fontWeight: 600,
   },
 

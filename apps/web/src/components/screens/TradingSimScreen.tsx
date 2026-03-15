@@ -9,6 +9,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { playButtonClick, playBetPlaced, playRoundEnd, hapticLight, hapticMedium } from '../../utils/sounds';
 import { LiveDot, LiveRoundBanner, StatusBadge, WinAmountDisplay, timeAgo } from '../ui/LiveIndicators';
+import { BetPanel } from '../ui/BetPanel';
 
 interface Candle { open: number; high: number; low: number; close: number; volume: number; timestamp: number; }
 interface Participant { id: string; userId: string; username?: string; startBalance: number; finalBalance?: number; finalPnl?: number; rank?: number; }
@@ -16,9 +17,9 @@ interface Room { id: string; entryFee: number; maxPlayers: number; currentPlayer
 type View = 'list' | 'game' | 'result';
 
 const ENTRY_TIERS = [
-  { fee: 100_000_000, label: '0.1', color: '#34d399', gradient: 'linear-gradient(135deg, #064e3b, #059669)', icon: '💹' },
-  { fee: 250_000_000, label: '0.25', color: '#a78bfa', gradient: 'linear-gradient(135deg, #3b0764, #7c3aed)', icon: '📊' },
-  { fee: 500_000_000, label: '0.5', color: '#fbbf24', gradient: 'linear-gradient(135deg, #78350f, #d97706)', icon: '🏆' },
+  { fee: 100_000_000, label: '0.1', color: '#2ecc71', gradient: 'linear-gradient(135deg, #064e3b, #059669)', icon: '💹' },
+  { fee: 250_000_000, label: '0.25', color: '#60a5fa', gradient: 'linear-gradient(135deg, #172554, #1d4ed8)', icon: '📊' },
+  { fee: 500_000_000, label: '0.5', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #78350f, #d97706)', icon: '🏆' },
 ];
 
 // ─── LIVE SPECTATOR CHART: Simulated trading round always running ───
@@ -53,10 +54,10 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
     const candles = candlesRef.current;
     if (candles.length === 0) {
       // Waiting state
-      ctx.fillStyle = '#34d399';
+      ctx.fillStyle = '#2ecc71';
       ctx.font = `900 ${isMobile ? 18 : 24}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(52,211,153,0.4)';
+      ctx.shadowColor = 'rgba(46,204,113,0.4)';
       ctx.shadowBlur = 12;
       ctx.fillText('TRADING ARENA', w / 2, h * 0.4);
       ctx.shadowBlur = 0;
@@ -104,7 +105,7 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
       const c = visible[i];
       const x = pad.left + (i + 0.5) * spacing;
       const isGreen = c.c >= c.o;
-      const color = isGreen ? '#34d399' : '#f87171';
+      const color = isGreen ? '#2ecc71' : '#f87171';
       ctx.strokeStyle = color; ctx.lineWidth = isMobile ? 1 : 1.5;
       ctx.beginPath(); ctx.moveTo(x, toY(c.h)); ctx.lineTo(x, toY(c.l)); ctx.stroke();
       const bTop = toY(Math.max(c.o, c.c));
@@ -118,7 +119,7 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
       const lastC = candles[candles.length - 1];
       const priceY = toY(lastC.c);
       const isUp = lastC.c >= candles[0].o;
-      const lineColor = isUp ? '#34d399' : '#f87171';
+      const lineColor = isUp ? '#2ecc71' : '#f87171';
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 3]);
@@ -135,12 +136,12 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
     // Top info
     const currentPhase = phaseRef.current;
     if (currentPhase === 'trading') {
-      ctx.fillStyle = '#34d399';
+      ctx.fillStyle = '#2ecc71';
       ctx.font = "700 9px 'Inter', system-ui, sans-serif";
       ctx.textAlign = 'left';
       ctx.fillText('\u25CF LIVE ROUND', pad.left + 4, 16);
     } else {
-      ctx.fillStyle = '#fbbf24';
+      ctx.fillStyle = '#8b5cf6';
       ctx.font = "700 9px 'Inter', system-ui, sans-serif";
       ctx.textAlign = 'left';
       ctx.fillText('ROUND COMPLETE', pad.left + 4, 16);
@@ -233,7 +234,7 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
             position: 'absolute', top: '6px', right: '8px',
             display: 'flex', alignItems: 'center', gap: '6px',
             padding: '4px 10px', borderRadius: '8px',
-            background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)',
+            background: 'rgba(0,0,0,0.6)', backdropFilter: '',
           }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             <span className="mono" style={{ fontSize: '12px', fontWeight: 700, color: timeLeft <= 10 ? '#f87171' : '#fff' }}>{timeLeft}s</span>
@@ -243,10 +244,10 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
           <div style={{
             position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
             textAlign: 'center', padding: '12px 24px', borderRadius: '12px',
-            background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+            background: 'rgba(0,0,0,0.7)', backdropFilter: '',
           }}>
             <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' }}>Round Complete</div>
-            <div className="mono" style={{ fontSize: '22px', fontWeight: 900, color: pnl >= 0 ? '#34d399' : '#f87171', marginTop: '2px' }}>
+            <div className="mono" style={{ fontSize: '22px', fontWeight: 900, color: pnl >= 0 ? '#2ecc71' : '#f87171', marginTop: '2px' }}>
               {pnl >= 0 ? '+' : ''}{pnl.toFixed(1)}%
             </div>
           </div>
@@ -285,6 +286,7 @@ export function TradingSimScreen() {
   const go = useAppNavigate();
   const isMobile = useIsMobile();
   const syncProfile = useGameStore((s) => s.syncProfile);
+  const profile = useGameStore((s) => s.profile);
   const userId = useAuthStore((s) => s.userId);
   const [view, setView] = useState<View>('list');
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -292,6 +294,7 @@ export function TradingSimScreen() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [recentRooms, setRecentRooms] = useState<any[]>([]);
+  const [entryAmount, setEntryAmount] = useState(0);
 
   // Game state
   const [position, setPosition] = useState(0);
@@ -340,6 +343,10 @@ export function TradingSimScreen() {
     } finally { setLoading(false); }
   };
 
+  const handleJoinRoom = async () => {
+    await handleCreate(entryAmount);
+  };
+
   const handleJoin = async (roomId: string) => {
     if (!userId) { go('auth'); return; }
     setError(''); setLoading(true);
@@ -353,7 +360,16 @@ export function TradingSimScreen() {
     } finally { setLoading(false); }
   };
 
+  const countdownTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const confettiRaf = useRef<number>(0);
+
   const startPolling = (roomId: string) => {
+    // Clear any existing polling interval first
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
+    // Clear any existing countdown timers
+    countdownTimers.current.forEach(t => clearTimeout(t));
+    countdownTimers.current = [];
+
     let prevStatus = '';
     const poll = async () => {
       try {
@@ -364,9 +380,11 @@ export function TradingSimScreen() {
         // Countdown when transitioning to active
         if (room.status === 'active' && prevStatus === 'waiting') {
           setCountdown(3);
-          setTimeout(() => setCountdown(2), 1000);
-          setTimeout(() => setCountdown(1), 2000);
-          setTimeout(() => setCountdown(null), 3000);
+          countdownTimers.current = [
+            setTimeout(() => setCountdown(2), 1000),
+            setTimeout(() => setCountdown(1), 2000),
+            setTimeout(() => setCountdown(null), 3000),
+          ];
         }
         prevStatus = room.status;
 
@@ -380,12 +398,12 @@ export function TradingSimScreen() {
           if (visible.length > 0) setCurrentPrice(visible[visible.length - 1].close);
           if (elapsedSec >= room.duration) {
             setView('result'); syncProfile(); playRoundEnd(true);
-            if (timerRef.current) clearInterval(timerRef.current);
+            if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
           }
         }
         if (room.status === 'finished') {
           setView('result'); syncProfile(); playRoundEnd(room.winnerId === userId);
-          if (timerRef.current) clearInterval(timerRef.current);
+          if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; }
         }
       } catch { /* ignore */ }
     };
@@ -393,7 +411,14 @@ export function TradingSimScreen() {
     timerRef.current = setInterval(poll, 1000);
   };
 
-  useEffect(() => { return () => { if (timerRef.current) clearInterval(timerRef.current); }; }, []);
+  // Cleanup all timers on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      countdownTimers.current.forEach(t => clearTimeout(t));
+      cancelAnimationFrame(confettiRaf.current);
+    };
+  }, []);
 
   // Draw chart
   const drawChart = useCallback(() => {
@@ -424,7 +449,7 @@ export function TradingSimScreen() {
 
     // Grid lines
     const gridLines = 5;
-    ctx.strokeStyle = 'rgba(119, 23, 255, 0.06)';
+    ctx.strokeStyle = 'rgba(0, 220, 130, 0.06)';
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     for (let i = 0; i <= gridLines; i++) {
@@ -448,7 +473,7 @@ export function TradingSimScreen() {
       const x = pad.left + i * (candleW + Math.max(1, gap / visibleCandles.length * i > 0 ? 1 : 0));
       const xPos = pad.left + (chartW / totalCandles) * i;
       const isGreen = c.close >= c.open;
-      const color = isGreen ? '#34d399' : '#f87171';
+      const color = isGreen ? '#2ecc71' : '#f87171';
 
       const highY = pad.top + ((maxP - c.high) / range) * chartH;
       const lowY = pad.top + ((maxP - c.low) / range) * chartH;
@@ -476,7 +501,7 @@ export function TradingSimScreen() {
       const lastPrice = visibleCandles[visibleCandles.length - 1].close;
       const priceY = pad.top + ((maxP - lastPrice) / range) * chartH;
       const isUp = lastPrice >= visibleCandles[0].open;
-      const lineColor = isUp ? '#34d399' : '#f87171';
+      const lineColor = isUp ? '#2ecc71' : '#f87171';
 
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 1;
@@ -508,7 +533,7 @@ export function TradingSimScreen() {
     canvas.width = canvas.offsetWidth * 2;
     canvas.height = canvas.offsetHeight * 2;
     ctx.scale(2, 2);
-    const colors = ['#34d399', '#7717ff', '#fbbf24', '#c084fc', '#5b8def', '#f472b6'];
+    const colors = ['#2ecc71', '#8b5cf6', '#a78bfa', '#3b82f6', '#5b8def', '#f472b6'];
     const particles: { x: number; y: number; vx: number; vy: number; color: string; alpha: number; size: number; }[] = [];
     for (let i = 0; i < 80; i++) {
       particles.push({
@@ -529,7 +554,7 @@ export function TradingSimScreen() {
         ctx.fillRect(p.x, p.y, p.size, p.size);
       });
       ctx.globalAlpha = 1;
-      if (++frame < 200) requestAnimationFrame(animate);
+      if (++frame < 200) confettiRaf.current = requestAnimationFrame(animate);
     };
     animate();
   }, []);
@@ -580,7 +605,7 @@ export function TradingSimScreen() {
           <div style={s.headerText}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <div style={s.headerIcon}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
               </div>
               <h1 style={s.title}>Trading Arena</h1>
             </div>
@@ -616,22 +641,22 @@ export function TradingSimScreen() {
           <span>Create Room</span>
           <span style={s.sectionHint}>Choose entry fee</span>
         </div>
-        <div style={s.tierGrid}>
-          {ENTRY_TIERS.map((tier) => (
-            <button
-              key={tier.fee}
-              style={{ ...s.tierCard, background: tier.gradient }}
-              onClick={() => handleCreate(tier.fee)}
-              disabled={loading}
-              className="hover-scale"
-            >
-              <span style={s.tierEmoji}>{tier.icon}</span>
-              <span style={s.tierFee} className="mono">{tier.label} SOL</span>
-              <span style={s.tierSub}>Entry Fee</span>
-              <div style={{ ...s.tierGlow, background: `radial-gradient(circle, ${tier.color}20 0%, transparent 70%)` }} />
-            </button>
-          ))}
-        </div>
+        <BetPanel
+          presets={[
+            { label: '0.1', lamports: 100_000_000 },
+            { label: '0.25', lamports: 250_000_000 },
+            { label: '0.5', lamports: 500_000_000 },
+          ]}
+          selectedAmount={entryAmount}
+          onAmountChange={setEntryAmount}
+          balance={profile.balance}
+          allowCustom={false}
+          showModifiers={false}
+          submitLabel="JOIN ROOM"
+          onSubmit={handleJoinRoom}
+          submitDisabled={entryAmount <= 0}
+          submitLoading={loading}
+        />
 
         {/* Available Rooms */}
         <div style={s.sectionLabel}>
@@ -640,9 +665,9 @@ export function TradingSimScreen() {
         </div>
         {rooms.length === 0 ? (
           <div style={s.emptyState}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(119,23,255,0.3)" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M16 16s-1.5-2-4-2-4 2-4 2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>
-            <span style={s.emptyText}>No rooms available</span>
-            <span style={s.emptyHint}>Create one and wait for opponents!</span>
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.3)" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M16 16s-1.5-2-4-2-4 2-4 2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>
+            <span style={s.emptyText}>No Active Rooms</span>
+            <span style={s.emptyHint}>Be the first! Create a room above and wait for opponents to join.</span>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
@@ -739,7 +764,7 @@ export function TradingSimScreen() {
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 800, color: '#fbbf24' }} className="mono">
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: '#00dc82' }} className="mono">
                         {formatSol(room.prizePool)}
                       </div>
                       <div style={{ fontSize: '10px', color: theme.text.muted }}>SOL pot</div>
@@ -774,8 +799,8 @@ export function TradingSimScreen() {
         {tradeFlash && (
           <div style={{
             ...s.tradeFlashOverlay,
-            background: tradeFlash === 'buy' ? 'rgba(52,211,153,0.08)' : 'rgba(248,113,113,0.08)',
-            borderColor: tradeFlash === 'buy' ? 'rgba(52,211,153,0.3)' : 'rgba(248,113,113,0.3)',
+            background: tradeFlash === 'buy' ? 'rgba(46,204,113,0.08)' : 'rgba(248,113,113,0.08)',
+            borderColor: tradeFlash === 'buy' ? 'rgba(46,204,113,0.3)' : 'rgba(248,113,113,0.3)',
           }} />
         )}
 
@@ -796,10 +821,10 @@ export function TradingSimScreen() {
           </div>
 
           <div style={s.hudCenter}>
-            <span style={{ ...s.pnlHero, color: pnl >= 0 ? '#34d399' : '#f87171', textShadow: `0 0 20px ${pnl >= 0 ? 'rgba(52,211,153,0.4)' : 'rgba(248,113,113,0.4)'}` }} className="mono">
+            <span style={{ ...s.pnlHero, color: pnl >= 0 ? '#2ecc71' : '#f87171', textShadow: `0 0 20px ${pnl >= 0 ? 'rgba(46,204,113,0.4)' : 'rgba(248,113,113,0.4)'}` }} className="mono">
               {pnl >= 0 ? '+' : ''}{pnl.toFixed(0)}
             </span>
-            <span style={{ fontSize: '11px', fontWeight: 600, color: pnl >= 0 ? 'rgba(52,211,153,0.7)' : 'rgba(248,113,113,0.7)' }} className="mono">
+            <span style={{ fontSize: '11px', fontWeight: 600, color: pnl >= 0 ? 'rgba(46,204,113,0.7)' : 'rgba(248,113,113,0.7)' }} className="mono">
               {pnl >= 0 ? '+' : ''}{pnlPercent}%
             </span>
           </div>
@@ -807,7 +832,7 @@ export function TradingSimScreen() {
           <div style={s.hudRight}>
             <div style={s.prizePill}>
               <img src="/sol-coin.png" alt="SOL" style={{ width: 14, height: 14 }} />
-              <span className="mono" style={{ color: '#fbbf24', fontWeight: 700, fontSize: '13px' }}>{formatSol(activeRoom.prizePool)}</span>
+              <span className="mono" style={{ color: '#00dc82', fontWeight: 700, fontSize: '13px' }}>{formatSol(activeRoom.prizePool)}</span>
             </div>
           </div>
         </div>
@@ -815,7 +840,7 @@ export function TradingSimScreen() {
         {/* Timer progress bar */}
         {!isWaiting && (
           <div style={s.timerBar}>
-            <div style={{ ...s.timerBarFill, width: `${Math.min(100, timeProgress)}%`, background: timeLeft <= 10 ? '#f87171' : 'linear-gradient(90deg, #7717ff, #c084fc)' }} />
+            <div style={{ ...s.timerBarFill, width: `${Math.min(100, timeProgress)}%`, background: timeLeft <= 10 ? '#f87171' : '#8b5cf6' }} />
           </div>
         )}
 
@@ -828,7 +853,7 @@ export function TradingSimScreen() {
               <span style={{ fontSize: '16px', fontWeight: 700, color: '#fff' }}>Waiting for players...</span>
               <span style={{ fontSize: '13px', color: theme.text.muted }}>{activeRoom.currentPlayers}/{activeRoom.maxPlayers} joined</span>
               <button
-                style={{ marginTop: '12px', padding: '10px 28px', background: theme.accent.purple, border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
+                style={{ marginTop: '12px', padding: '10px 28px', background: 'linear-gradient(135deg, #7c3aed, #8b5cf6, #a78bfa)', border: 'none', borderRadius: '10px', color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}
                 onClick={async () => {
                   try {
                     await api.startTradingSimRoom(activeRoom.id);
@@ -859,7 +884,7 @@ export function TradingSimScreen() {
           </div>
           <div style={s.infoItem}>
             <span style={s.infoLabel}>Value</span>
-            <span style={{ ...s.infoValue, color: pnl >= 0 ? '#34d399' : '#f87171' }} className="mono">${(cash + position * currentPrice).toFixed(0)}</span>
+            <span style={{ ...s.infoValue, color: pnl >= 0 ? '#2ecc71' : '#f87171' }} className="mono">${(cash + position * currentPrice).toFixed(0)}</span>
           </div>
         </div>
 
@@ -904,14 +929,14 @@ export function TradingSimScreen() {
           {(activeRoom.participants || []).map((p, i) => {
             const isMe = p.userId === userId;
             return (
-              <div key={p.id} style={{ ...s.leaderRow, ...(isMe ? { background: 'rgba(119,23,255,0.1)', borderColor: 'rgba(119,23,255,0.3)' } : {}) }}>
+              <div key={p.id} style={{ ...s.leaderRow, ...(isMe ? { background: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.3)' } : {}) }}>
                 <span style={s.leaderRank}>#{i + 1}</span>
                 <div style={{
                   width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
                   background: getAvatarGradient(null, p.username || '?'),
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: '8px', fontWeight: 700, color: '#fff',
-                  border: isMe ? '2px solid #7717ff' : '2px solid transparent',
+                  border: isMe ? '2px solid #8b5cf6' : '2px solid transparent',
                 }}>{getInitials(p.username || '?')}</div>
                 <span style={{ ...s.leaderName, ...(isMe ? { color: '#fff' } : {}) }}>{isMe ? 'You' : (p.username || 'Player')}</span>
               </div>
@@ -936,7 +961,7 @@ export function TradingSimScreen() {
           <span style={{ fontSize: '14px', fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase' as const, letterSpacing: '2px' }}>
             {isWinner ? '🏆 VICTORY' : 'GAME OVER'}
           </span>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: isWinner ? '#fbbf24' : theme.text.primary, marginTop: '4px' }}>
+          <div style={{ fontSize: '28px', fontWeight: 800, color: isWinner ? '#00dc82' : theme.text.primary, marginTop: '4px' }}>
             {isWinner ? 'You Won!' : 'Results'}
           </div>
         </div>
@@ -946,7 +971,7 @@ export function TradingSimScreen() {
           <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>Prize Pool</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <img src="/sol-coin.png" alt="SOL" style={{ width: 24, height: 24 }} />
-            <span className="mono" style={{ fontSize: '32px', fontWeight: 800, color: '#fbbf24' }}>{formatSol(activeRoom.prizePool)}</span>
+            <span className="mono" style={{ fontSize: '32px', fontWeight: 800, color: '#00dc82' }}>{formatSol(activeRoom.prizePool)}</span>
             <span style={{ fontSize: '16px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>SOL</span>
           </div>
         </div>
@@ -955,13 +980,13 @@ export function TradingSimScreen() {
         <div style={s.podiumGrid}>
           {sorted.map((p, i) => {
             const isMe = p.userId === userId;
-            const rankColors = ['#fbbf24', '#94a3b8', '#cd7f32'];
+            const rankColors = ['#8b5cf6', '#94a3b8', '#cd7f32'];
             const rankLabels = ['🥇', '🥈', '🥉'];
             return (
               <div key={p.id} style={{
                 ...s.podiumCard,
-                ...(i === 0 ? { border: '1px solid rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.06)' } : {}),
-                ...(isMe ? { boxShadow: '0 0 12px rgba(119,23,255,0.3)', border: '1px solid rgba(119,23,255,0.3)' } : {}),
+                ...(i === 0 ? { border: '1px solid rgba(139,92,246,0.3)', background: 'rgba(139,92,246,0.06)' } : {}),
+                ...(isMe ? { boxShadow: '0 0 12px rgba(139,92,246,0.3)', border: '1px solid rgba(139,92,246,0.3)' } : {}),
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span style={{ fontSize: i < 3 ? '20px' : '14px' }}>{i < 3 ? rankLabels[i] : `#${i + 1}`}</span>
@@ -979,7 +1004,7 @@ export function TradingSimScreen() {
                   </div>
                   <span style={{
                     fontSize: '16px', fontWeight: 800, fontFamily: "'JetBrains Mono', monospace",
-                    color: (p.finalPnl || 0) >= 0 ? '#34d399' : '#f87171',
+                    color: (p.finalPnl || 0) >= 0 ? '#2ecc71' : '#f87171',
                   }}>
                     {(p.finalPnl || 0) >= 0 ? '+' : ''}{(p.finalPnl || 0).toFixed(0)}
                   </span>
@@ -1031,8 +1056,8 @@ const s: Record<string, React.CSSProperties> = {
   },
   headerText: { flex: 1 },
   headerIcon: {
-    width: 36, height: 36, borderRadius: '10px', background: 'rgba(52,211,153,0.1)',
-    border: '1px solid rgba(52,211,153,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 36, height: 36, borderRadius: '10px', background: 'rgba(46,204,113,0.1)',
+    border: '1px solid rgba(46,204,113,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   title: { fontSize: '22px', fontWeight: 800, color: '#fff', margin: 0 },
   subtitle: { fontSize: '13px', color: theme.text.muted, margin: '4px 0 0' },
@@ -1057,18 +1082,6 @@ const s: Record<string, React.CSSProperties> = {
     textTransform: 'uppercase' as const, letterSpacing: '0.5px',
   },
   sectionHint: { fontSize: '11px', fontWeight: 500, color: theme.text.muted, textTransform: 'none' as const },
-  // Tier cards
-  tierGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' },
-  tierCard: {
-    padding: '20px 14px', borderRadius: '14px', border: '1px solid rgba(255,255,255,0.08)',
-    cursor: 'pointer', fontFamily: 'inherit', display: 'flex', flexDirection: 'column' as const,
-    alignItems: 'center', gap: '8px', position: 'relative' as const, overflow: 'hidden',
-    transition: 'all 0.2s ease',
-  },
-  tierEmoji: { fontSize: '28px' },
-  tierFee: { fontSize: '20px', fontWeight: 800, color: '#fff' },
-  tierSub: { fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const },
-  tierGlow: { position: 'absolute' as const, inset: 0, pointerEvents: 'none' as const },
   // Empty state
   emptyState: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: '8px',
@@ -1091,7 +1104,7 @@ const s: Record<string, React.CSSProperties> = {
   roomPlayersRow: { display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' },
   roomPlayerCount: { fontSize: '11px', fontWeight: 600, color: theme.text.muted, marginLeft: '4px' },
   joinBtn: {
-    padding: '10px 24px', background: theme.accent.purple, border: 'none', borderRadius: '10px',
+    padding: '10px 24px', background: 'linear-gradient(135deg, #7c3aed, #8b5cf6, #a78bfa)', border: 'none', borderRadius: '10px',
     color: '#fff', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
     transition: 'all 0.15s', letterSpacing: '1px',
   },
@@ -1111,10 +1124,10 @@ const s: Record<string, React.CSSProperties> = {
   waitingPill: {
     display: 'flex', alignItems: 'center', gap: '8px',
     padding: '6px 14px', borderRadius: '20px',
-    background: 'rgba(119,23,255,0.1)', border: '1px solid rgba(119,23,255,0.2)',
+    background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)',
   },
   waitingDot: {
-    width: 8, height: 8, borderRadius: '50%', background: '#7717ff',
+    width: 8, height: 8, borderRadius: '50%', background: '#8b5cf6',
     animation: 'pulse 1.5s ease infinite',
   },
   waitingText: { fontSize: '13px', fontWeight: 600, color: theme.text.secondary },
@@ -1122,7 +1135,7 @@ const s: Record<string, React.CSSProperties> = {
   prizePill: {
     display: 'flex', alignItems: 'center', gap: '6px',
     padding: '6px 12px', borderRadius: '20px',
-    background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)',
+    background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.2)',
   },
   // Timer bar
   timerBar: {
@@ -1132,17 +1145,17 @@ const s: Record<string, React.CSSProperties> = {
   // Chart
   chartContainer: {
     flex: 1, minHeight: '200px', position: 'relative' as const, borderRadius: '12px',
-    overflow: 'hidden', border: `1px solid rgba(119,23,255,0.12)`,
+    overflow: 'hidden', border: `1px solid rgba(139,92,246,0.12)`,
   },
   canvas: { width: '100%', height: '100%', display: 'block' },
   chartWaitingOverlay: {
     position: 'absolute' as const, inset: 0, display: 'flex', flexDirection: 'column' as const,
     alignItems: 'center', justifyContent: 'center', gap: '12px',
-    background: 'rgba(8,8,8,0.85)', backdropFilter: 'blur(8px)',
+    background: 'rgba(8,8,8,0.85)', backdropFilter: '',
   },
   waitingSpinner: {
     width: 32, height: 32, borderRadius: '50%',
-    border: '3px solid rgba(119,23,255,0.2)', borderTopColor: '#7717ff',
+    border: '3px solid rgba(139,92,246,0.2)', borderTopColor: '#8b5cf6',
     animation: 'spin 1s linear infinite',
   },
   // Info bar
@@ -1165,13 +1178,13 @@ const s: Record<string, React.CSSProperties> = {
     color: theme.text.muted, transition: 'all 0.15s',
   },
   qtyBtnActive: {
-    background: 'rgba(119,23,255,0.15)', borderColor: 'rgba(119,23,255,0.4)', color: '#c084fc',
+    background: 'rgba(139,92,246,0.15)', borderColor: 'rgba(139,92,246,0.4)', color: '#3b82f6',
   },
   // Trade buttons
   tradeButtons: { display: 'flex', gap: '10px' },
   buyBtn: {
-    flex: 1, padding: '14px', background: 'rgba(0,189,113,0.12)', border: '1px solid rgba(0,189,113,0.3)',
-    borderRadius: '12px', color: '#34d399', fontSize: '16px', fontWeight: 800,
+    flex: 1, padding: '14px', background: 'rgba(46,204,113,0.12)', border: '1px solid rgba(46,204,113,0.3)',
+    borderRadius: '12px', color: '#2ecc71', fontSize: '16px', fontWeight: 800,
     cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center',
     justifyContent: 'center', gap: '8px', transition: 'all 0.15s', letterSpacing: '1px',
   },
@@ -1195,11 +1208,11 @@ const s: Record<string, React.CSSProperties> = {
   countdownOverlay: {
     position: 'absolute' as const, inset: 0, zIndex: 50,
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center', gap: '8px',
-    background: 'rgba(17,17,20,0.88)', backdropFilter: 'blur(12px)',
+    background: 'rgba(17,17,20,0.88)', backdropFilter: '',
   },
   countdownNumber: {
     fontSize: '80px', fontWeight: 900, color: '#fff',
-    textShadow: '0 0 30px rgba(119,23,255,0.6)',
+    textShadow: '0 0 30px rgba(139,92,246,0.6)',
     animation: 'pulse 1s ease infinite',
   },
   countdownLabel: { fontSize: '16px', fontWeight: 600, color: theme.text.muted },
@@ -1218,8 +1231,8 @@ const s: Record<string, React.CSSProperties> = {
   prizeCard: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: '8px',
     padding: '24px', borderRadius: '16px',
-    background: 'linear-gradient(135deg, rgba(251,191,36,0.08), rgba(217,119,6,0.04))',
-    border: '1px solid rgba(251,191,36,0.2)',
+    background: 'linear-gradient(135deg, rgba(139,92,246,0.08), rgba(217,119,6,0.04))',
+    border: '1px solid rgba(139,92,246,0.2)',
   },
   podiumGrid: { display: 'flex', flexDirection: 'column' as const, gap: '8px' },
   podiumCard: {
@@ -1227,7 +1240,7 @@ const s: Record<string, React.CSSProperties> = {
     background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`,
   },
   playAgainBtn: {
-    flex: 1, padding: '14px', background: theme.accent.purple, border: 'none', borderRadius: '12px',
+    flex: 1, padding: '14px', background: 'linear-gradient(135deg, #7c3aed, #8b5cf6, #a78bfa)', border: 'none', borderRadius: '12px',
     color: '#fff', fontSize: '15px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
     transition: 'all 0.15s',
   },

@@ -16,7 +16,7 @@ const defaults = (size: number, style?: React.CSSProperties): React.CSSPropertie
 
 // ─── Game Node Icons ─────────────────────────────────────────────────────────
 
-export function GemIcon({ size = 20, color = '#34d399', className, style }: IconProps) {
+export function GemIcon({ size = 20, color = '#2ecc71', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M6 3h12l4 7-10 12L2 10l4-7z" fill={color} opacity="0.2" />
@@ -32,8 +32,8 @@ export function BombIcon({ size = 20, color = '#f87171', className, style }: Ico
       <circle cx="12" cy="14" r="8" fill={color} opacity="0.15" />
       <circle cx="12" cy="14" r="8" stroke={color} strokeWidth="1.5" />
       <path d="M14 6l2-3" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M16 3l1-1" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round" />
-      <path d="M15.5 2l1.5 0.5M17 2l-0.5 1.5" stroke="#fbbf24" strokeWidth="1" strokeLinecap="round" opacity="0.7" />
+      <path d="M16 3l1-1" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" />
+      <path d="M15.5 2l1.5 0.5M17 2l-0.5 1.5" stroke="#8b5cf6" strokeWidth="1" strokeLinecap="round" opacity="0.7" />
     </svg>
   );
 }
@@ -48,7 +48,7 @@ export function ShieldIcon({ size = 20, color = '#5b8def', className, style }: I
   );
 }
 
-export function LightningIcon({ size = 20, color = '#fbbf24', className, style }: IconProps) {
+export function LightningIcon({ size = 20, color = '#8b5cf6', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill={color} opacity="0.15" />
@@ -81,7 +81,7 @@ export function SwordsIcon({ size = 20, color = '#f87171', className, style }: I
 
 // ─── Direction / Prediction Icons ────────────────────────────────────────────
 
-export function ArrowUpIcon({ size = 24, color = '#34d399', className, style }: IconProps) {
+export function ArrowUpIcon({ size = 24, color = '#2ecc71', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M12 20V4" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
@@ -99,7 +99,7 @@ export function ArrowDownIcon({ size = 24, color = '#f87171', className, style }
   );
 }
 
-export function ArrowSidewaysIcon({ size = 24, color = '#fbbf24', className, style }: IconProps) {
+export function ArrowSidewaysIcon({ size = 24, color = '#8b5cf6', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M4 12h16" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
@@ -111,7 +111,7 @@ export function ArrowSidewaysIcon({ size = 24, color = '#fbbf24', className, sty
 
 // ─── Result Icons ────────────────────────────────────────────────────────────
 
-export function TrophyIcon({ size = 24, color = '#fbbf24', className, style }: IconProps) {
+export function TrophyIcon({ size = 24, color = '#8b5cf6', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" stroke={color} strokeWidth="1.5" />
@@ -135,7 +135,7 @@ export function ExplosionIcon({ size = 24, color = '#f87171', className, style }
 // ─── Medal Icons (Leaderboard) ───────────────────────────────────────────────
 
 export function MedalIcon({ size = 20, rank, className, style }: IconProps & { rank: 1 | 2 | 3 }) {
-  const colors = { 1: '#fbbf24', 2: '#94a3b8', 3: '#d97706' };
+  const colors = { 1: '#8b5cf6', 2: '#94a3b8', 3: '#d97706' };
   const c = colors[rank];
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
@@ -148,7 +148,7 @@ export function MedalIcon({ size = 20, rank, className, style }: IconProps & { r
 
 // ─── Utility Icons ───────────────────────────────────────────────────────────
 
-export function GiftIcon({ size = 20, color = '#c084fc', className, style }: IconProps) {
+export function GiftIcon({ size = 20, color = '#a78bfa', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className} style={defaults(size, style)}>
       <rect x="3" y="8" width="18" height="4" rx="1" fill={color} opacity="0.12" />
@@ -173,7 +173,7 @@ export function HandshakeIcon({ size = 20, color = '#5b8def', className, style }
   );
 }
 
-export function PackageIcon({ size = 20, color = '#fbbf24', className, style }: IconProps) {
+export function PackageIcon({ size = 20, color = '#8b5cf6', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className} style={defaults(size, style)}>
       <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" fill={color} opacity="0.1" />
@@ -192,19 +192,19 @@ export function LockIcon({ size = 20, color = '#f87171', className, style }: Ico
   );
 }
 
-export function PartyIcon({ size = 20, color = '#fbbf24', className, style }: IconProps) {
+export function PartyIcon({ size = 20, color = '#8b5cf6', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M4 20l3.5-14L21.5 9.5 4 20z" fill={color} opacity="0.15" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
       <circle cx="14" cy="4" r="1.5" fill="#f87171" />
-      <circle cx="19" cy="6" r="1" fill="#34d399" />
+      <circle cx="19" cy="6" r="1" fill="#2ecc71" />
       <circle cx="17" cy="2" r="1" fill="#5b8def" />
       <path d="M8.5 7l1 2" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
 
-export function CheckIcon({ size = 16, color = '#34d399', className, style }: IconProps) {
+export function CheckIcon({ size = 16, color = '#2ecc71', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M5 12l5 5L20 7" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -229,7 +229,7 @@ export function InfoIcon({ size = 16, color = '#5b8def', className, style }: Ico
   );
 }
 
-export function WarningIcon({ size = 16, color = '#fbbf24', className, style }: IconProps) {
+export function WarningIcon({ size = 16, color = '#8b5cf6', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M12 2L2 20h20L12 2z" fill={color} opacity="0.12" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
@@ -238,7 +238,7 @@ export function WarningIcon({ size = 16, color = '#fbbf24', className, style }: 
   );
 }
 
-export function MoneyIcon({ size = 20, color = '#34d399', className, style }: IconProps) {
+export function MoneyIcon({ size = 20, color = '#2ecc71', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className} style={defaults(size, style)}>
       <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
@@ -257,7 +257,7 @@ export function UserIcon({ size = 20, color = '#8888a0', className, style }: Ico
   );
 }
 
-export function UploadIcon({ size = 20, color = '#c084fc', className, style }: IconProps) {
+export function UploadIcon({ size = 20, color = '#a78bfa', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={defaults(size, style)}>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -267,7 +267,7 @@ export function UploadIcon({ size = 20, color = '#c084fc', className, style }: I
   );
 }
 
-export function WalletIcon({ size = 20, color = '#c084fc', className, style }: IconProps) {
+export function WalletIcon({ size = 20, color = '#a78bfa', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className} style={defaults(size, style)}>
       <rect x="2" y="6" width="20" height="14" rx="2" fill={color} opacity="0.1" />

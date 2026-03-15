@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes, ReactNode } from 'react';
 import { theme } from '../../styles/theme';
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost';
+type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'ghost' | 'success';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -13,22 +13,28 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
   primary: {
-    background: '#7717ff',
+    background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 50%, #a78bfa 100%)',
     color: '#fff',
     border: 'none',
-    fontWeight: 600,
+    fontWeight: 700,
+  },
+  success: {
+    background: '#00dc82',
+    color: '#080808',
+    border: 'none',
+    fontWeight: 700,
   },
   secondary: {
-    background: 'rgba(255,255,255,0.06)',
+    background: 'transparent',
     color: theme.text.primary,
     border: `1px solid ${theme.border.medium}`,
-    fontWeight: 500,
+    fontWeight: 600,
   },
   danger: {
-    background: theme.danger,
+    background: '#ff4757',
     color: '#fff',
     border: 'none',
-    fontWeight: 600,
+    fontWeight: 700,
   },
   ghost: {
     background: 'transparent',
@@ -39,9 +45,9 @@ const variantStyles: Record<ButtonVariant, React.CSSProperties> = {
 };
 
 const sizeStyles: Record<ButtonSize, React.CSSProperties> = {
-  sm: { padding: '6px 14px', fontSize: '15px', borderRadius: '6px' },
-  md: { padding: '10px 20px', fontSize: '16px', borderRadius: '8px' },
-  lg: { padding: '14px 28px', fontSize: '17px', borderRadius: '10px' },
+  sm: { padding: '7px 16px', fontSize: '13px', borderRadius: '6px' },
+  md: { padding: '11px 22px', fontSize: '14px', borderRadius: '8px' },
+  lg: { padding: '14px 30px', fontSize: '15px', borderRadius: '10px' },
 };
 
 export function Button({
@@ -65,7 +71,7 @@ export function Button({
         fontFamily: 'inherit',
         transition: 'all 0.15s ease',
         width: fullWidth ? '100%' : undefined,
-        opacity: props.disabled ? 0.5 : 1,
+        opacity: props.disabled ? 0.4 : 1,
         ...style,
       }}
       {...props}

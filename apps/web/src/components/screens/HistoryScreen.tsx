@@ -3,6 +3,7 @@ import { api } from '../../utils/api';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { ChartBarIcon } from '../ui/GameIcons';
+import { PageHeader } from '../ui/PageHeader';
 
 interface HistoryEntry {
   id: number;
@@ -38,10 +39,27 @@ export function HistoryScreen() {
 
   return (
     <div style={styles.container}>
+      <PageHeader
+        title="History"
+        subtitle="Your round-by-round game history"
+        icon={<ChartBarIcon size={20} color={theme.accent.purple} />}
+        action={
+          <span className="mono" style={{
+            fontSize: '13px',
+            fontWeight: 600,
+            color: theme.accent.purple,
+            background: theme.bg.elevated,
+            border: `1px solid ${theme.border.subtle}`,
+            padding: '3px 12px',
+            borderRadius: theme.radius.full,
+          }}>
+            {entries.length} rounds
+          </span>
+        }
+      />
       <div style={styles.panel} className="card-enter card-enter-1">
         <div style={styles.panelHeader}>
-          <span style={styles.panelTitle}>History</span>
-          <span style={styles.panelCount} className="mono">{entries.length}</span>
+          <span style={styles.panelTitle}>Rounds</span>
         </div>
 
         {/* Table Header */}
@@ -61,20 +79,31 @@ export function HistoryScreen() {
               {[...Array(6)].map((_, i) => (
                 <div key={i} style={{
                   display: 'flex', gap: '12px', padding: '10px 0',
-                  borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
+                  borderBottom: `1px solid ${theme.border.subtle}`,
                 }}>
-                  <div style={{ width: '60px', height: '14px', borderRadius: '4px', background: 'rgba(119, 23, 255, 0.08)', animation: 'pulse 1.5s infinite' }} />
-                  <div style={{ width: '50px', height: '14px', borderRadius: '4px', background: 'rgba(119, 23, 255, 0.06)', animation: 'pulse 1.5s infinite', animationDelay: '0.2s' }} />
+                  <div style={{ width: '60px', height: '14px', borderRadius: '4px', background: theme.bg.elevated, animation: 'pulse 1.5s infinite' }} />
+                  <div style={{ width: '50px', height: '14px', borderRadius: '4px', background: theme.bg.tertiary, animation: 'pulse 1.5s infinite', animationDelay: '0.2s' }} />
                   <div style={{ flex: 1 }} />
-                  <div style={{ width: '70px', height: '14px', borderRadius: '4px', background: 'rgba(119, 23, 255, 0.06)', animation: 'pulse 1.5s infinite', animationDelay: '0.4s' }} />
+                  <div style={{ width: '70px', height: '14px', borderRadius: '4px', background: theme.bg.tertiary, animation: 'pulse 1.5s infinite', animationDelay: '0.4s' }} />
                 </div>
               ))}
             </div>
           ) : entries.length === 0 ? (
             <div style={styles.empty}>
               <ChartBarIcon size={36} color="#555570" />
-              <span>No rounds played yet</span>
-              <span style={{ fontSize: '13px', color: '#444460' }}>Your game history will appear here</span>
+              <span style={{ fontSize: '16px', fontWeight: 700, color: theme.text.secondary }}>No Rounds Played Yet</span>
+              <span style={{ fontSize: '13px', color: theme.text.muted, maxWidth: '280px', lineHeight: 1.5 }}>
+                Your solo game results will appear here. Play a round to get started!
+              </span>
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                {['Solo', 'Predictions'].map((t) => (
+                  <span key={t} style={{
+                    padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600,
+                    background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)',
+                    color: theme.text.muted,
+                  }}>{t}</span>
+                ))}
+              </div>
             </div>
           ) : (
             entries.map((r) => {
@@ -109,7 +138,7 @@ export function HistoryScreen() {
                     ...styles.td, width: '80px', textAlign: 'right',
                     color: multColor,
                     textShadow: mult >= 1
-                      ? '0 0 8px rgba(52, 211, 153, 0.4)'
+                      ? '0 0 8px rgba(46, 204, 113, 0.4)'
                       : '0 0 8px rgba(248, 113, 113, 0.4)',
                   }} className="mono">
                     {mult.toFixed(2)}x
@@ -123,7 +152,7 @@ export function HistoryScreen() {
                   <span style={{
                     ...styles.td, width: '50px', textAlign: 'right',
                     color: theme.accent.purple,
-                    textShadow: '0 0 8px rgba(119, 23, 255, 0.4)',
+                    textShadow: '0 0 8px rgba(139, 92, 246, 0.4)',
                   }} className="mono">
                     +{r.xpAwarded}
                   </span>
@@ -152,49 +181,36 @@ const styles: Record<string, React.CSSProperties> = {
     boxSizing: 'border-box',
   },
   panel: {
-    background: 'rgba(28, 20, 42, 0.85)',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
-    border: '1px solid rgba(119, 23, 255, 0.18)',
-    borderRadius: '14px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.04)',
   },
   panelHeader: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
     padding: '10px 14px',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
-    background: 'rgba(32, 24, 48, 0.95)',
+    borderBottom: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.tertiary,
   },
   panelTitle: {
-    fontSize: '14px',
-    fontWeight: 700,
-    color: theme.text.secondary,
+    fontSize: '12px',
+    fontWeight: 600,
+    color: theme.text.muted,
     flex: 1,
     fontFamily: "inherit",
     textTransform: 'uppercase' as const,
-    letterSpacing: '1px',
-  },
-  panelCount: {
-    fontSize: '14px',
-    fontWeight: 700,
-    color: '#c084fc',
-    background: 'rgba(119, 23, 255, 0.18)',
-    border: '1px solid rgba(119, 23, 255, 0.2)',
-    padding: '2px 10px',
-    borderRadius: '20px',
-    boxShadow: '0 0 8px rgba(119, 23, 255, 0.15)',
+    letterSpacing: '0.5px',
   },
   tableHeader: {
     display: 'flex',
     padding: '8px 12px',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.08)',
-    background: 'rgba(32, 24, 48, 0.95)',
+    borderBottom: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.tertiary,
     minWidth: '580px',
   },
   th: {
@@ -211,10 +227,10 @@ const styles: Record<string, React.CSSProperties> = {
   tableRow: {
     display: 'flex',
     padding: '8px 12px',
-    borderBottom: '1px solid rgba(119, 23, 255, 0.06)',
+    borderBottom: `1px solid ${theme.border.subtle}`,
     alignItems: 'center',
     minWidth: '580px',
-    transition: 'background-color 0.15s ease, transform 0.1s ease',
+    transition: 'background-color 0.15s ease',
   },
   td: {
     fontSize: '14px',

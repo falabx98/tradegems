@@ -6,6 +6,8 @@ import { formatSol, solToLamports } from '../../utils/sol';
 import { isPhantomInstalled, connectPhantom, sendSolToTreasury, getConnectedAddress } from '../../utils/phantom';
 import { theme } from '../../styles/theme';
 import { CheckIcon, GiftIcon, WalletIcon } from '../ui/GameIcons';
+import { PageHeader } from '../ui/PageHeader';
+import { TabBar } from '../ui/TabBar';
 
 interface Transaction {
   id: string;
@@ -28,6 +30,7 @@ export function WalletScreen() {
   const profile = useGameStore((s) => s.profile);
   const syncProfile = useGameStore((s) => s.syncProfile);
   const walletAddress = useAuthStore((s) => s.walletAddress);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
 
@@ -174,7 +177,7 @@ export function WalletScreen() {
   }
 
   function txColor(type: string) {
-    if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock', 'signup_bonus'].includes(type)) return '#34d399';
+    if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock', 'signup_bonus'].includes(type)) return '#2ecc71';
     if (['bet_lock', 'bet_settle', 'withdraw_complete'].includes(type)) return '#f87171';
     return theme.text.secondary;
   }
@@ -188,8 +191,8 @@ export function WalletScreen() {
   function txIcon(type: string) {
     if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock', 'signup_bonus'].includes(type)) {
       return (
-        <div style={{ ...s.txIconCircle, background: 'rgba(52, 211, 153, 0.1)', border: '1px solid rgba(52, 211, 153, 0.2)' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 15 12 9 18 15" /></svg>
+        <div style={{ ...s.txIconCircle, background: 'rgba(46, 204, 113, 0.1)', border: '1px solid rgba(46, 204, 113, 0.2)' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 15 12 9 18 15" /></svg>
         </div>
       );
     }
@@ -213,6 +216,7 @@ export function WalletScreen() {
 
   return (
     <div style={s.root}>
+      <PageHeader title="Wallet" subtitle="Deposit, withdraw, and track your balance" icon={<WalletIcon size={20} color={theme.accent.purple} />} />
       <div style={isMobile ? s.twoColMobile : s.twoCol}>
         {/* ── Left Column: Balance + Deposit/Withdraw ── */}
         <div style={isMobile ? s.leftColMobile : s.leftCol}>
@@ -224,9 +228,9 @@ export function WalletScreen() {
                 <img src="/sol-coin.png" alt="SOL" style={{ width: 28, height: 28 }} />
                 <span style={s.balanceLabel}>Total Balance</span>
               </div>
-              <div style={s.balanceValue} className="mono">
+              <div style={{ ...s.balanceValue, background: theme.gradient.primary, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }} className="mono">
                 {formatSol(profile.balance, 4)}
-                <span style={s.balanceSuffix}>SOL</span>
+                <span style={{ ...s.balanceSuffix, WebkitTextFillColor: theme.text.muted, background: 'none' }}>SOL</span>
               </div>
             </div>
             {linkedAddress && (
@@ -240,17 +244,15 @@ export function WalletScreen() {
           </div>
 
           {/* ── Tabs ── */}
-          <div style={s.tabBar}>
-            <button style={tab === 'deposit' ? s.tabActive : s.tab} onClick={() => setTab('deposit')}>
-              Deposit
-            </button>
-            <button style={tab === 'withdraw' ? s.tabActive : s.tab} onClick={() => setTab('withdraw')}>
-              Withdraw
-            </button>
-            <button style={tab === 'pnl' ? s.tabActive : s.tab} onClick={() => setTab('pnl')}>
-              P&L
-            </button>
-          </div>
+          <TabBar
+            tabs={[
+              { id: 'deposit', label: 'Deposit' },
+              { id: 'withdraw', label: 'Withdraw' },
+              { id: 'pnl', label: 'P&L' },
+            ]}
+            active={tab}
+            onChange={(id) => setTab(id as Tab)}
+          />
 
           {/* ── Deposit Tab ── */}
           {tab === 'deposit' && (
@@ -268,9 +270,9 @@ export function WalletScreen() {
                       <button
                         style={{
                           ...s.copyBtn,
-                          background: copied ? 'rgba(52, 211, 153, 0.1)' : theme.bg.elevated,
-                          borderColor: copied ? 'rgba(52, 211, 153, 0.3)' : theme.border.medium,
-                          color: copied ? '#34d399' : theme.accent.violet,
+                          background: copied ? 'rgba(46, 204, 113, 0.1)' : theme.bg.elevated,
+                          borderColor: copied ? 'rgba(46, 204, 113, 0.3)' : theme.border.medium,
+                          color: copied ? '#2ecc71' : theme.accent.purple,
                         }}
                         onClick={() => {
                           navigator.clipboard.writeText(treasuryAddress);
@@ -278,12 +280,14 @@ export function WalletScreen() {
                           setTimeout(() => setCopied(false), 2000);
                         }}
                       >
-                        {copied ? <><CheckIcon size={14} color="#34d399" /> Copied!</> : 'Copy Address'}
+                        {copied ? <><CheckIcon size={14} color="#2ecc71" /> Copied!</> : 'Copy Address'}
                       </button>
                     </>
                   ) : (
                     <div style={s.depositAddressBox}>
-                      <span style={{ ...s.depositAddressText, color: theme.text.muted }} className="mono">Loading...</span>
+                      <span style={{ ...s.depositAddressText, color: theme.text.muted }} className="mono">
+                        {isAuthenticated ? 'Loading...' : 'Login to see your deposit address'}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -337,11 +341,11 @@ export function WalletScreen() {
                 {depositBonusUsed === false && (
                   <div style={s.bonusBanner}>
                     <div style={s.bonusBannerHeader}>
-                      <GiftIcon size={18} color="#34d399" />
-                      <span style={{ ...s.bonusBannerTitle, color: '#34d399' }}>100% First Deposit Bonus</span>
+                      <GiftIcon size={18} color="#2ecc71" />
+                      <span style={{ ...s.bonusBannerTitle, color: '#2ecc71' }}>100% First Deposit Bonus</span>
                     </div>
                     <div style={s.bonusBannerDesc}>
-                      Deposit any amount and we'll <strong style={{ color: theme.accent.green }}>double it</strong>. Your first deposit gets matched 100% — deposit 1 SOL, play with 2 SOL!
+                      Deposit any amount and we'll <strong style={{ color: theme.accent.purple }}>double it</strong>. Your first deposit gets matched 100% — deposit 1 SOL, play with 2 SOL!
                     </div>
                   </div>
                 )}
@@ -576,7 +580,7 @@ function PnlChart() {
     // Line
     ctx.beginPath();
     points.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
-    ctx.strokeStyle = isUp ? '#34d399' : '#f87171';
+    ctx.strokeStyle = isUp ? '#2ecc71' : '#f87171';
     ctx.lineWidth = 2;
     ctx.stroke();
 
@@ -661,9 +665,9 @@ const s: Record<string, React.CSSProperties> = {
 
   // Balance Card
   balanceCard: {
-    background: theme.bg.secondary,
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '12px',
+    borderRadius: theme.radius.lg,
     padding: '20px',
   },
   balanceTop: {
@@ -707,7 +711,7 @@ const s: Record<string, React.CSSProperties> = {
     width: '6px',
     height: '6px',
     borderRadius: '50%',
-    background: '#34d399',
+    background: '#2ecc71',
     display: 'inline-block',
   },
   linkedText: {
@@ -740,7 +744,7 @@ const s: Record<string, React.CSSProperties> = {
   tabActive: {
     flex: 1,
     padding: '10px 0',
-    background: theme.accent.purple,
+    background: 'linear-gradient(135deg, #7c3aed, #8b5cf6, #a78bfa)',
     border: 'none',
     borderRadius: '6px',
     color: '#fff',
@@ -752,9 +756,9 @@ const s: Record<string, React.CSSProperties> = {
 
   // Card
   card: {
-    background: theme.bg.secondary,
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '12px',
+    borderRadius: theme.radius.lg,
     padding: '16px',
   },
 
@@ -819,10 +823,10 @@ const s: Record<string, React.CSSProperties> = {
   },
   quickBtnActive: {
     padding: '6px 14px',
-    background: 'rgba(119, 23, 255, 0.1)',
+    background: 'rgba(139, 92, 246, 0.1)',
     border: `1px solid ${theme.border.accent}`,
     borderRadius: '6px',
-    color: theme.accent.violet,
+    color: theme.accent.purple,
     fontSize: '13px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -832,7 +836,7 @@ const s: Record<string, React.CSSProperties> = {
   // Buttons
   primaryBtn: {
     padding: '14px',
-    background: theme.accent.purple,
+    background: 'linear-gradient(135deg, #7c3aed, #8b5cf6, #a78bfa)',
     border: 'none',
     borderRadius: '8px',
     color: '#fff',
@@ -861,7 +865,7 @@ const s: Record<string, React.CSSProperties> = {
     background: theme.bg.elevated,
     border: `1px solid ${theme.border.medium}`,
     borderRadius: '6px',
-    color: theme.accent.violet,
+    color: theme.accent.purple,
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -894,7 +898,7 @@ const s: Record<string, React.CSSProperties> = {
     height: '16px',
     borderRadius: '50%',
     background: theme.bg.elevated,
-    color: theme.accent.violet,
+    color: theme.accent.purple,
     fontSize: '11px',
     fontWeight: 700,
     display: 'flex',
@@ -935,7 +939,7 @@ const s: Record<string, React.CSSProperties> = {
   depositAddressLabel: {
     fontSize: '13px',
     fontWeight: 700,
-    color: theme.accent.violet,
+    color: theme.accent.purple,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.5px',
   },
@@ -1002,7 +1006,7 @@ const s: Record<string, React.CSSProperties> = {
     height: '18px',
     borderRadius: '50%',
     background: theme.bg.elevated,
-    color: theme.accent.violet,
+    color: theme.accent.purple,
     fontSize: '11px',
     fontWeight: 700,
     display: 'flex',
@@ -1021,7 +1025,7 @@ const s: Record<string, React.CSSProperties> = {
   successMsg: {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#34d399',
+    color: '#2ecc71',
     textAlign: 'center' as const,
   },
   errorMsg: {
@@ -1033,9 +1037,9 @@ const s: Record<string, React.CSSProperties> = {
 
   // Transaction History
   historyCard: {
-    background: theme.bg.secondary,
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '12px',
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
     flex: 1,
     display: 'flex',
@@ -1060,7 +1064,7 @@ const s: Record<string, React.CSSProperties> = {
   historyCount: {
     fontSize: '12px',
     fontWeight: 600,
-    color: theme.accent.violet,
+    color: theme.accent.purple,
     background: theme.bg.elevated,
     border: `1px solid ${theme.border.subtle}`,
     padding: '2px 10px',
@@ -1147,8 +1151,8 @@ const s: Record<string, React.CSSProperties> = {
     flexDirection: 'column' as const,
     gap: '10px',
     padding: '14px',
-    background: 'rgba(251, 191, 36, 0.04)',
-    border: '1px solid rgba(251, 191, 36, 0.15)',
+    background: 'rgba(139, 92, 246, 0.04)',
+    border: '1px solid rgba(139, 92, 246, 0.15)',
     borderRadius: '8px',
   },
   bonusBannerHeader: {
@@ -1159,7 +1163,7 @@ const s: Record<string, React.CSSProperties> = {
   bonusBannerTitle: {
     fontSize: '14px',
     fontWeight: 700,
-    color: '#fbbf24',
+    color: '#8b5cf6',
   },
   bonusBannerDesc: {
     fontSize: '13px',
@@ -1179,7 +1183,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   bonusProgressFill: {
     height: '100%',
-    background: `linear-gradient(90deg, ${theme.accent.purple}, ${theme.accent.green})`,
+    background: `linear-gradient(90deg, ${theme.accent.purple}, ${theme.accent.purple})`,
     borderRadius: '2px',
     transition: 'width 0.3s ease',
     minWidth: '2px',
@@ -1195,13 +1199,13 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '12px 14px',
-    background: 'rgba(52, 211, 153, 0.04)',
-    border: '1px solid rgba(52, 211, 153, 0.15)',
+    background: 'rgba(46, 204, 113, 0.04)',
+    border: '1px solid rgba(46, 204, 113, 0.15)',
     borderRadius: '8px',
   },
   bonusUnlockedText: {
     fontSize: '13px',
     fontWeight: 600,
-    color: '#34d399',
+    color: '#2ecc71',
   },
 };

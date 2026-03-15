@@ -4,6 +4,9 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 import { apiFetch } from '../../utils/api';
 import { formatSol } from '../../utils/sol';
+import { PageHeader } from '../ui/PageHeader';
+import { StatCard as SharedStatCard } from '../ui/StatCard';
+import { TabBar } from '../ui/TabBar';
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -293,32 +296,23 @@ export function AdminScreen() {
       ...styles.container,
       ...(isMobile ? { padding: '12px' } : {}),
     }}>
-      {/* Header */}
-      <div style={styles.header}>
-        <button onClick={() => go('settings')} style={styles.backBtn}>
+      <PageHeader
+        title="Admin Panel"
+        subtitle="Platform management and analytics"
+        icon={
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <polyline points="15 18 9 12 15 6" />
+            <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
           </svg>
-        </button>
-        <span style={styles.headerTitle}>Admin Dashboard</span>
-        <div style={{ width: '36px' }} />
-      </div>
+        }
+      />
 
       {/* Tabs */}
-      <div style={styles.tabRow}>
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            style={{
-              ...styles.tab,
-              ...(activeTab === tab.key ? styles.tabActive : {}),
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      <TabBar
+        tabs={TABS.map((t) => ({ id: t.key, label: t.label }))}
+        active={activeTab}
+        onChange={(id) => setActiveTab(id as typeof activeTab)}
+      />
 
       <div style={styles.content}>
         {/* ─── Overview Tab ──────────────────────────────────────────── */}
@@ -328,12 +322,12 @@ export function AdminScreen() {
               ...styles.statsGrid,
               gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
             }}>
-              <StatCard label="Total Users" value={stats.totalUsers.toLocaleString()} />
-              <StatCard label="Revenue 24h" value={`${formatSol(stats.revenue24h)} SOL`} color={theme.success} />
-              <StatCard label="Bet Volume" value={`${formatSol(stats.betVolumeToday)} SOL`} color="#c084fc" />
-              <StatCard label="Active Users" value={stats.activeUsers.toLocaleString()} color={theme.info} />
-              <StatCard label="House Edge" value={`${(stats.houseEdge * 100).toFixed(2)}%`} color={theme.warning} />
-              <StatCard label="Rounds Today" value={stats.roundsToday.toLocaleString()} />
+              <SharedStatCard label="Total Users" value={stats.totalUsers.toLocaleString()} />
+              <SharedStatCard label="Revenue 24h" value={`${formatSol(stats.revenue24h)} SOL`} color={theme.success} trend="up" />
+              <SharedStatCard label="Bet Volume" value={`${formatSol(stats.betVolumeToday)} SOL`} color={theme.accent.purple} />
+              <SharedStatCard label="Active Users" value={stats.activeUsers.toLocaleString()} color={theme.info} />
+              <SharedStatCard label="House Edge" value={`${(stats.houseEdge * 100).toFixed(2)}%`} color={theme.warning} />
+              <SharedStatCard label="Rounds Today" value={stats.roundsToday.toLocaleString()} />
             </div>
           </>
         )}
@@ -487,7 +481,7 @@ export function AdminScreen() {
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px', background: theme.bg.tertiary, padding: '12px', borderRadius: '8px' }}>
                         <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Username</span><br /><span style={{ color: theme.text.primary, fontWeight: 700 }}>{selectedUser.username}</span></div>
                         <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Email</span><br /><span style={{ color: theme.text.primary }}>{selectedUser.email || 'N/A'}</span></div>
-                        <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Role</span><br /><span style={{ color: '#c084fc', fontWeight: 600 }}>{selectedUser.role}</span></div>
+                        <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Role</span><br /><span style={{ color: '#8b5cf6', fontWeight: 600 }}>{selectedUser.role}</span></div>
                         <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Status</span><br /><span style={{ color: selectedUser.status === 'active' ? theme.success : theme.danger, fontWeight: 600 }}>{selectedUser.status}</span></div>
                         <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Level / VIP</span><br /><span style={{ color: theme.text.primary }}>Lv.{selectedUser.level} / {selectedUser.vipTier}</span></div>
                         <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Registered</span><br /><span style={{ color: theme.text.primary }}>{new Date(selectedUser.createdAt).toLocaleString()}</span></div>
@@ -510,7 +504,7 @@ export function AdminScreen() {
                           <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Rounds</span><br /><span className="mono" style={{ color: theme.text.primary }}>{selectedUser.roundsPlayed}</span></div>
                           <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Wagered</span><br /><span className="mono" style={{ color: theme.text.primary }}>{formatSol(Number(selectedUser.totalWagered))} SOL</span></div>
                           <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Won</span><br /><span className="mono" style={{ color: theme.success }}>{formatSol(Number(selectedUser.totalWon))} SOL</span></div>
-                          <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Best Multi</span><br /><span className="mono" style={{ color: '#c084fc' }}>{Number(selectedUser.bestMultiplier).toFixed(2)}x</span></div>
+                          <div><span style={{ color: theme.text.muted, fontSize: '12px' }}>Best Multi</span><br /><span className="mono" style={{ color: '#8b5cf6' }}>{Number(selectedUser.bestMultiplier).toFixed(2)}x</span></div>
                         </div>
                       </div>
 
@@ -632,12 +626,12 @@ export function AdminScreen() {
             ...styles.statsGrid,
             gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(3, 1fr)',
           }}>
-            <StatCard label="Treasury Address" value={treasury.address.slice(0, 6) + '...' + treasury.address.slice(-4)} mono />
-            <StatCard label="SOL Balance" value={`${treasury.balanceSol.toFixed(4)} SOL`} color={theme.success} />
-            <StatCard label="Total Deposits" value={treasury.totalDeposits.toLocaleString()} />
-            <StatCard label="Deposit Amount" value={`${formatSol(treasury.totalDepositAmount)} SOL`} color="#c084fc" />
-            <StatCard label="Total Withdrawals" value={treasury.totalWithdrawals.toLocaleString()} />
-            <StatCard label="Pending Withdrawals" value={treasury.pendingWithdrawals.toLocaleString()} color={theme.warning} />
+            <SharedStatCard label="Treasury Address" value={treasury.address.slice(0, 6) + '...' + treasury.address.slice(-4)} />
+            <SharedStatCard label="SOL Balance" value={`${treasury.balanceSol.toFixed(4)} SOL`} color={theme.success} trend="up" />
+            <SharedStatCard label="Total Deposits" value={treasury.totalDeposits.toLocaleString()} />
+            <SharedStatCard label="Deposit Amount" value={`${formatSol(treasury.totalDepositAmount)} SOL`} color={theme.accent.purple} />
+            <SharedStatCard label="Total Withdrawals" value={treasury.totalWithdrawals.toLocaleString()} />
+            <SharedStatCard label="Pending Withdrawals" value={treasury.pendingWithdrawals.toLocaleString()} color={theme.warning} />
           </div>
         )}
 
@@ -839,7 +833,7 @@ export function AdminScreen() {
                           <span style={styles.target}>{r.id.slice(0, 8)}</span>
                         </td>
                         <td style={styles.td}>
-                          <span style={{ fontWeight: 700, color: '#c084fc', fontSize: '12px', textTransform: 'uppercase' as const }}>{r.mode || '--'}</span>
+                          <span style={{ fontWeight: 700, color: '#8b5cf6', fontSize: '12px', textTransform: 'uppercase' as const }}>{r.mode || '--'}</span>
                         </td>
                         <td style={styles.td}>
                           <span style={{
@@ -862,24 +856,24 @@ export function AdminScreen() {
                       </tr>
                       {selectedRound?.id === r.id && (
                         <tr key={`${r.id}-details`}>
-                          <td colSpan={6} style={{ ...styles.td, background: 'rgba(119, 23, 255, 0.04)', padding: '16px' }}>
+                          <td colSpan={6} style={{ ...styles.td, background: 'rgba(139, 92, 246, 0.04)', padding: '16px' }}>
                             <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '6px', fontSize: '13px' }}>
                               <span style={{ color: theme.text.muted }}>
-                                <strong style={{ color: '#c084fc' }}>Round ID:</strong> {selectedRound.id}
+                                <strong style={{ color: '#8b5cf6' }}>Round ID:</strong> {selectedRound.id}
                               </span>
                               {selectedRound.bets && (
                                 <span style={{ color: theme.text.muted }}>
-                                  <strong style={{ color: '#c084fc' }}>Bets:</strong> {selectedRound.bets.length}
+                                  <strong style={{ color: '#8b5cf6' }}>Bets:</strong> {selectedRound.bets.length}
                                 </span>
                               )}
                               {selectedRound.result && (
                                 <span style={{ color: theme.text.muted }}>
-                                  <strong style={{ color: '#c084fc' }}>Result:</strong> {JSON.stringify(selectedRound.result)}
+                                  <strong style={{ color: '#8b5cf6' }}>Result:</strong> {JSON.stringify(selectedRound.result)}
                                 </span>
                               )}
                               {selectedRound.resolvedAt && (
                                 <span style={{ color: theme.text.muted }}>
-                                  <strong style={{ color: '#c084fc' }}>Resolved At:</strong> {new Date(selectedRound.resolvedAt).toLocaleString()}
+                                  <strong style={{ color: '#8b5cf6' }}>Resolved At:</strong> {new Date(selectedRound.resolvedAt).toLocaleString()}
                                 </span>
                               )}
                             </div>
@@ -957,7 +951,7 @@ export function AdminScreen() {
                   {bonusCodesList.map((b: any) => (
                     <tr key={b.id}>
                       <td style={styles.td}>
-                        <span className="mono" style={{ fontWeight: 700, color: '#c084fc', fontSize: '13px' }}>{b.code}</span>
+                        <span className="mono" style={{ fontWeight: 700, color: '#8b5cf6', fontSize: '13px' }}>{b.code}</span>
                       </td>
                       <td style={styles.td}>
                         <span style={{ color: theme.text.muted, fontSize: '12px' }}>{b.description || '--'}</span>
@@ -1056,24 +1050,6 @@ export function AdminScreen() {
   );
 }
 
-// ─── Stat Card Sub-Component ─────────────────────────────────────────────────
-
-function StatCard({ label, value, color, mono }: { label: string; value: string; color?: string; mono?: boolean }) {
-  return (
-    <div style={styles.statCard}>
-      <span style={styles.statLabel}>{label}</span>
-      <span
-        style={{
-          ...styles.statValue,
-          ...(color ? { color } : {}),
-        }}
-        className={mono ? 'mono' : undefined}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
@@ -1121,77 +1097,16 @@ const styles: Record<string, React.CSSProperties> = {
   backBtnLarge: {
     marginTop: '12px',
     padding: '10px 24px',
-    background: 'rgba(119, 23, 255, 0.15)',
-    border: '1px solid rgba(119, 23, 255, 0.3)',
+    background: 'rgba(139, 92, 246, 0.15)',
+    border: '1px solid rgba(139, 92, 246, 0.3)',
     borderRadius: '8px',
-    color: '#c084fc',
+    color: '#8b5cf6',
     fontSize: '14px',
     fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'inherit',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
-  },
-
-  // Header
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '12px',
-  },
-  backBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '36px',
-    height: '36px',
-    borderRadius: '10px',
-    border: `1px solid ${theme.border.medium}`,
-    background: theme.bg.secondary,
-    color: theme.text.secondary,
-    cursor: 'pointer',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: '20px',
-    fontWeight: 700,
-    color: theme.text.primary,
-    fontFamily: "inherit",
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-    textAlign: 'center',
-  },
-
-  // Tabs
-  tabRow: {
-    display: 'flex',
-    gap: '2px',
-    background: theme.bg.secondary,
-    borderRadius: '10px',
-    padding: '3px',
-    border: `1px solid ${theme.border.subtle}`,
-    marginBottom: '16px',
-    overflowX: 'auto',
-  },
-  tab: {
-    flex: 1,
-    padding: '8px 12px',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '13px',
-    fontWeight: 700,
-    color: theme.text.muted,
-    fontFamily: 'inherit',
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-    transition: 'all 0.15s ease',
-  },
-  tabActive: {
-    background: 'rgba(119, 23, 255, 0.15)',
-    color: '#c084fc',
   },
 
   // Content
@@ -1207,30 +1122,6 @@ const styles: Record<string, React.CSSProperties> = {
   statsGrid: {
     display: 'grid',
     gap: '10px',
-  },
-  statCard: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-    padding: '16px',
-    background: theme.bg.secondary,
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
-  },
-  statLabel: {
-    fontSize: '12px',
-    fontWeight: 600,
-    color: theme.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  },
-  statValue: {
-    fontSize: '20px',
-    fontWeight: 800,
-    color: theme.text.primary,
-    fontFamily: "inherit",
-    letterSpacing: '0.5px',
-    wordBreak: 'break-all',
   },
 
   // Search
@@ -1253,14 +1144,14 @@ const styles: Record<string, React.CSSProperties> = {
   },
   searchBtn: {
     padding: '10px 20px',
-    background: 'rgba(119, 23, 255, 0.15)',
-    border: '1px solid rgba(119, 23, 255, 0.3)',
+    background: 'rgba(139, 92, 246, 0.15)',
+    border: '1px solid rgba(139, 92, 246, 0.3)',
     borderRadius: '8px',
     cursor: 'pointer',
     fontFamily: 'inherit',
     fontSize: '14px',
     fontWeight: 700,
-    color: '#c084fc',
+    color: '#8b5cf6',
     textTransform: 'uppercase',
     letterSpacing: '0.5px',
     flexShrink: 0,
@@ -1277,9 +1168,9 @@ const styles: Record<string, React.CSSProperties> = {
   // Table
   tableWrap: {
     overflow: 'auto',
-    background: theme.bg.secondary,
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
+    borderRadius: theme.radius.md,
   },
   table: {
     width: '100%',
@@ -1323,7 +1214,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   level: {
     fontWeight: 700,
-    color: '#c084fc',
+    color: '#8b5cf6',
     fontSize: '13px',
     fontFamily: '"JetBrains Mono", monospace',
   },
@@ -1415,10 +1306,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   actionBtnPurple: {
     padding: '3px 8px',
-    background: 'rgba(119, 23, 255, 0.1)',
-    border: '1px solid rgba(119, 23, 255, 0.25)',
+    background: 'rgba(139, 92, 246, 0.1)',
+    border: '1px solid rgba(139, 92, 246, 0.25)',
     borderRadius: '4px',
-    color: '#c084fc',
+    color: '#8b5cf6',
     fontSize: '11px',
     fontWeight: 700,
     cursor: 'pointer',
@@ -1449,10 +1340,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   filterBtn: {
     padding: '6px 14px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '6px',
-    color: '#6b6b8a',
+    background: 'transparent',
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.md,
+    color: theme.text.muted,
     fontSize: '12px',
     fontWeight: 700,
     cursor: 'pointer',
@@ -1462,10 +1353,10 @@ const styles: Record<string, React.CSSProperties> = {
   },
   filterBtnActive: {
     padding: '6px 14px',
-    background: 'rgba(119, 23, 255, 0.15)',
-    border: '1px solid rgba(119, 23, 255, 0.3)',
-    borderRadius: '6px',
-    color: '#c084fc',
+    background: `rgba(139, 92, 246, 0.12)`,
+    border: `1px solid ${theme.accent.purple}`,
+    borderRadius: theme.radius.md,
+    color: theme.accent.purple,
     fontSize: '12px',
     fontWeight: 700,
     cursor: 'pointer',
@@ -1492,16 +1383,16 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '10px',
     padding: '24px',
-    background: '#1c142a',
-    border: '1px solid rgba(119, 23, 255, 0.2)',
-    borderRadius: '12px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.lg,
     width: '360px',
     maxWidth: '90vw',
   },
   modalTitle: {
     fontSize: '16px',
     fontWeight: 800,
-    color: '#fff',
+    color: theme.text.primary,
     fontFamily: "inherit",
     letterSpacing: '0.5px',
     marginBottom: '4px',
@@ -1511,10 +1402,10 @@ const styles: Record<string, React.CSSProperties> = {
   formInput: {
     width: '100%',
     padding: '10px 12px',
-    background: '#111118',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: '8px',
-    color: '#fff',
+    background: theme.bg.primary,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.md,
+    color: theme.text.primary,
     fontSize: '14px',
     outline: 'none',
     fontFamily: 'inherit',
@@ -1525,15 +1416,15 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '8px',
     padding: '16px',
-    background: 'rgba(119, 23, 255, 0.06)',
-    border: '1px solid rgba(119, 23, 255, 0.15)',
-    borderRadius: '10px',
+    background: theme.bg.tertiary,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.md,
     marginBottom: '12px',
   },
   formLabel: {
     fontSize: '11px',
     fontWeight: 600,
-    color: '#6b6b8a',
+    color: theme.text.muted,
     textTransform: 'uppercase',
     letterSpacing: '0.3px',
     marginBottom: '2px',
@@ -1548,7 +1439,7 @@ const styles: Record<string, React.CSSProperties> = {
   actionType: {
     fontSize: '12px',
     fontWeight: 700,
-    color: '#c084fc',
+    color: '#8b5cf6',
     textTransform: 'uppercase',
     letterSpacing: '0.3px',
   },

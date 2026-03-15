@@ -6,17 +6,9 @@ import { api } from '../../utils/api';
 import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { getAvatarGradient, getInitials } from '../../utils/avatars';
-import { playButtonClick, playBetPlaced, playRoundEnd, hapticLight, hapticMedium } from '../../utils/sounds';
+import { playBetPlaced, playRoundEnd, hapticMedium } from '../../utils/sounds';
 import { useIsMobile } from '../../hooks/useIsMobile';
-
-const BET_AMOUNTS = [
-  { lamports: 10_000_000, label: '0.01' },
-  { lamports: 50_000_000, label: '0.05' },
-  { lamports: 100_000_000, label: '0.1' },
-  { lamports: 250_000_000, label: '0.25' },
-  { lamports: 500_000_000, label: '0.5' },
-  { lamports: 1_000_000_000, label: '1' },
-];
+import { BetPanel } from '../ui/BetPanel';
 
 interface Candle {
   open: number;
@@ -126,10 +118,10 @@ function FlipCandleChart({ candles, status, result, resultMultiplier, flipStarte
       ctx.beginPath(); ctx.moveTo(pad.left, midY); ctx.lineTo(w - pad.right, midY); ctx.stroke();
       ctx.setLineDash([]);
 
-      ctx.fillStyle = '#fbbf24';
+      ctx.fillStyle = '#8b5cf6';
       ctx.font = `900 ${isMobile ? 20 : 28}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(251,191,36,0.4)';
+      ctx.shadowColor = 'rgba(139,92,246,0.4)';
       ctx.shadowBlur = 12;
       ctx.fillText('NEXT FLIP', w / 2, h * 0.4);
       ctx.shadowBlur = 0;
@@ -200,7 +192,7 @@ function FlipCandleChart({ candles, status, result, resultMultiplier, flipStarte
 
     // Result overlay
     if (status === 'resolved' && result && resultMultiplier !== null) {
-      const resColor = result === 'bullish' ? '#34d399' : '#f87171';
+      const resColor = result === 'bullish' ? '#2ecc71' : '#f87171';
       ctx.fillStyle = resColor;
       ctx.font = `900 ${isMobile ? 28 : 36}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
@@ -237,11 +229,11 @@ export function CandleflipScreen() {
   const userId = useAuthStore((s) => s.userId);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const syncProfile = useGameStore((s) => s.syncProfile);
+  const profile = useGameStore((s) => s.profile);
 
   const [round, setRound] = useState<CandleflipState | null>(null);
   const [pick, setPick] = useState<'bullish' | 'bearish'>('bullish');
   const [betAmount, setBetAmount] = useState(100_000_000);
-  const [customBet, setCustomBet] = useState('0.1');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [recentRounds, setRecentRounds] = useState<any[]>([]);
@@ -325,8 +317,8 @@ export function CandleflipScreen() {
         </button>
         <div style={s.headerText}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ ...s.headerIcon, background: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.2)' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round">
+            <div style={{ ...s.headerIcon, background: 'rgba(139,92,246,0.1)', borderColor: 'rgba(139,92,246,0.2)' }}>
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round">
                 <rect x="4" y="8" width="16" height="8" rx="2" /><path d="M12 4v4" /><path d="M12 16v4" />
               </svg>
             </div>
@@ -337,9 +329,9 @@ export function CandleflipScreen() {
         {round && (
           <div style={{
             padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 700,
-            background: round.status === 'waiting' ? 'rgba(251,191,36,0.12)' : round.status === 'flipping' ? 'rgba(119,23,255,0.12)' : 'rgba(52,211,153,0.12)',
-            color: round.status === 'waiting' ? '#fbbf24' : round.status === 'flipping' ? '#c084fc' : '#34d399',
-            border: `1px solid ${round.status === 'waiting' ? 'rgba(251,191,36,0.2)' : round.status === 'flipping' ? 'rgba(119,23,255,0.2)' : 'rgba(52,211,153,0.2)'}`,
+            background: round.status === 'waiting' ? 'rgba(139,92,246,0.12)' : round.status === 'flipping' ? 'rgba(139,92,246,0.12)' : 'rgba(46,204,113,0.12)',
+            color: round.status === 'waiting' ? '#8b5cf6' : round.status === 'flipping' ? '#8b5cf6' : '#2ecc71',
+            border: `1px solid ${round.status === 'waiting' ? 'rgba(139,92,246,0.2)' : round.status === 'flipping' ? 'rgba(139,92,246,0.2)' : 'rgba(46,204,113,0.2)'}`,
             letterSpacing: '1px',
           }}>
             {round.status === 'waiting' ? `BET ${waitRemaining}s` : round.status === 'flipping' ? 'FLIPPING' : 'RESULT'}
@@ -363,13 +355,13 @@ export function CandleflipScreen() {
       {round?.status === 'resolved' && myBet && (
         <div style={{
           padding: '14px', textAlign: 'center', borderRadius: '12px',
-          background: myBet.status === 'won' ? 'rgba(52,211,153,0.08)' : 'rgba(239,68,68,0.08)',
-          border: `1px solid ${myBet.status === 'won' ? 'rgba(52,211,153,0.2)' : 'rgba(239,68,68,0.2)'}`,
+          background: myBet.status === 'won' ? 'rgba(46,204,113,0.08)' : 'rgba(239,68,68,0.08)',
+          border: `1px solid ${myBet.status === 'won' ? 'rgba(46,204,113,0.2)' : 'rgba(239,68,68,0.2)'}`,
         }}>
-          <div style={{ fontSize: '18px', fontWeight: 900, color: myBet.status === 'won' ? '#34d399' : '#ef4444' }}>
+          <div style={{ fontSize: '18px', fontWeight: 900, color: myBet.status === 'won' ? '#2ecc71' : '#ef4444' }}>
             {myBet.status === 'won' ? 'YOU WON!' : 'YOU LOST'}
           </div>
-          <div className="mono" style={{ fontSize: '22px', fontWeight: 900, color: myBet.status === 'won' ? '#34d399' : '#ef4444', marginTop: '2px' }}>
+          <div className="mono" style={{ fontSize: '22px', fontWeight: 900, color: myBet.status === 'won' ? '#2ecc71' : '#ef4444', marginTop: '2px' }}>
             {myBet.status === 'won' ? `+${formatSol(myBet.payout - myBet.betAmount)}` : `-${formatSol(myBet.betAmount)}`} SOL
           </div>
         </div>
@@ -383,13 +375,13 @@ export function CandleflipScreen() {
         }}>
           {round.bets.map(bet => {
             const isMe = bet.userId === userId;
-            const pickColor = bet.pick === 'bullish' ? '#34d399' : '#f87171';
+            const pickColor = bet.pick === 'bullish' ? '#2ecc71' : '#f87171';
             return (
               <div key={bet.userId} style={{
                 display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',
                 borderRadius: '10px', flexShrink: 0,
-                background: isMe ? 'rgba(119,23,255,0.1)' : theme.bg.secondary,
-                border: `1px solid ${isMe ? 'rgba(119,23,255,0.3)' : theme.border.subtle}`,
+                background: isMe ? 'rgba(139,92,246,0.1)' : theme.bg.secondary,
+                border: `1px solid ${isMe ? 'rgba(139,92,246,0.3)' : theme.border.subtle}`,
               }}>
                 <div style={{
                   width: 22, height: 22, borderRadius: '50%',
@@ -403,7 +395,7 @@ export function CandleflipScreen() {
                 <span style={{ fontSize: '9px', fontWeight: 800, color: pickColor, padding: '1px 5px', background: `${pickColor}15`, borderRadius: '4px' }}>
                   {bet.pick === 'bullish' ? 'BULL' : 'BEAR'}
                 </span>
-                <span className="mono" style={{ fontSize: '10px', fontWeight: 700, color: '#fbbf24' }}>
+                <span className="mono" style={{ fontSize: '10px', fontWeight: 700, color: '#8b5cf6' }}>
                   {formatSol(bet.betAmount)}
                 </span>
               </div>
@@ -424,14 +416,14 @@ export function CandleflipScreen() {
             return (
               <div key={r.id} style={{
                 padding: '4px 10px', borderRadius: '8px', flexShrink: 0,
-                background: isBull ? 'rgba(52,211,153,0.1)' : 'rgba(248,113,113,0.1)',
-                border: `1px solid ${isBull ? 'rgba(52,211,153,0.2)' : 'rgba(248,113,113,0.2)'}`,
+                background: isBull ? 'rgba(46,204,113,0.1)' : 'rgba(248,113,113,0.1)',
+                border: `1px solid ${isBull ? 'rgba(46,204,113,0.2)' : 'rgba(248,113,113,0.2)'}`,
                 display: 'flex', alignItems: 'center', gap: '4px',
               }}>
-                <span style={{ fontSize: '10px', color: isBull ? '#34d399' : '#f87171' }}>
+                <span style={{ fontSize: '10px', color: isBull ? '#2ecc71' : '#f87171' }}>
                   {isBull ? '\u25B2' : '\u25BC'}
                 </span>
-                <span className="mono" style={{ fontSize: '11px', fontWeight: 800, color: isBull ? '#34d399' : '#f87171' }}>
+                <span className="mono" style={{ fontSize: '11px', fontWeight: 800, color: isBull ? '#2ecc71' : '#f87171' }}>
                   {mult.toFixed(2)}x
                 </span>
               </div>
@@ -442,90 +434,69 @@ export function CandleflipScreen() {
 
       {/* Betting Controls — only during waiting and not already bet */}
       {round?.status === 'waiting' && !hasBet && (
-        <>
-          {/* Pick */}
-          <div style={s.sectionLabel}>Pick Your Trend</div>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            <button
-              style={{ ...s.pickBtn, ...(pick === 'bullish' ? { background: 'rgba(52,211,153,0.12)', borderColor: 'rgba(52,211,153,0.4)', color: '#34d399' } : {}) }}
-              onClick={() => { setPick('bullish'); playButtonClick(); }}
-              className="hover-scale"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="18 15 12 9 6 15" /></svg>
-              BULLISH
-              {bullCount > 0 && <span style={{ fontSize: '11px', opacity: 0.6 }}>({bullCount})</span>}
-            </button>
-            <button
-              style={{ ...s.pickBtn, ...(pick === 'bearish' ? { background: 'rgba(248,113,113,0.12)', borderColor: 'rgba(248,113,113,0.4)', color: '#f87171' } : {}) }}
-              onClick={() => { setPick('bearish'); playButtonClick(); }}
-              className="hover-scale"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg>
-              BEARISH
-              {bearCount > 0 && <span style={{ fontSize: '11px', opacity: 0.6 }}>({bearCount})</span>}
-            </button>
-          </div>
-
-          {/* Bet Amount */}
-          <div style={s.sectionLabel}>Bet Amount</div>
-          <div style={s.betGrid}>
-            {BET_AMOUNTS.map(b => (
-              <button
-                key={b.lamports}
-                style={{ ...s.betBtn, ...(betAmount === b.lamports ? s.betBtnActive : {}) }}
-                onClick={() => { setBetAmount(b.lamports); setCustomBet(b.label); playButtonClick(); }}
-              >
-                <span className="mono" style={{ fontSize: '14px', fontWeight: 700 }}>{b.label}</span>
-                <span style={{ fontSize: '10px', color: theme.text.muted }}>SOL</span>
-              </button>
-            ))}
-          </div>
-
-          <div style={s.customBetRow}>
-            <input
-              type="number"
-              value={customBet}
-              onChange={e => {
-                setCustomBet(e.target.value);
-                const val = parseFloat(e.target.value);
-                if (!isNaN(val) && val > 0) {
-                  const lamports = Math.floor(val * 1_000_000_000);
-                  if (lamports < 1_000_000) {
-                    setError('Minimum bet is 0.001 SOL');
-                    setTimeout(() => setError(''), 3000);
-                  } else {
-                    setBetAmount(lamports);
-                  }
-                }
-              }}
-              style={s.customBetInput}
-              placeholder="Custom SOL (min 0.001)"
-              className="mono"
-            />
-          </div>
-
-          <button
-            style={s.betBtn2}
-            onClick={handleBet}
-            disabled={loading || betAmount <= 0}
-            className="hover-scale"
-          >
-            {loading ? 'Placing bet...' : `BET ${pick.toUpperCase()}`}
-          </button>
-        </>
+        <BetPanel
+          presets={[
+            { label: '0.01', lamports: 10_000_000 },
+            { label: '0.05', lamports: 50_000_000 },
+            { label: '0.1', lamports: 100_000_000 },
+            { label: '0.25', lamports: 250_000_000 },
+            { label: '0.5', lamports: 500_000_000 },
+            { label: '1', lamports: 1_000_000_000 },
+          ]}
+          selectedAmount={betAmount}
+          onAmountChange={setBetAmount}
+          balance={profile.balance}
+          choices={[
+            { id: 'bullish', label: 'BULLISH', color: '#2ecc71', icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="2.5" strokeLinecap="round"><polyline points="18 15 12 9 6 15" /></svg>, payout: '1.9x' },
+            { id: 'bearish', label: 'BEARISH', color: '#f87171', icon: <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg>, payout: '1.9x' },
+          ]}
+          selectedChoice={pick}
+          onChoiceSelect={(id) => setPick(id as 'bullish' | 'bearish')}
+          submitLabel="BET"
+          onSubmit={handleBet}
+          submitDisabled={!pick || betAmount <= 0}
+          submitLoading={loading}
+        />
       )}
 
       {/* Already bet, waiting */}
       {round?.status === 'waiting' && hasBet && (
         <div style={{
           padding: '16px', textAlign: 'center', borderRadius: '12px',
-          background: 'rgba(119,23,255,0.06)', border: '1px solid rgba(119,23,255,0.15)',
+          background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)',
         }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: '#c084fc' }}>
+          <div style={{ fontSize: '14px', fontWeight: 700, color: '#8b5cf6' }}>
             Bet placed: {formatSol(myBet!.betAmount)} SOL on {myBet!.pick.toUpperCase()}
           </div>
           <div style={{ fontSize: '12px', color: theme.text.muted, marginTop: '4px' }}>
             Flipping in {waitRemaining}s...
+          </div>
+        </div>
+      )}
+
+      {/* No active round — waiting state */}
+      {!round && (
+        <div style={{
+          padding: '24px', textAlign: 'center', borderRadius: '14px',
+          background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`,
+        }}>
+          <div style={{ fontSize: '28px', marginBottom: '8px' }}>⏳</div>
+          <div style={{ fontSize: '16px', fontWeight: 700, color: theme.text.secondary }}>
+            Waiting for next round...
+          </div>
+          <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '6px' }}>
+            A new flip starts automatically every 30 seconds
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '14px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div className="mono" style={{ fontSize: '18px', fontWeight: 800, color: '#2ecc71' }}>▲ BULL</div>
+              <div style={{ fontSize: '11px', color: theme.text.muted }}>Over 1.00x</div>
+            </div>
+            <div style={{ width: '1px', background: theme.border.subtle }} />
+            <div style={{ textAlign: 'center' }}>
+              <div className="mono" style={{ fontSize: '18px', fontWeight: 800, color: '#f87171' }}>▼ BEAR</div>
+              <div style={{ fontSize: '11px', color: theme.text.muted }}>Under 1.00x</div>
+            </div>
           </div>
         </div>
       )}
@@ -587,38 +558,11 @@ const s: Record<string, React.CSSProperties> = {
     padding: '10px 14px', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)',
     borderRadius: '10px', color: '#f87171', fontSize: '14px', fontWeight: 600, textAlign: 'center',
   },
-  sectionLabel: {
-    fontSize: '12px', fontWeight: 700, color: theme.text.muted,
-    textTransform: 'uppercase', letterSpacing: '0.5px',
-  },
-  pickBtn: {
-    flex: 1, padding: '16px 14px', borderRadius: '12px', border: `1px solid ${theme.border.subtle}`,
-    background: theme.bg.secondary, cursor: 'pointer', fontFamily: 'inherit',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
-    fontSize: '16px', fontWeight: 800, color: theme.text.muted, transition: 'all 0.15s',
-    letterSpacing: '1px', minHeight: '56px',
-  },
-  betGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' },
-  betBtn: {
-    padding: '12px 8px', borderRadius: '10px', border: `1px solid ${theme.border.subtle}`,
-    background: theme.bg.secondary, cursor: 'pointer', fontFamily: 'inherit',
-    display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: '2px',
-    transition: 'all 0.15s', color: theme.text.primary,
-  },
-  betBtnActive: {
-    background: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.4)', color: '#fbbf24',
-  },
-  customBetRow: { display: 'flex', gap: '10px' },
-  customBetInput: {
-    flex: 1, padding: '12px 14px', borderRadius: '10px', border: `1px solid ${theme.border.subtle}`,
-    background: theme.bg.secondary, color: theme.text.primary, fontSize: '15px', fontWeight: 700,
-    outline: 'none', fontFamily: "'JetBrains Mono', monospace", minWidth: 0,
-  },
   betBtn2: {
     width: '100%', padding: '16px',
-    background: 'linear-gradient(135deg, #7717ff, #886cff)',
+    background: 'linear-gradient(135deg, #7c3aed, #8b5cf6, #a78bfa)',
     border: 'none', borderRadius: '14px', color: '#fff',
     fontSize: '16px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-    boxShadow: '0 4px 20px rgba(119, 23, 255, 0.3)', letterSpacing: '1px',
+    boxShadow: '0 4px 20px rgba(139, 92, 246, 0.3)', letterSpacing: '1px',
   },
 };

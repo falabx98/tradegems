@@ -10,10 +10,10 @@ const ICON_COMPONENTS: Record<ToastType, (color: string) => React.ReactNode> = {
 
 const COLORS: Record<ToastType, { bg: string; border: string; text: string; icon: string }> = {
   success: {
-    bg: 'rgba(20, 241, 149, 0.08)',
-    border: 'rgba(20, 241, 149, 0.25)',
-    text: '#34d399',
-    icon: '#14F195',
+    bg: 'rgba(46, 204, 113, 0.08)',
+    border: 'rgba(46, 204, 113, 0.25)',
+    text: '#2ecc71',
+    icon: '#2ecc71',
   },
   error: {
     bg: 'rgba(248, 113, 113, 0.08)',
@@ -22,16 +22,16 @@ const COLORS: Record<ToastType, { bg: string; border: string; text: string; icon
     icon: '#f87171',
   },
   info: {
-    bg: 'rgba(119, 23, 255, 0.08)',
-    border: 'rgba(119, 23, 255, 0.25)',
-    text: '#c084fc',
-    icon: '#7717ff',
+    bg: 'rgba(139, 92, 246, 0.08)',
+    border: 'rgba(139, 92, 246, 0.25)',
+    text: '#3b82f6',
+    icon: '#8b5cf6',
   },
   warning: {
     bg: 'rgba(251, 191, 36, 0.08)',
     border: 'rgba(251, 191, 36, 0.25)',
-    text: '#fbbf24',
-    icon: '#fbbf24',
+    text: '#8b5cf6',
+    icon: '#8b5cf6',
   },
 };
 
@@ -99,8 +99,6 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '12px 14px',
     borderRadius: '12px',
     border: '1px solid',
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
     cursor: 'pointer',
     pointerEvents: 'auto',

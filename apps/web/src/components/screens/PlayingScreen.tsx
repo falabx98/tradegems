@@ -220,7 +220,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     background: 'rgba(17, 17, 20, 0.88)',
-    backdropFilter: 'blur(12px)',
+    backdropFilter: 'blur(4px)',
     zIndex: 10,
   },
   countdownContent: {

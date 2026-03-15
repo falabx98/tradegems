@@ -8,6 +8,8 @@ import { getAvatarGradient, getInitials } from '../../utils/avatars';
 import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { playButtonClick, playBetPlaced, playRoundEnd, hapticLight, hapticMedium } from '../../utils/sounds';
+import { PageHeader } from '../ui/PageHeader';
+import { StatCard } from '../ui/StatCard';
 
 /* ─── Types ─── */
 interface LotteryDraw {
@@ -222,6 +224,7 @@ export function LotteryScreen() {
     const incomplete = tickets.some((t) => t.numbers.includes(null) || t.gemBall === null);
     if (incomplete) {
       setError('Fill all numbers on every ticket (or use Auto-fill)');
+      setTimeout(() => setError(''), 4000);
       return;
     }
     setBuying(true);
@@ -236,12 +239,14 @@ export function LotteryScreen() {
         gemBall: t.gemBall as number,
       })));
       setSuccess(`${tickets.length} ticket${tickets.length > 1 ? 's' : ''} purchased!`);
+      setTimeout(() => setSuccess(''), 4000);
       setTickets([createEmptyTicket()]);
       // Refresh draw
       const d = await api.getLotteryCurrentDraw();
       if (d?.id) setDraw(d);
     } catch (e: any) {
       setError(e?.message || 'Failed to purchase tickets');
+      setTimeout(() => setError(''), 4000);
     }
     setBuying(false);
   };
@@ -268,6 +273,7 @@ export function LotteryScreen() {
   if (loading) {
     return (
       <div style={s.container}>
+        <PageHeader title="Lottery" subtitle="Jackpot Draws" />
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px', color: theme.text.muted }}>
           Loading lottery...
         </div>
@@ -277,42 +283,72 @@ export function LotteryScreen() {
 
   return (
     <div style={s.container}>
-      {/* Hero Banner */}
-      <div style={s.hero}>
-        <div style={s.heroDecor}>
-          {/* Gem balls */}
-          <svg width="80" height="80" viewBox="0 0 80 80" style={{ position: 'absolute', left: '5%', top: '10%', opacity: 0.5 }}>
-            <circle cx="40" cy="40" r="38" fill="url(#gb1)" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+      {/* Page Header */}
+      <PageHeader
+        title="Lottery"
+        subtitle="Jackpot Draws"
+        icon={
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M6 3h12l4 6-10 13L2 9z" />
+          </svg>
+        }
+      />
+
+      {/* Jackpot Banner */}
+      <div style={s.jackpotBanner}>
+        <div style={s.jackpotBannerDecor} aria-hidden>
+          <svg width="70" height="70" viewBox="0 0 80 80" style={{ position: 'absolute', left: '4%', top: '50%', transform: 'translateY(-50%)', opacity: 0.18 }}>
+            <circle cx="40" cy="40" r="38" fill="url(#gb1)" stroke="rgba(255,255,255,0.15)" strokeWidth="2" />
             <text x="40" y="48" textAnchor="middle" fill="white" fontSize="28" fontWeight="bold">5</text>
             <defs><radialGradient id="gb1" cx="35%" cy="35%"><stop offset="0%" stopColor="#a78bfa" /><stop offset="100%" stopColor="#5b21b6" /></radialGradient></defs>
           </svg>
-          <svg width="60" height="60" viewBox="0 0 60 60" style={{ position: 'absolute', right: '8%', top: '15%', opacity: 0.4 }}>
-            <circle cx="30" cy="30" r="28" fill="url(#gb2)" stroke="rgba(255,255,255,0.2)" strokeWidth="2" />
+          <svg width="50" height="50" viewBox="0 0 60 60" style={{ position: 'absolute', right: '6%', top: '50%', transform: 'translateY(-50%)', opacity: 0.15 }}>
+            <circle cx="30" cy="30" r="28" fill="url(#gb2)" stroke="rgba(255,255,255,0.15)" strokeWidth="2" />
             <text x="30" y="37" textAnchor="middle" fill="white" fontSize="20" fontWeight="bold">3</text>
-            <defs><radialGradient id="gb2" cx="35%" cy="35%"><stop offset="0%" stopColor="#c084fc" /><stop offset="100%" stopColor="#7c3aed" /></radialGradient></defs>
-          </svg>
-          <svg width="50" height="50" viewBox="0 0 50 50" style={{ position: 'absolute', right: '25%', bottom: '10%', opacity: 0.3 }}>
-            <circle cx="25" cy="25" r="23" fill="url(#gb3)" stroke="rgba(255,255,255,0.15)" strokeWidth="2" />
-            <text x="25" y="32" textAnchor="middle" fill="white" fontSize="16" fontWeight="bold">9</text>
-            <defs><radialGradient id="gb3" cx="35%" cy="35%"><stop offset="0%" stopColor="#818cf8" /><stop offset="100%" stopColor="#4338ca" /></radialGradient></defs>
+            <defs><radialGradient id="gb2" cx="35%" cy="35%"><stop offset="0%" stopColor="#8b5cf6" /><stop offset="100%" stopColor="#7c3aed" /></radialGradient></defs>
           </svg>
         </div>
-        <div style={s.heroContent}>
-          <div style={s.heroIcon}>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.9)" strokeWidth="1.5">
-              <path d="M6 3h12l4 6-10 13L2 9z" />
-            </svg>
-          </div>
-          {draw && (
+        <div style={s.jackpotBannerContent}>
+          {draw ? (
             <>
-              <div style={s.heroTitle}>Join Draw #{draw.drawNumber}</div>
-              <div style={s.heroDate}>{formatDate(draw.drawDate)} at {formatTime(draw.drawDate)}</div>
-              <div style={s.heroJackpot}>{formatSol(estimatedJackpot)} SOL</div>
-              <div style={s.heroSub}>Estimated Jackpot</div>
+              <div style={s.jackpotDrawLabel}>DRAW #{draw.drawNumber} &bull; {formatDate(draw.drawDate)} at {formatTime(draw.drawDate)}</div>
+              <div style={s.jackpotAmount}>{formatSol(estimatedJackpot)} SOL</div>
+              <div style={s.jackpotSubLabel}>Estimated Jackpot</div>
             </>
+          ) : (
+            <div style={{ color: theme.text.muted, fontSize: '14px' }}>No active draw — next draw coming soon!</div>
           )}
         </div>
       </div>
+
+      {/* Stats Row */}
+      {draw && (
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <StatCard
+            label="Prize Pool"
+            value={`${formatSol(draw.prizePool + draw.rolloverPool)} SOL`}
+            color={theme.accent.lavender}
+            icon={
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+            }
+          />
+          <StatCard
+            label="Tickets Sold"
+            value={draw.totalTickets.toLocaleString()}
+            icon={
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18M15 3v18" /></svg>
+            }
+          />
+          <StatCard
+            label="Rollover"
+            value={draw.rolloverPool > 0 ? `${formatSol(draw.rolloverPool)} SOL` : '--'}
+            color={draw.rolloverPool > 0 ? theme.accent.amber : undefined}
+            icon={
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>
+            }
+          />
+        </div>
+      )}
 
       {/* Tabs */}
       <div style={s.tabBar}>
@@ -332,6 +368,37 @@ export function LotteryScreen() {
       {success && <div style={s.successMsg}>{success}</div>}
 
       {/* Tab Content */}
+      {tab === 'play' && !draw && (
+        <div style={{
+          padding: '32px 20px', textAlign: 'center', borderRadius: '14px',
+          background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`,
+        }}>
+          <div style={{ fontSize: '36px', marginBottom: '12px' }}>🎰</div>
+          <div style={{ fontSize: '18px', fontWeight: 700, color: theme.text.secondary }}>
+            Next Draw Coming Soon
+          </div>
+          <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '8px', maxWidth: '400px', margin: '8px auto 0' }}>
+            Draws happen regularly. Pick 5 numbers + 1 GemBall for a chance to win the jackpot!
+          </div>
+          <div style={{
+            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px',
+            marginTop: '20px', maxWidth: '360px', margin: '20px auto 0',
+          }}>
+            <div style={{ padding: '12px 8px', borderRadius: '10px', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: '#8b5cf6' }}>5+1</div>
+              <div style={{ fontSize: '10px', color: theme.text.muted, marginTop: '2px' }}>Numbers to pick</div>
+            </div>
+            <div style={{ padding: '12px 8px', borderRadius: '10px', background: 'rgba(46,204,113,0.06)', border: '1px solid rgba(46,204,113,0.12)' }}>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: '#2ecc71' }}>5</div>
+              <div style={{ fontSize: '10px', color: theme.text.muted, marginTop: '2px' }}>Prize tiers</div>
+            </div>
+            <div style={{ padding: '12px 8px', borderRadius: '10px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)' }}>
+              <div style={{ fontSize: '20px', fontWeight: 900, color: '#f59e0b' }}>100x</div>
+              <div style={{ fontSize: '10px', color: theme.text.muted, marginTop: '2px' }}>Top payout</div>
+            </div>
+          </div>
+        </div>
+      )}
       {tab === 'play' && draw && <PlayTab
         draw={draw} entryType={entryType} setEntryType={setEntryType}
         tickets={tickets} setTicketCount={setTicketCount} autoFillAll={autoFillAll}
@@ -365,14 +432,17 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
         {/* Step 1: Entry Type */}
         <div style={s.stepCard}>
           <div style={s.stepHeader}>1. Select Entry Type</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '14px' }}>
             <button
               onClick={() => setEntryType('standard')}
               style={entryType === 'standard' ? { ...s.entryOption, ...s.entryOptionActive } : s.entryOption}
             >
-              <span style={s.entryLabel}>Standard entry</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
+                <span style={s.entryLabel}>Standard entry</span>
+                <span style={{ fontSize: '11px', color: theme.text.muted }}>5 numbers + GemBall</span>
+              </div>
               <span style={s.entryPrice}>
-                <img src="/sol-coin.png" alt="" style={{ width: 16, height: 16 }} />
+                <img src="/sol-coin.png" alt="" style={{ width: 14, height: 14 }} />
                 {formatSol(draw.standardPrice)} SOL
               </span>
             </button>
@@ -380,12 +450,15 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
               onClick={() => setEntryType('power')}
               style={entryType === 'power' ? { ...s.entryOption, ...s.entryOptionPower } : s.entryOption}
             >
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-                <span style={s.entryLabel}>Power entry</span>
-                <span style={{ fontSize: '10px', color: theme.text.muted, marginTop: '2px' }}>Guaranteed GemBall match</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '2px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={s.entryLabel}>Power entry</span>
+                  <span style={s.powerBadge}>POWER</span>
+                </div>
+                <span style={{ fontSize: '11px', color: theme.text.muted }}>Guaranteed GemBall match</span>
               </div>
               <span style={s.entryPrice}>
-                <img src="/sol-coin.png" alt="" style={{ width: 16, height: 16 }} />
+                <img src="/sol-coin.png" alt="" style={{ width: 14, height: 14 }} />
                 {formatSol(draw.powerPrice)} SOL
               </span>
             </button>
@@ -394,9 +467,9 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
 
         {/* Step 2: Number of Entries */}
         <div style={s.stepCard}>
-          <div style={s.stepHeader}>2. Select Number of Entries</div>
-          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={s.stepHeader}>2. Number of Entries</div>
+          <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <input
                 type="number"
                 min={1}
@@ -406,13 +479,13 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
                 style={s.countInput}
               />
               {[1, 5, 10, 25].map((n) => (
-                <button key={n} onClick={() => setTicketCount(n)} style={s.countPill}>{n}</button>
+                <button key={n} onClick={() => setTicketCount(n)} style={tickets.length === n ? { ...s.countPill, ...s.countPillActive } : s.countPill}>{n}</button>
               ))}
               <button onClick={() => setTicketCount(MAX_TICKETS)} style={s.countPill}>Max</button>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ color: theme.text.muted, fontSize: '13px' }}>Total cost</span>
-              <span style={{ color: theme.text.primary, fontSize: '15px', fontWeight: 600, fontFamily: 'monospace' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: theme.bg.tertiary, borderRadius: theme.radius.sm }}>
+              <span style={{ color: theme.text.muted, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total cost</span>
+              <span style={{ color: theme.text.primary, fontSize: '16px', fontWeight: 700, fontFamily: 'monospace' }}>
                 {formatSol(totalCost)} SOL
               </span>
             </div>
@@ -424,27 +497,27 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
       <div style={s.stepCard}>
         <div style={{ ...s.stepHeader, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span>3. Choose Lottery Numbers</span>
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '6px' }}>
             <button onClick={autoFillAll} style={s.actionBtn}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
               Auto-fill All
             </button>
             <button onClick={clearAll} style={s.actionBtn}>Clear All</button>
           </div>
         </div>
 
-        <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
           {/* Column headers */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '30px', paddingBottom: '4px' }}>
-            <span style={{ color: theme.text.muted, fontSize: '11px', width: isMobile ? '180px' : '240px' }}>Numbers</span>
-            <span style={{ color: '#a78bfa', fontSize: '11px' }}>GemBall</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingLeft: '28px', paddingBottom: '4px' }}>
+            <span style={{ color: theme.text.muted, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px', width: isMobile ? '186px' : '246px' }}>Numbers (1–36)</span>
+            <span style={{ color: theme.accent.lavender, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>GemBall</span>
           </div>
 
           {tickets.map((ticket: TicketEntry, tIdx: number) => (
             <div key={ticket.id} style={s.ticketRow}>
               <span style={s.ticketNum}>{tIdx + 1}</span>
               {/* Main numbers */}
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '5px' }}>
                 {ticket.numbers.map((n: number | null, nIdx: number) => (
                   <button
                     key={nIdx}
@@ -465,11 +538,11 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
               {/* Actions */}
               <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
                 <button onClick={() => autoFillOne(tIdx)} style={s.iconBtn} title="Auto-fill">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" /></svg>
                 </button>
                 {tickets.length > 1 && (
                   <button onClick={() => removeTicket(tIdx)} style={s.iconBtn} title="Remove">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
                   </button>
                 )}
               </div>
@@ -493,27 +566,32 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
 
       {/* Bottom Buy Bar */}
       <div style={s.buyBar}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div>
-            <div style={{ color: theme.text.muted, fontSize: '11px' }}>Total cost</div>
-            <div style={{ color: theme.text.primary, fontWeight: 700, fontFamily: 'monospace', fontSize: '16px' }}>
+            <div style={{ color: theme.text.muted, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total cost</div>
+            <div style={{ color: theme.text.primary, fontWeight: 700, fontFamily: 'monospace', fontSize: '17px' }}>
               {formatSol(totalCost)} SOL
             </div>
           </div>
+          <div style={{ width: '1px', height: '32px', background: theme.border.medium }} />
           <div>
-            <div style={{ color: theme.text.muted, fontSize: '11px' }}>Tickets</div>
-            <div style={{ color: theme.text.primary, fontWeight: 600, fontSize: '16px' }}>{tickets.length}</div>
+            <div style={{ color: theme.text.muted, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Tickets</div>
+            <div style={{ color: theme.text.primary, fontWeight: 700, fontSize: '17px' }}>{tickets.length}</div>
           </div>
         </div>
         <button
           onClick={handleBuy}
           disabled={buying || !isAuthenticated || totalCost > balance}
+          className="btn-3d-primary"
           style={{
-            ...s.buyBtn,
             opacity: (buying || !isAuthenticated || totalCost > balance) ? 0.5 : 1,
+            padding: '12px 32px',
+            fontSize: '15px',
+            fontWeight: 700,
+            cursor: (buying || !isAuthenticated || totalCost > balance) ? 'not-allowed' : 'pointer',
           }}
         >
-          {!isAuthenticated ? 'Sign In to Play' : buying ? 'Buying...' : totalCost > balance ? 'Insufficient Balance' : 'Buy Now'}
+          {!isAuthenticated ? 'Sign In to Play' : buying ? 'Buying...' : totalCost > balance ? 'Insufficient Balance' : 'Buy Tickets'}
         </button>
       </div>
     </div>
@@ -535,16 +613,17 @@ function NumberPicker({ slot, ticketIdx, slotIdx, currentTicket, onSelectNumber,
   return (
     <div style={s.pickerOverlay} onClick={onClose}>
       <div style={s.pickerCard} onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <span style={{ color: theme.text.primary, fontWeight: 600, fontSize: '14px' }}>
-            {slot === 'main' ? `Pick Number (Slot ${(slotIdx ?? 0) + 1})` : 'Pick GemBall'}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', paddingBottom: '12px', borderBottom: `1px solid ${theme.border.medium}` }}>
+          <span style={{ color: theme.text.primary, fontWeight: 700, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            {slot === 'main' ? `Pick Number — Slot ${(slotIdx ?? 0) + 1}` : 'Pick GemBall (1–9)'}
           </span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: theme.text.muted, cursor: 'pointer', fontSize: '18px' }}>x</button>
+          <button onClick={onClose} style={{ background: theme.bg.tertiary, border: `1px solid ${theme.border.medium}`, borderRadius: theme.radius.sm, color: theme.text.secondary, cursor: 'pointer', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', lineHeight: 1 }}>×</button>
         </div>
         {slot === 'main' ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
             {Array.from({ length: MAIN_RANGE.max }, (_, i) => i + 1).map((n) => {
               const used = usedNumbers.includes(n) && currentTicket.numbers[slotIdx ?? 0] !== n;
+              const selected = currentTicket.numbers[slotIdx ?? 0] === n;
               return (
                 <button
                   key={n}
@@ -552,8 +631,12 @@ function NumberPicker({ slot, ticketIdx, slotIdx, currentTicket, onSelectNumber,
                   onClick={() => onSelectNumber(ticketIdx, slotIdx ?? 0, n)}
                   style={{
                     ...s.pickerNum,
-                    opacity: used ? 0.3 : 1,
-                    background: currentTicket.numbers[slotIdx ?? 0] === n ? theme.accent.purple : 'rgba(255,255,255,0.06)',
+                    opacity: used ? 0.25 : 1,
+                    background: selected ? theme.gradient.primary : theme.bg.tertiary,
+                    border: selected ? 'none' : `1px solid ${theme.border.medium}`,
+                    color: selected ? '#fff' : theme.text.secondary,
+                    fontWeight: selected ? 700 : 500,
+                    transform: selected ? 'scale(1.08)' : 'scale(1)',
                   }}
                 >
                   {n}
@@ -563,18 +646,25 @@ function NumberPicker({ slot, ticketIdx, slotIdx, currentTicket, onSelectNumber,
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(9, 1fr)', gap: '6px' }}>
-            {Array.from({ length: GEMBALL_RANGE.max }, (_, i) => i + 1).map((n) => (
-              <button
-                key={n}
-                onClick={() => onSelectGemBall(ticketIdx, n)}
-                style={{
-                  ...s.pickerGem,
-                  background: currentTicket.gemBall === n ? '#7c3aed' : 'rgba(139,92,246,0.15)',
-                }}
-              >
-                {n}
-              </button>
-            ))}
+            {Array.from({ length: GEMBALL_RANGE.max }, (_, i) => i + 1).map((n) => {
+              const selected = currentTicket.gemBall === n;
+              return (
+                <button
+                  key={n}
+                  onClick={() => onSelectGemBall(ticketIdx, n)}
+                  style={{
+                    ...s.pickerGem,
+                    background: selected ? theme.gradient.primary : 'rgba(139,92,246,0.08)',
+                    border: selected ? 'none' : `1px solid ${theme.border.accent}`,
+                    color: selected ? '#fff' : theme.accent.lavender,
+                    fontWeight: selected ? 700 : 500,
+                    transform: selected ? 'scale(1.12)' : 'scale(1)',
+                  }}
+                >
+                  {n}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -597,13 +687,13 @@ function TicketsTab({ viewDraw, viewDrawNumber, setViewDrawNumber, draw, myTicke
           style={s.drawNavBtn}
           disabled={viewDrawNumber <= 1}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M15 18l-6-6 6-6" /></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6" /></svg>
           Prev
         </button>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ color: theme.text.primary, fontWeight: 600, fontSize: '15px' }}>Draw #{viewDrawNumber}</div>
-          {viewDraw && <div style={{ color: theme.text.muted, fontSize: '12px' }}>{new Date(viewDraw.drawDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>}
-          {viewDrawNumber === maxDraw && <span style={s.currentBadge}>Current</span>}
+          <div style={{ color: theme.text.primary, fontWeight: 700, fontSize: '15px' }}>Draw #{viewDrawNumber}</div>
+          {viewDraw && <div style={{ color: theme.text.muted, fontSize: '12px', marginTop: '2px' }}>{new Date(viewDraw.drawDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</div>}
+          {viewDrawNumber === maxDraw && <span style={s.currentBadge}>LIVE</span>}
         </div>
         <button
           onClick={() => viewDrawNumber < maxDraw && setViewDrawNumber(viewDrawNumber + 1)}
@@ -611,28 +701,29 @@ function TicketsTab({ viewDraw, viewDrawNumber, setViewDrawNumber, draw, myTicke
           disabled={viewDrawNumber >= maxDraw}
         >
           Next
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 18l6-6-6-6" /></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 18l6-6-6-6" /></svg>
         </button>
       </div>
 
       {/* Winning Numbers (completed draws) */}
       {viewDraw?.status === 'completed' && viewDraw.winningNumbers && (
         <div style={s.winningBox}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '8px' }}>
-            <span style={{ color: theme.text.muted, fontSize: '12px' }}>Winning Numbers</span>
+          <div style={{ marginBottom: '12px' }}>
+            <span style={{ color: theme.text.muted, fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Winning Numbers</span>
           </div>
-          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
             {(viewDraw.winningNumbers as number[]).map((n: number, i: number) => (
               <div key={i} style={s.winBall}>{n}</div>
             ))}
+            <div style={{ width: '1px', height: '36px', background: theme.border.medium, margin: '0 4px' }} />
             <div style={s.winGemBall}>{viewDraw.winningGemBall}</div>
           </div>
         </div>
       )}
 
       {viewDraw?.status === 'open' && (
-        <div style={{ textAlign: 'center', padding: '20px', color: theme.text.muted, fontSize: '14px' }}>
-          Draw has not happened yet. Buy tickets in the Play tab!
+        <div style={{ textAlign: 'center', padding: '24px 16px', background: theme.bg.card, border: `1px solid ${theme.border.subtle}`, borderRadius: theme.radius.lg, color: theme.text.muted, fontSize: '14px' }}>
+          Draw has not happened yet — buy tickets in the Play tab!
         </div>
       )}
 
@@ -653,19 +744,20 @@ function TicketsTab({ viewDraw, viewDrawNumber, setViewDrawNumber, draw, myTicke
       {ticketsSubTab === 'my' && (
         <div>
           {myTickets.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px 16px', color: theme.text.muted }}>
+            <div style={{ textAlign: 'center', padding: '48px 16px', color: theme.text.muted, background: theme.bg.card, border: `1px solid ${theme.border.subtle}`, borderRadius: theme.radius.lg }}>
+              <div style={{ fontSize: '28px', marginBottom: '8px', opacity: 0.4 }}>🎫</div>
               No tickets for this draw
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {myTickets.map((ticket: LotteryTicket, i: number) => (
                 <div key={ticket.id} style={s.myTicketRow}>
-                  <span style={{ color: theme.text.muted, fontSize: '12px', width: '24px' }}>{i + 1}</span>
+                  <span style={{ color: theme.text.muted, fontSize: '11px', fontWeight: 600, width: '22px', textAlign: 'center' }}>{i + 1}</span>
                   <div style={{ display: 'flex', gap: '4px' }}>
                     {(ticket.numbers as number[]).map((n: number, ni: number) => {
                       const matched = viewDraw?.winningNumbers?.includes(n);
                       return (
-                        <div key={ni} style={{ ...s.miniBall, background: matched ? '#22c55e' : 'rgba(255,255,255,0.08)', color: matched ? '#fff' : theme.text.secondary }}>
+                        <div key={ni} style={{ ...s.miniBall, background: matched ? theme.accent.green : theme.bg.tertiary, color: matched ? theme.bg.primary : theme.text.secondary, border: matched ? 'none' : `1px solid ${theme.border.medium}` }}>
                           {n}
                         </div>
                       );
@@ -673,13 +765,13 @@ function TicketsTab({ viewDraw, viewDrawNumber, setViewDrawNumber, draw, myTicke
                     {(() => {
                       const gbMatched = ticket.entryType === 'power' || ticket.gemBall === viewDraw?.winningGemBall;
                       return (
-                        <div style={{ ...s.miniGem, background: gbMatched ? '#7c3aed' : 'rgba(139,92,246,0.15)', color: gbMatched ? '#fff' : '#a78bfa' }}>
+                        <div style={{ ...s.miniGem, background: gbMatched ? theme.accent.violet : 'rgba(139,92,246,0.1)', color: gbMatched ? '#fff' : theme.accent.lavender, border: gbMatched ? 'none' : `1px solid ${theme.border.accent}` }}>
                           {ticket.gemBall}
                         </div>
                       );
                     })()}
                   </div>
-                  <span style={{ marginLeft: 'auto', fontSize: '11px', color: ticket.entryType === 'power' ? '#a78bfa' : theme.text.muted }}>
+                  <span style={{ marginLeft: 'auto', fontSize: '10px', fontWeight: 700, letterSpacing: '0.5px', color: ticket.entryType === 'power' ? theme.accent.lavender : theme.text.muted, background: ticket.entryType === 'power' ? 'rgba(167,139,250,0.1)' : theme.bg.tertiary, padding: '2px 6px', borderRadius: theme.radius.sm, border: ticket.entryType === 'power' ? `1px solid ${theme.border.accent}` : `1px solid ${theme.border.subtle}` }}>
                     {ticket.entryType === 'power' ? 'POWER' : 'STD'}
                   </span>
                 </div>
@@ -693,7 +785,7 @@ function TicketsTab({ viewDraw, viewDrawNumber, setViewDrawNumber, draw, myTicke
       {ticketsSubTab === 'prizes' && (
         <div>
           {viewDraw?.status !== 'completed' ? (
-            <div style={{ textAlign: 'center', padding: '40px 16px', color: theme.text.muted }}>
+            <div style={{ textAlign: 'center', padding: '48px 16px', color: theme.text.muted, background: theme.bg.card, border: `1px solid ${theme.border.subtle}`, borderRadius: theme.radius.lg }}>
               Prizes available after draw completes
             </div>
           ) : (
@@ -707,14 +799,14 @@ function TicketsTab({ viewDraw, viewDrawNumber, setViewDrawNumber, draw, myTicke
               {PRIZE_TIER_LABELS.map((pt) => {
                 const data = prizeTiers.find((p: PrizeTier) => p.tier === pt.tier);
                 return (
-                  <div key={pt.tier} style={s.prizeRow}>
-                    <span style={{ flex: 1, color: pt.tier === 1 ? '#fbbf24' : theme.text.primary, fontWeight: pt.tier === 1 ? 700 : 400 }}>
+                  <div key={pt.tier} style={{ ...s.prizeRow, background: pt.tier === 1 ? 'rgba(139,92,246,0.04)' : 'transparent' }}>
+                    <span style={{ flex: 1, color: pt.tier === 1 ? theme.accent.purple : theme.text.primary, fontWeight: pt.tier === 1 ? 700 : 400 }}>
                       {pt.label}
                     </span>
                     <span style={{ flex: 1 }}>
                       <MatchPattern desc={pt.desc} />
                     </span>
-                    <span style={{ flex: 1, textAlign: 'right', fontFamily: 'monospace', color: theme.text.primary }}>
+                    <span style={{ flex: 1, textAlign: 'right', fontFamily: 'monospace', color: pt.tier === 1 ? theme.accent.lavender : theme.text.primary, fontWeight: pt.tier === 1 ? 700 : 400 }}>
                       {data ? `${formatSol(data.prizeAmount)} SOL` : '--'}
                     </span>
                     <span style={{ width: '60px', textAlign: 'right', color: theme.text.muted }}>
@@ -742,7 +834,7 @@ function MatchPattern({ desc }: { desc: string }) {
       {!isGbOnly && Array.from({ length: 5 }, (_, i) => (
         <div key={i} style={{
           width: 14, height: 14, borderRadius: '50%',
-          background: i < mainCount ? '#fbbf24' : 'rgba(255,255,255,0.1)',
+          background: i < mainCount ? '#8b5cf6' : 'rgba(255,255,255,0.1)',
           border: '1px solid rgba(255,255,255,0.15)',
         }} />
       ))}
@@ -750,7 +842,7 @@ function MatchPattern({ desc }: { desc: string }) {
         <div style={{
           width: 14, height: 14, borderRadius: '50%',
           background: '#7c3aed',
-          border: '1px solid rgba(139,92,246,0.5)',
+          border: '1px solid rgba(59,130,246,0.5)',
           marginLeft: isGbOnly ? 0 : 4,
         }} />
       )}
@@ -792,9 +884,11 @@ function HowToPlayTab({ isMobile }: { isMobile: boolean }) {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
         {steps.map((step) => (
           <div key={step.num} style={s.howCard}>
-            <span style={{ fontSize: '28px' }}>{step.icon}</span>
-            <span style={{ color: '#fbbf24', fontWeight: 700, fontSize: '13px' }}>{step.num}. {step.title}</span>
-            <span style={{ color: theme.text.muted, fontSize: '12px', lineHeight: '1.4' }}>{step.desc}</span>
+            <div style={{ fontSize: '26px', lineHeight: 1 }}>{step.icon}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
+              <span style={{ color: theme.accent.purple, fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{step.num}. {step.title}</span>
+              <span style={{ color: theme.text.muted, fontSize: '11px', lineHeight: '1.5', textAlign: 'center' }}>{step.desc}</span>
+            </div>
           </div>
         ))}
       </div>
@@ -803,21 +897,27 @@ function HowToPlayTab({ isMobile }: { isMobile: boolean }) {
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '10px' }}>
         {info.map((item) => (
           <div key={item.title} style={s.infoCard}>
-            <span style={{ color: theme.text.primary, fontWeight: 600, fontSize: '14px' }}>{item.title}</span>
-            <span style={{ color: theme.text.muted, fontSize: '12px', lineHeight: '1.5' }}>{item.desc}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+              <div style={{ width: '3px', height: '14px', background: theme.gradient.primary, borderRadius: '2px' }} />
+              <span style={{ color: theme.text.primary, fontWeight: 600, fontSize: '13px' }}>{item.title}</span>
+            </div>
+            <span style={{ color: theme.text.muted, fontSize: '12px', lineHeight: '1.6' }}>{item.desc}</span>
           </div>
         ))}
       </div>
 
       {/* FAQ */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <div style={{ color: '#fbbf24', fontWeight: 700, fontSize: '15px', marginBottom: '8px' }}>Frequently Asked Questions</div>
+        <div style={{ color: theme.accent.purple, fontWeight: 700, fontSize: '13px', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></svg>
+          FAQ
+        </div>
         {faqs.map((faq, i) => (
           <div key={i} style={s.faqItem}>
             <button onClick={() => setOpenFaq(openFaq === i ? null : i)} style={s.faqQuestion}>
               <span>{faq.q}</span>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-                style={{ transform: openFaq === i ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                style={{ transform: openFaq === i ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0, color: theme.text.muted }}>
                 <path d="M6 9l6 6 6-6" />
               </svg>
             </button>
@@ -845,30 +945,27 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%',
   },
 
-  // Hero
-  hero: {
+  // Jackpot Banner
+  jackpotBanner: {
     position: 'relative',
-    borderRadius: '12px',
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
-    background: 'linear-gradient(135deg, #4a0eb8 0%, #7717ff 40%, #5b21b6 70%, #3b0764 100%)',
-    padding: '32px 20px',
+    background: `linear-gradient(135deg, ${theme.accent.violet} 0%, ${theme.accent.purple} 50%, ${theme.accent.lavender} 100%)`,
+    padding: '28px 24px',
     textAlign: 'center',
-    minHeight: '200px',
   },
-  heroDecor: { position: 'absolute', inset: 0, pointerEvents: 'none' },
-  heroContent: { position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' },
-  heroIcon: { marginBottom: '4px' },
-  heroTitle: { color: '#fff', fontSize: '18px', fontWeight: 600 },
-  heroDate: { color: 'rgba(255,255,255,0.7)', fontSize: '13px' },
-  heroJackpot: { color: '#fbbf24', fontSize: '42px', fontWeight: 800, fontFamily: 'monospace', textShadow: '0 2px 20px rgba(251,191,36,0.4)', marginTop: '8px' },
-  heroSub: { color: 'rgba(255,255,255,0.6)', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '1px' },
+  jackpotBannerDecor: { position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' },
+  jackpotBannerContent: { position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' },
+  jackpotDrawLabel: { color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '6px' },
+  jackpotAmount: { color: '#fff', fontSize: '46px', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1, textShadow: '0 2px 24px rgba(0,0,0,0.3)' },
+  jackpotSubLabel: { color: 'rgba(255,255,255,0.65)', fontSize: '12px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginTop: '4px' },
 
   // Tabs
   tabBar: {
     display: 'flex',
     gap: '0',
-    background: 'rgba(255,255,255,0.04)',
-    borderRadius: '8px',
+    background: theme.bg.card,
+    borderRadius: theme.radius.md,
     padding: '3px',
     border: `1px solid ${theme.border.subtle}`,
   },
@@ -881,46 +978,49 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '13px',
     fontWeight: 500,
     cursor: 'pointer',
-    borderRadius: '6px',
+    borderRadius: theme.radius.sm,
     transition: 'all 0.15s',
   },
   tabActive: {
-    background: theme.accent.purple,
+    background: theme.gradient.primary,
     color: '#fff',
+    fontWeight: 700,
   },
 
   // Messages
   errorMsg: {
-    background: 'rgba(239,68,68,0.1)',
-    border: '1px solid rgba(239,68,68,0.3)',
-    borderRadius: '8px',
+    background: 'rgba(255,71,87,0.08)',
+    border: `1px solid rgba(255,71,87,0.25)`,
+    borderRadius: theme.radius.md,
     padding: '10px 14px',
-    color: '#f87171',
+    color: theme.accent.red,
     fontSize: '13px',
   },
   successMsg: {
-    background: 'rgba(34,197,94,0.1)',
-    border: '1px solid rgba(34,197,94,0.3)',
-    borderRadius: '8px',
+    background: 'rgba(0,220,130,0.08)',
+    border: `1px solid rgba(0,220,130,0.25)`,
+    borderRadius: theme.radius.md,
     padding: '10px 14px',
-    color: '#34d399',
+    color: theme.accent.green,
     fontSize: '13px',
   },
 
   // Step cards
   stepCard: {
-    background: 'rgba(255,255,255,0.03)',
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
   },
   stepHeader: {
     padding: '10px 14px',
-    background: 'rgba(251,191,36,0.08)',
-    borderBottom: '1px dashed rgba(251,191,36,0.2)',
-    color: '#fbbf24',
+    background: 'rgba(139,92,246,0.07)',
+    borderBottom: `1px solid ${theme.border.accent}`,
+    color: theme.accent.purple,
     fontWeight: 700,
-    fontSize: '14px',
+    fontSize: '12px',
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   },
 
   // Entry type options
@@ -929,31 +1029,32 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '12px 14px',
-    background: 'rgba(255,255,255,0.04)',
-    border: '2px solid transparent',
-    borderRadius: '8px',
+    background: theme.bg.tertiary,
+    border: `2px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.md,
     cursor: 'pointer',
     transition: 'all 0.15s',
     width: '100%',
   },
   entryOptionActive: {
     borderColor: theme.accent.purple,
-    background: 'rgba(119,23,255,0.1)',
+    background: 'rgba(139,92,246,0.08)',
   },
   entryOptionPower: {
-    borderColor: '#7c3aed',
-    background: 'rgba(124,58,237,0.1)',
+    borderColor: theme.accent.violet,
+    background: 'rgba(124,58,237,0.08)',
   },
-  entryLabel: { color: theme.text.primary, fontWeight: 500, fontSize: '14px' },
-  entryPrice: { display: 'flex', alignItems: 'center', gap: '6px', color: '#22c55e', fontWeight: 600, fontFamily: 'monospace', fontSize: '14px' },
+  entryLabel: { color: theme.text.primary, fontWeight: 600, fontSize: '14px' },
+  entryPrice: { display: 'flex', alignItems: 'center', gap: '5px', color: theme.accent.green, fontWeight: 700, fontFamily: 'monospace', fontSize: '13px' },
+  powerBadge: { display: 'inline-flex', alignItems: 'center', padding: '1px 6px', background: 'rgba(139,92,246,0.15)', border: `1px solid ${theme.border.accent}`, borderRadius: theme.radius.sm, color: theme.accent.lavender, fontSize: '9px', fontWeight: 700, letterSpacing: '0.5px' },
 
   // Count input
   countInput: {
     width: '60px',
     padding: '8px 10px',
-    background: 'rgba(255,255,255,0.06)',
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '6px',
+    background: theme.bg.tertiary,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.sm,
     color: theme.text.primary,
     fontSize: '14px',
     textAlign: 'center',
@@ -962,14 +1063,19 @@ const s: Record<string, React.CSSProperties> = {
   },
   countPill: {
     padding: '6px 12px',
-    background: 'rgba(255,255,255,0.06)',
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '20px',
+    background: theme.bg.tertiary,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.full,
     color: theme.text.secondary,
     fontSize: '12px',
     cursor: 'pointer',
     transition: 'all 0.1s',
     fontWeight: 500,
+  },
+  countPillActive: {
+    background: 'rgba(139,92,246,0.12)',
+    border: `1px solid ${theme.border.accent}`,
+    color: theme.accent.lavender,
   },
 
   // Action buttons
@@ -978,9 +1084,9 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '4px',
     padding: '5px 10px',
-    background: 'rgba(255,255,255,0.06)',
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '6px',
+    background: theme.bg.elevated,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.sm,
     color: theme.text.secondary,
     fontSize: '11px',
     cursor: 'pointer',
@@ -993,28 +1099,28 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     gap: '8px',
     padding: '8px 10px',
-    background: 'rgba(255,255,255,0.02)',
-    borderRadius: '8px',
+    background: theme.bg.tertiary,
+    borderRadius: theme.radius.md,
     border: `1px solid ${theme.border.subtle}`,
   },
   ticketNum: {
     color: theme.text.muted,
-    fontSize: '12px',
-    fontWeight: 600,
-    width: '20px',
+    fontSize: '11px',
+    fontWeight: 700,
+    width: '18px',
     textAlign: 'center',
   },
 
   // Number circles
   numCircle: {
-    width: '36px',
-    height: '36px',
+    width: '34px',
+    height: '34px',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(255,255,255,0.06)',
-    border: '2px solid rgba(255,255,255,0.1)',
+    background: theme.bg.elevated,
+    border: `2px solid ${theme.border.medium}`,
     color: theme.text.muted,
     fontSize: '12px',
     cursor: 'pointer',
@@ -1022,14 +1128,14 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 500,
   },
   numCircleFilled: {
-    width: '36px',
-    height: '36px',
+    width: '34px',
+    height: '34px',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(255,255,255,0.12)',
-    border: '2px solid rgba(255,255,255,0.3)',
+    background: theme.gradient.primary,
+    border: 'none',
     color: '#fff',
     fontSize: '13px',
     fontWeight: 700,
@@ -1037,30 +1143,30 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s',
   },
   gemCircle: {
-    width: '36px',
-    height: '36px',
+    width: '34px',
+    height: '34px',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(139,92,246,0.12)',
-    border: '2px solid rgba(139,92,246,0.3)',
-    color: '#a78bfa',
-    fontSize: '10px',
-    fontWeight: 600,
+    background: 'rgba(139,92,246,0.07)',
+    border: `2px solid ${theme.border.accent}`,
+    color: theme.accent.lavender,
+    fontSize: '9px',
+    fontWeight: 700,
     cursor: 'pointer',
     transition: 'all 0.15s',
     marginLeft: '4px',
   },
   gemCircleFilled: {
-    width: '36px',
-    height: '36px',
+    width: '34px',
+    height: '34px',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: '#7c3aed',
-    border: '2px solid #a78bfa',
+    background: theme.gradient.primary,
+    border: `2px solid ${theme.accent.lavender}`,
     color: '#fff',
     fontSize: '14px',
     fontWeight: 700,
@@ -1074,9 +1180,9 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(255,255,255,0.05)',
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '6px',
+    background: theme.bg.elevated,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.sm,
     color: theme.text.muted,
     cursor: 'pointer',
   },
@@ -1085,20 +1191,20 @@ const s: Record<string, React.CSSProperties> = {
   pickerOverlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(0,0,0,0.6)',
+    background: theme.bg.overlay,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
-    backdropFilter: 'blur(4px)',
   },
   pickerCard: {
-    background: '#141414',
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '12px',
-    padding: '16px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.lg,
+    padding: '18px',
     maxWidth: '340px',
     width: '90%',
+    boxShadow: theme.shadow.lg,
   },
   pickerNum: {
     width: '100%',
@@ -1106,11 +1212,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: '8px',
-    border: '1px solid rgba(255,255,255,0.1)',
-    color: '#fff',
-    fontSize: '13px',
-    fontWeight: 600,
+    borderRadius: theme.radius.sm,
     cursor: 'pointer',
     transition: 'all 0.1s',
   },
@@ -1121,10 +1223,6 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: '50%',
-    border: '1px solid rgba(139,92,246,0.3)',
-    color: '#fff',
-    fontSize: '14px',
-    fontWeight: 700,
     cursor: 'pointer',
     transition: 'all 0.1s',
   },
@@ -1134,25 +1232,14 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '14px 16px',
-    background: 'rgba(255,255,255,0.04)',
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
+    padding: '14px 18px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.lg,
     position: 'sticky',
     bottom: '70px',
     zIndex: 10,
-    backdropFilter: 'blur(12px)',
-  },
-  buyBtn: {
-    padding: '12px 28px',
-    background: 'linear-gradient(135deg, #7717ff, #5b21b6)',
-    border: 'none',
-    borderRadius: '8px',
-    color: '#fff',
-    fontSize: '15px',
-    fontWeight: 700,
-    cursor: 'pointer',
-    transition: 'all 0.15s',
+    boxShadow: theme.shadow.md,
   },
 
   // Draw navigator
@@ -1161,65 +1248,71 @@ const s: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: '12px 16px',
-    background: 'rgba(255,255,255,0.03)',
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
+    borderRadius: theme.radius.lg,
   },
   drawNavBtn: {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
-    padding: '6px 12px',
-    background: 'none',
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '6px',
+    padding: '7px 14px',
+    background: theme.bg.tertiary,
+    border: `1px solid ${theme.border.medium}`,
+    borderRadius: theme.radius.sm,
     color: theme.text.secondary,
     fontSize: '13px',
+    fontWeight: 500,
     cursor: 'pointer',
   },
   currentBadge: {
-    display: 'inline-block',
+    display: 'inline-flex',
+    alignItems: 'center',
     padding: '2px 8px',
-    background: 'rgba(119,23,255,0.2)',
-    borderRadius: '10px',
-    color: '#a78bfa',
-    fontSize: '10px',
-    fontWeight: 600,
+    background: 'rgba(0,220,130,0.12)',
+    border: '1px solid rgba(0,220,130,0.25)',
+    borderRadius: theme.radius.full,
+    color: theme.accent.green,
+    fontSize: '9px',
+    fontWeight: 700,
+    letterSpacing: '0.5px',
     marginTop: '4px',
   },
 
   // Winning numbers display
   winningBox: {
     padding: '20px',
-    background: 'rgba(255,255,255,0.03)',
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
+    borderRadius: theme.radius.lg,
     textAlign: 'center',
   },
   winBall: {
-    width: '44px',
-    height: '44px',
+    width: '46px',
+    height: '46px',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'linear-gradient(135deg, #fbbf24, #d97706)',
-    color: '#000',
-    fontSize: '16px',
-    fontWeight: 800,
-  },
-  winGemBall: {
-    width: '44px',
-    height: '44px',
-    borderRadius: '50%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'linear-gradient(135deg, #a78bfa, #7c3aed)',
+    background: theme.gradient.primary,
     color: '#fff',
     fontSize: '16px',
     fontWeight: 800,
-    marginLeft: '8px',
+    boxShadow: theme.shadow.glow,
+  },
+  winGemBall: {
+    width: '46px',
+    height: '46px',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: theme.accent.violet,
+    border: `2px solid ${theme.accent.lavender}`,
+    color: '#fff',
+    fontSize: '16px',
+    fontWeight: 800,
+    boxShadow: theme.shadow.glow,
   },
 
   // Sub-tabs
@@ -1239,6 +1332,7 @@ const s: Record<string, React.CSSProperties> = {
   subTabActive: {
     color: theme.accent.purple,
     borderBottomColor: theme.accent.purple,
+    fontWeight: 700,
   },
 
   // My tickets
@@ -1246,9 +1340,9 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    padding: '8px 10px',
-    background: 'rgba(255,255,255,0.02)',
-    borderRadius: '6px',
+    padding: '10px 12px',
+    background: theme.bg.card,
+    borderRadius: theme.radius.md,
     border: `1px solid ${theme.border.subtle}`,
   },
   miniBall: {
@@ -1278,23 +1372,25 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '8px',
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
+    background: theme.bg.card,
   },
   prizeHeader: {
     display: 'flex',
     padding: '10px 14px',
-    background: 'rgba(255,255,255,0.04)',
-    borderBottom: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.elevated,
+    borderBottom: `1px solid ${theme.border.medium}`,
     color: theme.text.muted,
-    fontSize: '11px',
-    fontWeight: 600,
-    textTransform: 'uppercase',
+    fontSize: '10px',
+    fontWeight: 700,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
   },
   prizeRow: {
     display: 'flex',
     alignItems: 'center',
-    padding: '10px 14px',
+    padding: '11px 14px',
     borderBottom: `1px solid ${theme.border.subtle}`,
     fontSize: '13px',
     color: theme.text.secondary,
@@ -1304,11 +1400,11 @@ const s: Record<string, React.CSSProperties> = {
   howCard: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '6px',
-    padding: '16px',
-    background: 'rgba(255,255,255,0.03)',
+    gap: '10px',
+    padding: '18px 14px',
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
+    borderRadius: theme.radius.lg,
     textAlign: 'center',
     alignItems: 'center',
   },
@@ -1317,14 +1413,15 @@ const s: Record<string, React.CSSProperties> = {
     flexDirection: 'column',
     gap: '6px',
     padding: '14px',
-    background: 'rgba(255,255,255,0.03)',
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
+    borderRadius: theme.radius.lg,
   },
   faqItem: {
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '8px',
+    borderRadius: theme.radius.md,
     overflow: 'hidden',
+    background: theme.bg.card,
   },
   faqQuestion: {
     display: 'flex',
@@ -1332,7 +1429,7 @@ const s: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     width: '100%',
     padding: '12px 14px',
-    background: 'rgba(255,255,255,0.03)',
+    background: theme.bg.card,
     border: 'none',
     color: theme.text.primary,
     fontSize: '13px',
@@ -1346,5 +1443,6 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     lineHeight: '1.6',
     borderTop: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.tertiary,
   },
 };

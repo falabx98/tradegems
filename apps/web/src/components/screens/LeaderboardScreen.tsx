@@ -8,6 +8,8 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { MoneyIcon, GemIcon, ChartBarIcon, MedalIcon, TrophyIcon } from '../ui/GameIcons';
 import { setProfileTarget } from './PlayerProfileScreen';
 import { isPhotoAvatar, getAvatarGradient, getInitials as getAvatarInitials } from '../../utils/avatars';
+import { PageHeader } from '../ui/PageHeader';
+import { TabBar } from '../ui/TabBar';
 
 interface LeaderboardEntry {
   rank: number;
@@ -86,41 +88,29 @@ export function LeaderboardScreen() {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header} className="card-enter">
-        <h1 style={styles.title}>Rankings</h1>
-      </div>
+      <PageHeader title="Leaderboard" subtitle="Top players ranked by profit, multiplier, and volume" icon={<TrophyIcon size={20} color={theme.accent.purple} />} />
 
-      {/* Tab bar */}
-      <div style={styles.tabBar} className="card-enter card-enter-1">
-        {TABS.map((tab) => (
+      {/* Category tabs */}
+      <TabBar
+        tabs={TABS.map((t) => ({ id: t.id, label: t.label }))}
+        active={activeTab}
+        onChange={(id) => setActiveTab(id)}
+      />
+
+      {/* Period selector */}
+      <div style={styles.periodWrap} className="card-enter card-enter-1">
+        {PERIODS.map((p) => (
           <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            key={p.id}
+            onClick={() => setActivePeriod(p.id)}
             style={{
-              ...styles.tab,
-              ...(activeTab === tab.id ? styles.tabActive : {}),
+              ...styles.periodBtn,
+              ...(activePeriod === p.id ? styles.periodActive : {}),
             }}
           >
-            <span>{tab.icon}</span>
-            {(!isMobile || activeTab === tab.id) && <span>{tab.label}</span>}
+            {p.label}
           </button>
         ))}
-        <div style={{ flex: 1 }} />
-        <div style={styles.periodWrap}>
-          {PERIODS.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => setActivePeriod(p.id)}
-              style={{
-                ...styles.periodBtn,
-                ...(activePeriod === p.id ? styles.periodActive : {}),
-              }}
-            >
-              {p.label}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Top 3 Podium */}
@@ -187,7 +177,7 @@ export function LeaderboardScreen() {
                 <span style={{
                   fontSize: actualRank === 1 ? '14px' : '13px',
                   fontWeight: 700,
-                  color: isMe ? '#c084fc' : theme.text.primary,
+                  color: isMe ? '#3b82f6' : theme.text.primary,
                   maxWidth: isMobile ? '80px' : '110px',
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -196,7 +186,7 @@ export function LeaderboardScreen() {
                   marginTop: '4px',
                 }}>
                   {entry.username || 'Anonymous'}
-                  {isMe && <span style={{ color: '#c084fc', fontSize: '10px' }}> (you)</span>}
+                  {isMe && <span style={{ color: '#3b82f6', fontSize: '10px' }}> (you)</span>}
                 </span>
 
                 {/* Score */}
@@ -266,9 +256,23 @@ export function LeaderboardScreen() {
             </>
           ) : entries.length === 0 ? (
             <div style={styles.empty}>
-              <TrophyIcon size={44} color="#fbbf24" />
+              <TrophyIcon size={44} color="#8b5cf6" />
               <span style={styles.emptyTitle}>No Rankings Yet</span>
               <span style={styles.emptyDesc}>Play rounds to climb the leaderboard and earn your spot!</span>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                {['profit', 'multiplier', 'volume'].map((t) => (
+                  <div key={t} style={{
+                    padding: '8px 14px', borderRadius: '8px',
+                    background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)',
+                    fontSize: '11px', color: theme.text.muted, textAlign: 'center',
+                  }}>
+                    <div style={{ fontSize: '14px', fontWeight: 700, color: '#8b5cf6' }}>
+                      {t === 'profit' ? '💰' : t === 'multiplier' ? '🎯' : '📊'}
+                    </div>
+                    <div style={{ marginTop: '2px', textTransform: 'capitalize' }}>{t}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             (hasTop3 ? rest : entries).map((entry) => {
@@ -309,7 +313,7 @@ export function LeaderboardScreen() {
                         borderRadius: '50%',
                         objectFit: 'cover' as const,
                         border: isMe
-                          ? '1.5px solid rgba(119, 23, 255, 0.4)'
+                          ? '1.5px solid rgba(139, 92, 246, 0.4)'
                           : meta ? `1.5px solid ${meta.color}30` : '1.5px solid rgba(255, 255, 255, 0.08)',
                         flexShrink: 0,
                       }} />
@@ -319,10 +323,10 @@ export function LeaderboardScreen() {
                         height: 30,
                         borderRadius: '50%',
                         background: isMe
-                          ? 'rgba(119, 23, 255, 0.15)'
+                          ? 'rgba(139, 92, 246, 0.15)'
                           : getAvatarGradient(null, entry.username),
                         border: isMe
-                          ? '1.5px solid rgba(119, 23, 255, 0.4)'
+                          ? '1.5px solid rgba(139, 92, 246, 0.4)'
                           : meta ? `1.5px solid ${meta.color}30` : '1.5px solid rgba(255, 255, 255, 0.08)',
                         display: 'flex',
                         alignItems: 'center',
@@ -330,7 +334,7 @@ export function LeaderboardScreen() {
                         fontSize: '11px',
                         fontWeight: 700,
                         fontFamily: "inherit",
-                        color: isMe ? '#c084fc' : meta ? meta.color : '#fff',
+                        color: isMe ? '#3b82f6' : meta ? meta.color : '#fff',
                         flexShrink: 0,
                       }}>
                         {getAvatarInitials(entry.username)}
@@ -341,7 +345,7 @@ export function LeaderboardScreen() {
                       <span style={{
                         fontSize: '14px',
                         fontWeight: 600,
-                        color: isMe ? '#c084fc' : theme.text.primary,
+                        color: isMe ? '#3b82f6' : theme.text.primary,
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
@@ -362,8 +366,8 @@ export function LeaderboardScreen() {
                           height: '100%',
                           borderRadius: '2px',
                           background: isMe
-                            ? 'rgba(119, 23, 255, 0.5)'
-                            : meta ? `${meta.color}50` : 'rgba(119, 23, 255, 0.2)',
+                            ? 'rgba(139, 92, 246, 0.5)'
+                            : meta ? `${meta.color}50` : 'rgba(139, 92, 246, 0.2)',
                           transition: 'width 0.6s ease',
                         }} />
                       </div>
@@ -377,7 +381,7 @@ export function LeaderboardScreen() {
                     fontSize: '14px',
                     fontWeight: 700,
                     fontFamily: "'JetBrains Mono', monospace",
-                    color: isMe ? '#c084fc' : meta ? meta.color : theme.text.primary,
+                    color: isMe ? '#3b82f6' : meta ? meta.color : theme.text.primary,
                     textShadow: meta ? `0 0 8px ${meta.glow}` : 'none',
                   }}>
                     {formatScore(entry.score, activeTab)}
@@ -401,66 +405,21 @@ const styles: Record<string, React.CSSProperties> = {
     minHeight: '100%',
     boxSizing: 'border-box',
   },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    fontSize: '22px',
-    fontWeight: 800,
-    fontFamily: "inherit",
-    color: theme.text.primary,
-    margin: 0,
-    letterSpacing: '1px',
-    textTransform: 'uppercase' as const,
-    textShadow: '0 0 20px rgba(119, 23, 255, 0.3)',
-  },
-
-  // Tabs
-  tabBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-    background: theme.bg.secondary,
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '12px',
-    padding: '4px',
-  },
-  tab: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '7px 14px',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: '8px',
-    color: theme.text.muted,
-    fontSize: '13px',
-    fontWeight: 700,
-    cursor: 'pointer',
-    fontFamily: "inherit",
-    transition: 'all 0.15s',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.5px',
-  },
-  tabActive: {
-    background: 'rgba(119, 23, 255, 0.15)',
-    color: '#c084fc',
-    boxShadow: '0 0 12px rgba(119, 23, 255, 0.25)',
-  },
+  // Period selector
   periodWrap: {
     display: 'flex',
-    gap: '2px',
-    background: 'rgba(0, 0, 0, 0.2)',
-    borderRadius: '6px',
-    padding: '2px',
+    gap: '4px',
+    background: theme.bg.card,
+    border: `1px solid ${theme.border.subtle}`,
+    borderRadius: theme.radius.md,
+    padding: '3px',
+    alignSelf: 'flex-start',
   },
   periodBtn: {
-    padding: '4px 10px',
+    padding: '5px 14px',
     background: 'transparent',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: theme.radius.sm,
     color: theme.text.muted,
     fontSize: '12px',
     fontWeight: 600,
@@ -469,8 +428,8 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'all 0.15s',
   },
   periodActive: {
-    background: 'rgba(119, 23, 255, 0.2)',
-    color: '#c084fc',
+    background: theme.gradient.primary,
+    color: '#fff',
   },
 
   // Podium
@@ -484,9 +443,9 @@ const styles: Record<string, React.CSSProperties> = {
 
   // Table
   panel: {
-    background: theme.bg.secondary,
+    background: theme.bg.card,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '14px',
+    borderRadius: theme.radius.lg,
     overflow: 'hidden',
     flex: 1,
     display: 'flex',
@@ -496,7 +455,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     padding: '10px 14px',
     borderBottom: `1px solid ${theme.border.subtle}`,
-    background: 'rgba(32, 24, 48, 0.6)',
+    background: theme.bg.tertiary,
   },
   th: {
     fontSize: '12px',
@@ -517,8 +476,8 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'background 0.15s',
   },
   rowMe: {
-    background: 'rgba(119, 23, 255, 0.06)',
-    borderLeft: '3px solid #7717ff',
+    background: 'rgba(139, 92, 246, 0.06)',
+    borderLeft: '3px solid #8b5cf6',
   },
   rankNum: {
     fontSize: '14px',
@@ -529,9 +488,9 @@ const styles: Record<string, React.CSSProperties> = {
   meTag: {
     fontSize: '10px',
     fontWeight: 700,
-    color: '#c084fc',
+    color: '#3b82f6',
     padding: '1px 5px',
-    background: 'rgba(119, 23, 255, 0.15)',
+    background: 'rgba(139, 92, 246, 0.15)',
     borderRadius: '4px',
     marginLeft: '6px',
     verticalAlign: 'middle',

@@ -490,7 +490,7 @@ export function LobbyScreen() {
               </div>
               <div style={s.statDivider} />
               <StatRow label="Rounds" value={`${profile.roundsPlayed}`} />
-              <StatRow label="Best" value={`${profile.bestMultiplier.toFixed(1)}x`} color={theme.game.multiplier} />
+              <StatRow label="Best" value={`${Number(profile.bestMultiplier || 0).toFixed(1)}x`} color={theme.game.multiplier} />
               <div style={s.statDivider} />
               <StatRow label="XP" value={`${profile.xp}/${profile.xpToNext}`} color={theme.accent.purple} />
               <div style={s.xpBarContainer}>
@@ -595,8 +595,8 @@ function LiveWinsTicker() {
               <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, background: getAvatarGradient(null, w.username), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 700, color: '#fff' }}>{getInitials(w.username)}</div>
               <span style={{ fontSize: '12px', fontWeight: 600, color: theme.text.secondary, maxWidth: '70px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{w.username}</span>
               <span style={{ fontSize: '9px', fontWeight: 700, padding: '2px 5px', borderRadius: '4px', letterSpacing: '0.5px', background: `${badgeColor}20`, color: badgeColor }}>{w.feedType}</span>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: theme.game.multiplier }} className="mono">{w.multiplier.toFixed(2)}x</span>
-              <span style={{ fontSize: '12px', fontWeight: 600, color: theme.game.multiplier }} className="mono">+{(w.profit / 1e9).toFixed(3)}</span>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: theme.game.multiplier }} className="mono">{Number(w.multiplier).toFixed(2)}x</span>
+              <span style={{ fontSize: '12px', fontWeight: 600, color: theme.game.multiplier }} className="mono">+{(Number(w.profit) / 1e9).toFixed(3)}</span>
             </div>
           );
         })}

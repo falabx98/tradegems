@@ -235,6 +235,9 @@ export const api = {
   getRoundHistory: (limit?: number) =>
     apiFetch(`/v1/rounds/history?limit=${limit || 20}`),
 
+  getRecentRounds: (limit?: number) =>
+    apiFetch<{ data: any[] }>(`/v1/rounds/recent?limit=${limit || 20}`),
+
   // Solo round lifecycle
   startSoloRound: () =>
     apiFetch('/v1/rounds/solo/start', { method: 'POST' }),
@@ -433,6 +436,9 @@ export const api = {
 
   getPredictionHistory: (limit?: number) =>
     apiFetch<{ data: Array<{ id: string; direction: string; betAmount: number; result: string; payout: number; multiplier: string; pattern: string | null; createdAt: string }> }>(`/v1/predictions/history?limit=${limit || 20}`),
+
+  getRecentPredictions: (limit?: number) =>
+    apiFetch<{ data: any[] }>(`/v1/predictions/recent?limit=${limit || 20}`),
 
   // Player Profile
   getPlayerProfile: (id: string) =>

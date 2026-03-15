@@ -213,13 +213,35 @@ export async function predictionRoutes(server: FastifyInstance) {
     return { success: true, id: saved.id, payout: actualPayout, xpGained, result: serverResult };
   });
 
-  // Get prediction history
+  // Get prediction history (per user)
   server.get('/history', async (request) => {
     const userId = getAuthUser(request).userId;
     const { limit } = request.query as { limit?: string };
 
     const data = await db.select().from(predictionRounds)
       .where(eq(predictionRounds.userId, userId))
+      .orderBy(desc(predictionRounds.createdAt))
+      .limit(parseInt(limit || '20'));
+
+    return { data };
+  });
+
+  // Global recent predictions (public, all users)
+  server.get('/recent', async (request) => {
+    const { limit } = request.query as { limit?: string };
+
+    const data = await db.select({
+      id: predictionRounds.id,
+      username: users.username,
+      direction: predictionRounds.direction,
+      betAmount: predictionRounds.betAmount,
+      result: predictionRounds.result,
+      payout: predictionRounds.payout,
+      multiplier: predictionRounds.multiplier,
+      createdAt: predictionRounds.createdAt,
+    })
+      .from(predictionRounds)
+      .innerJoin(users, eq(predictionRounds.userId, users.id))
       .orderBy(desc(predictionRounds.createdAt))
       .limit(parseInt(limit || '20'));
 

@@ -118,12 +118,12 @@ export function SoloSetupScreen() {
         <RecentGames
           title="Recent Solo Games"
           fetchGames={async () => {
-            const res = await api.getRoundHistory(10) as any;
+            const res = await api.getRecentRounds(10) as any;
             return (res.data || res || []).map((r: any) => ({
               id: r.id || r.roundId,
               result: r.resultType === 'win' ? 'win' : 'loss',
               multiplier: r.finalMultiplier || 0,
-              amount: r.betAmount || 0,
+              amount: r.amount || r.betAmount || 0,
               payout: r.payoutAmount || 0,
               time: r.createdAt,
             }));

@@ -364,7 +364,7 @@ export function PredictionScreen() {
         <RecentGames
           title="Recent Predictions"
           fetchGames={async () => {
-            const res = await api.getPredictionHistory(10);
+            const res = await api.getRecentPredictions(10);
             return (res.data || []).map((r: any) => ({
               id: r.id,
               result: r.result === 'win' ? 'win' : 'loss',

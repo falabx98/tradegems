@@ -1,5 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { desc, eq } from 'drizzle-orm';
+import { betResults, bets, users } from '@tradingarena/db';
+import { getDb } from '../config/database.js';
 import { BetService } from '../modules/bet/bet.service.js';
 import { RoundService } from '../modules/round/round.service.js';
 import { requireAuth, requireAdmin, getAuthUser } from '../middleware/auth.js';
@@ -73,6 +76,27 @@ export async function gameplayRoutes(server: FastifyInstance) {
       getAuthUser(request).userId,
       limit ? parseInt(limit) : 20,
     );
+    return { data: results };
+  });
+
+  // Global recent solo games (public, all users)
+  server.get('/recent', async (request) => {
+    const { limit } = request.query as { limit?: string };
+    const db = getDb();
+    const results = await db.select({
+      id: betResults.id,
+      username: users.username,
+      finalMultiplier: betResults.finalMultiplier,
+      amount: bets.amount,
+      payoutAmount: betResults.payoutAmount,
+      resultType: betResults.resultType,
+      createdAt: betResults.createdAt,
+    })
+      .from(betResults)
+      .innerJoin(users, eq(betResults.userId, users.id))
+      .innerJoin(bets, eq(betResults.betId, bets.id))
+      .orderBy(desc(betResults.createdAt))
+      .limit(parseInt(limit || '20'));
     return { data: results };
   });
 

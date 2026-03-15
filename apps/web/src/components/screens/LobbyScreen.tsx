@@ -411,8 +411,6 @@ export function LobbyScreen() {
   if (isMobile) {
     return (
       <div style={{ ...s.container, padding: '10px', gap: '12px' }}>
-        <BannerCarousel isMobile={isMobile} onBannerClick={handleBannerClick} />
-
         {/* Quick Stats — 2x2 compact on mobile */}
         <div style={{ ...s.statsRow, gridTemplateColumns: 'repeat(2, 1fr)' }}>
           <StatCard label="Players" value={liveStats.active} color={theme.accent.lavender} />
@@ -476,8 +474,6 @@ export function LobbyScreen() {
   /* ─── DESKTOP LAYOUT ─── */
   return (
     <div style={s.container}>
-      <BannerCarousel isMobile={false} onBannerClick={handleBannerClick} />
-
       {/* Quick Stats Row */}
       {statsRow}
 
@@ -740,7 +736,7 @@ const tickerStyles: Record<string, React.CSSProperties> = {
     gap: '16px',
     padding: '10px 14px',
     whiteSpace: 'nowrap' as const,
-    overflow: 'hidden',
+    width: 'max-content',
   },
   entry: {
     display: 'inline-flex',

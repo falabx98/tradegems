@@ -236,8 +236,8 @@ export class TradingSimService {
     const expectedPrice = chartData[candleIdx]?.close;
 
     if (expectedPrice !== undefined) {
-      // Allow 2% tolerance for latency/rounding
-      const tolerance = expectedPrice * 0.02;
+      // Allow 5% tolerance for latency/rounding (client may be 1-2 candles behind)
+      const tolerance = expectedPrice * 0.05;
       if (Math.abs(price - expectedPrice) > tolerance) {
         throw new Error(`Trade price deviates too far from chart price`);
       }
@@ -250,7 +250,7 @@ export class TradingSimService {
     const maxQty = Math.ceil((SIM_START_BALANCE * 2) / Math.max(price, 0.01));
     if (quantity > maxQty) throw new Error(`Quantity exceeds maximum allowed`);
 
-    // Record the trade
+    // Record the trade (store elapsed seconds, not raw Date.now())
     const [trade] = await this.db
       .insert(tradingSimTrades)
       .values({
@@ -259,7 +259,7 @@ export class TradingSimService {
         tradeType,
         price: price.toFixed(4),
         quantity,
-        timestamp,
+        timestamp: elapsedSec,
       })
       .returning();
 

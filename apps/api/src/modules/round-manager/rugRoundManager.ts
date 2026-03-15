@@ -41,6 +41,18 @@ let state: RoundState | null = null;
 let hiddenRugMultiplier = 1.00;
 let hiddenSeed = '';
 let phaseStartedAt = 0;
+const inFlightBets = new Set<string>();
+let stateLock = false;
+
+async function withStateLock<T>(fn: () => Promise<T>): Promise<T> {
+  if (stateLock) throw new Error('State operation in progress');
+  stateLock = true;
+  try {
+    return await fn();
+  } finally {
+    stateLock = false;
+  }
+}
 
 const db = () => getDb();
 const wallet = new WalletService();
@@ -117,29 +129,33 @@ async function transitionToActive() {
 }
 
 async function settleAllBets() {
-  if (!state) return;
-  const database = db();
+  return withStateLock(async () => {
+    if (!state) return;
+    const database = db();
 
-  for (const bet of state.bets) {
-    if (bet.status === 'active') {
-      // Not cashed out = rugged
-      bet.status = 'rugged';
-      await database.update(rugRoundBets)
-        .set({ status: 'rugged', payout: 0, settledAt: new Date() })
-        .where(and(
-          eq(rugRoundBets.roundId, state.roundId),
-          eq(rugRoundBets.userId, bet.userId)
-        ));
+    for (const bet of state.bets) {
+      if (bet.status === 'active') {
+        // Not cashed out = rugged
+        bet.status = 'rugged';
+        await database.update(rugRoundBets)
+          .set({ status: 'rugged', payout: 0, settledAt: new Date() })
+          .where(and(
+            eq(rugRoundBets.roundId, state.roundId),
+            eq(rugRoundBets.userId, bet.userId)
+          ));
 
-      // Settle wallet: player loses bet
-      const user = await database.query.users.findFirst({ where: eq(users.id, bet.userId) });
-      if (user && user.role !== 'bot') {
-        try {
-          await wallet.settlePayout(bet.userId, bet.betAmount, 0, 0, 'SOL', { type: 'rug_round', id: state.roundId });
-        } catch { /* bot or already settled */ }
+        // Settle wallet: player loses bet
+        const user = await database.query.users.findFirst({ where: eq(users.id, bet.userId) });
+        if (user && user.role !== 'bot') {
+          try {
+            await wallet.settlePayout(bet.userId, bet.betAmount, 0, 0, 'SOL', { type: 'rug_round', id: state.roundId });
+          } catch (err) {
+            console.error('[RugRound] settleAllBets settlement failed:', err, { userId: bet.userId, roundId: state.roundId });
+          }
+        }
       }
     }
-  }
+  });
 }
 
 async function transitionToResolved() {
@@ -233,36 +249,55 @@ export async function joinRound(userId: string, betAmount: number): Promise<{ su
     return { success: false, message: 'Already in this round.' };
   }
 
-  // Check user role for wallet ops
-  const database = db();
-  const user = await database.query.users.findFirst({ where: eq(users.id, userId) });
-  if (!user) return { success: false, message: 'User not found.' };
-
-  // Lock funds (skip for bots)
-  if (user.role !== 'bot') {
-    await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state.roundId });
+  // Prevent concurrent joins from the same user
+  if (inFlightBets.has(userId)) {
+    return { success: false, message: 'Bet already in progress.' };
   }
+  inFlightBets.add(userId);
+  try {
+    return await withStateLock(async () => {
+      // Check user role for wallet ops
+      const database = db();
+      const user = await database.query.users.findFirst({ where: eq(users.id, userId) });
+      if (!user) return { success: false, message: 'User not found.' };
 
-  // Insert bet to DB
-  await database.insert(rugRoundBets).values({
-    roundId: state.roundId,
-    userId,
-    betAmount,
-    status: 'active',
-  });
+      // Lock funds (skip for bots)
+      if (user.role !== 'bot') {
+        await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state!.roundId });
+      }
 
-  // Add to state
-  state.bets.push({
-    userId,
-    username: user.username || 'Player',
-    avatarUrl: user.avatarUrl || null,
-    betAmount,
-    cashOutMultiplier: null,
-    status: 'active',
-  });
+      try {
+        // Insert bet to DB
+        await database.insert(rugRoundBets).values({
+          roundId: state!.roundId,
+          userId,
+          betAmount,
+          status: 'active',
+        });
+      } catch (err) {
+        // DB insert failed — rollback the fund lock
+        if (user.role !== 'bot') {
+          try { await wallet.releaseFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state!.roundId }); } catch {}
+        }
+        throw err;
+      }
 
-  await saveToRedis();
-  return { success: true };
+      // Add to state
+      state!.bets.push({
+        userId,
+        username: user.username || 'Player',
+        avatarUrl: user.avatarUrl || null,
+        betAmount,
+        cashOutMultiplier: null,
+        status: 'active',
+      });
+
+      await saveToRedis();
+      return { success: true };
+    });
+  } finally {
+    inFlightBets.delete(userId);
+  }
 }
 
 export async function cashOut(userId: string): Promise<{ success: boolean; multiplier?: number; payout?: number; message?: string }> {
@@ -270,46 +305,48 @@ export async function cashOut(userId: string): Promise<{ success: boolean; multi
     return { success: false, message: 'Round is not active.' };
   }
 
-  const bet = state.bets.find(b => b.userId === userId && b.status === 'active');
-  if (!bet) {
-    return { success: false, message: 'No active bet in this round.' };
-  }
+  return withStateLock(async () => {
+    const bet = state!.bets.find(b => b.userId === userId && b.status === 'active');
+    if (!bet) {
+      return { success: false, message: 'No active bet in this round.' };
+    }
 
-  const multiplier = state.currentMultiplier;
+    const multiplier = state!.currentMultiplier;
 
-  // Already past rug? (race condition protection)
-  if (multiplier >= hiddenRugMultiplier) {
-    return { success: false, message: 'Too late — rugged!' };
-  }
+    // Already past rug? (race condition protection)
+    if (multiplier >= hiddenRugMultiplier) {
+      return { success: false, message: 'Too late — rugged!' };
+    }
 
-  const payout = Math.floor(bet.betAmount * multiplier);
-  bet.cashOutMultiplier = parseFloat(multiplier.toFixed(4));
-  bet.status = 'cashed_out';
+    const payout = Math.floor(bet.betAmount * multiplier);
+    bet.cashOutMultiplier = parseFloat(multiplier.toFixed(4));
+    bet.status = 'cashed_out';
 
-  const database = db();
+    const database = db();
 
-  // Update bet in DB
-  await database.update(rugRoundBets)
-    .set({
-      cashOutMultiplier: multiplier.toFixed(4),
-      payout,
-      status: 'cashed_out',
-      settledAt: new Date(),
-    })
-    .where(and(
-      eq(rugRoundBets.roundId, state.roundId),
-      eq(rugRoundBets.userId, userId)
-    ));
+    // Update bet in DB
+    await database.update(rugRoundBets)
+      .set({
+        cashOutMultiplier: multiplier.toFixed(4),
+        payout,
+        status: 'cashed_out',
+        settledAt: new Date(),
+      })
+      .where(and(
+        eq(rugRoundBets.roundId, state!.roundId),
+        eq(rugRoundBets.userId, userId)
+      ));
 
-  // Settle wallet (skip for bots)
-  const user = await database.query.users.findFirst({ where: eq(users.id, userId) });
-  if (user && user.role !== 'bot') {
-    // fee=0 because house edge is embedded in the crash point algorithm; lockFunds only locked betAmount
-    await wallet.settlePayout(userId, bet.betAmount, 0, payout, 'SOL', { type: 'rug_round', id: state.roundId });
-  }
+    // Settle wallet (skip for bots)
+    const user = await database.query.users.findFirst({ where: eq(users.id, userId) });
+    if (user && user.role !== 'bot') {
+      // fee=0 because house edge is embedded in the crash point algorithm; lockFunds only locked betAmount
+      await wallet.settlePayout(userId, bet.betAmount, 0, payout, 'SOL', { type: 'rug_round', id: state!.roundId });
+    }
 
-  await saveToRedis();
-  return { success: true, multiplier: bet.cashOutMultiplier, payout };
+    await saveToRedis();
+    return { success: true, multiplier: bet.cashOutMultiplier, payout };
+  });
 }
 
 export async function getRecentRounds(limit: number = 10) {

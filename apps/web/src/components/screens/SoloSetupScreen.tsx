@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../../stores/gameStore';
+import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
@@ -8,9 +9,10 @@ import { playBetPlaced, hapticMedium } from '../../utils/sounds';
 import { api, getServerConfig } from '../../utils/api';
 import { BetPanel } from '../ui/BetPanel';
 import { RecentGames } from '../ui/RecentGames';
+import { toast } from '../../stores/toastStore';
 
 // Defaults that match server — will be overwritten by getServerConfig()
-let _feeRate = 0.05;
+let _feeRate = 0.03;
 let _minBetLamports = 1_000_000;
 
 export function SoloSetupScreen() {
@@ -40,6 +42,12 @@ export function SoloSetupScreen() {
 
   const handleStart = () => {
     if (!canAfford || !meetsMinBet) return;
+    const { isAuthenticated } = useAuthStore.getState();
+    if (!isAuthenticated) {
+      toast.error('Login Required', 'Please log in or connect a wallet before playing.');
+      go('auth');
+      return;
+    }
     playBetPlaced();
     hapticMedium();
     startRound();

@@ -22,6 +22,7 @@ interface PredictionLock {
   refId: string;
   direction: 'up' | 'down' | 'sideways'; // locked at bet time — client cannot change
   serverOutcome: 'win' | 'loss'; // Server-determined result — client cannot override
+  createdAt: number; // Date.now() timestamp for orphan cleanup
 }
 
 // ── Win probabilities per direction (house edge ~8-10% after 3% fee) ──
@@ -76,10 +77,17 @@ export async function predictionRoutes(server: FastifyInstance) {
       refId,
       direction: body.direction,
       serverOutcome,
+      createdAt: Date.now(),
     };
     await redis.set(`prediction:lock:${refId}`, JSON.stringify(lockData), 'EX', 120);
 
-    return { success: true, lockRef: refId, fee };
+    // Return chart direction instead of raw win/loss to prevent cheating.
+    // If win: chart moves in the user's predicted direction. If loss: chart moves a different direction.
+    const chartDirection: 'up' | 'down' | 'sideways' = serverOutcome === 'win'
+      ? body.direction
+      : (['up', 'down', 'sideways'] as const).filter(d => d !== body.direction)[Math.floor(Math.random() * 2)];
+
+    return { success: true, lockRef: refId, fee, chartDirection };
   });
 
   // Step 2: Settle prediction after game resolves (uses pre-locked funds)
@@ -217,11 +225,12 @@ export async function predictionRoutes(server: FastifyInstance) {
   server.get('/history', async (request) => {
     const userId = getAuthUser(request).userId;
     const { limit } = request.query as { limit?: string };
+    const parsedLimit = Math.min(Math.max(parseInt(limit || '20', 10) || 20, 1), 100);
 
     const data = await db.select().from(predictionRounds)
       .where(eq(predictionRounds.userId, userId))
       .orderBy(desc(predictionRounds.createdAt))
-      .limit(parseInt(limit || '20'));
+      .limit(parsedLimit);
 
     return { data };
   });
@@ -234,6 +243,7 @@ export async function predictionPublicRoutes(server: FastifyInstance) {
 
   server.get('/recent', async (request) => {
     const { limit } = request.query as { limit?: string };
+    const parsedLimit = Math.min(Math.max(parseInt(limit || '20', 10) || 20, 1), 100);
 
     const data = await db.select({
       id: predictionRounds.id,
@@ -248,7 +258,7 @@ export async function predictionPublicRoutes(server: FastifyInstance) {
       .from(predictionRounds)
       .innerJoin(users, eq(predictionRounds.userId, users.id))
       .orderBy(desc(predictionRounds.createdAt))
-      .limit(parseInt(limit || '20'));
+      .limit(parsedLimit);
 
     return { data };
   });

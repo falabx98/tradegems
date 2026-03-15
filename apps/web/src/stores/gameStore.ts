@@ -142,7 +142,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     // Deduct betAmount + fee from local balance immediately
     // Use cached server config fee rate; sync it in background if not loaded yet
     const cachedConfig = (globalThis as any).__serverConfig;
-    const feeRate = cachedConfig?.feeRate ?? 0.05;
+    const feeRate = cachedConfig?.feeRate ?? 0.03;
     const fee = Math.floor(state.betAmount * feeRate);
     const totalCost = state.betAmount + fee;
     const profile = { ...state.profile };
@@ -172,7 +172,7 @@ export const useGameStore = create<GameState>((set, get) => ({
         const round = await api.startSoloRound() as any;
         const roundId = round.id;
 
-        const idempotencyKey = `${roundId}-${Date.now()}`;
+        const idempotencyKey = `solo-${roundId}`;
         await api.placeBet(roundId, {
           amount: state.betAmount, // already in lamports
           riskTier: state.riskTier,

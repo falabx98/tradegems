@@ -423,7 +423,7 @@ export const api = {
 
   // Predictions
   lockPrediction: (betAmount: number, direction: 'up' | 'down' | 'sideways') =>
-    apiFetch<{ success: boolean; lockRef: string; fee: number }>('/v1/predictions/lock', {
+    apiFetch<{ success: boolean; lockRef: string; fee: number; chartDirection: 'up' | 'down' | 'sideways' }>('/v1/predictions/lock', {
       method: 'POST',
       body: JSON.stringify({ betAmount, direction }),
     }),

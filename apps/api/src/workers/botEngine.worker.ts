@@ -32,6 +32,7 @@ interface PendingSimRoom {
 // ─── State ──────────────────────────────────────────────────
 let botUsers: BotUser[] = [];
 let engineTimer: ReturnType<typeof setInterval> | null = null;
+let cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 // Pending lifecycle arrays
 const pendingSimJoins: PendingSimJoin[] = [];
@@ -274,11 +275,13 @@ async function simulateSoloPlay(bot: BotUser): Promise<void> {
     }).returning({ id: rounds.id });
 
     // Insert bet
+    const feeRate = parseFloat(process.env.PLATFORM_FEE_RATE || '0.03');
+    const fee = Math.floor(betAmount * feeRate);
     const [bet] = await db.insert(bets).values({
       userId: bot.id,
       roundId: round.id,
       amount: betAmount,
-      fee: 0,
+      fee,
       riskTier,
       betSizeTier: betAmount >= 500_000_000 ? 'large' : betAmount >= 100_000_000 ? 'medium' : 'small',
       status: 'settled',
@@ -658,12 +661,11 @@ async function botBuyLotteryTickets(bot: BotUser): Promise<void> {
     // Insert tickets directly (bots don't use real balance)
     await db.insert(lotteryTickets).values(ticketValues);
 
-    // Update draw counters
+    // Update draw ticket count only — do NOT inflate prizePool with bot purchases (no real funds)
     await db
       .update(lotteryDraws)
       .set({
         totalTickets: sql`${lotteryDraws.totalTickets} + ${ticketCount}`,
-        prizePool: sql`${lotteryDraws.prizePool} + ${totalCost}`,
       })
       .where(eq(lotteryDraws.id, draw.id));
 
@@ -875,7 +877,7 @@ export async function startBotEngine(): Promise<void> {
   }, 5000);
 
   // Cleanup stale rounds every 60 seconds (cancel entry_open rounds older than 10 min with no bets)
-  setInterval(async () => {
+  cleanupTimer = setInterval(async () => {
     try {
       const { getDb } = await import('../config/database.js');
       const { sql } = await import('drizzle-orm');
@@ -900,6 +902,10 @@ export function stopBotEngine(): void {
   if (engineTimer) {
     clearInterval(engineTimer);
     engineTimer = null;
-    console.log('[BotEngine] Bot engine stopped');
   }
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+    cleanupTimer = null;
+  }
+  console.log('[BotEngine] Bot engine stopped');
 }

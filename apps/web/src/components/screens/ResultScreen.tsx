@@ -154,7 +154,7 @@ export function ResultScreen() {
   const { result, profile, playAgain, resetRound, betAmount, riskTier } = useGameStore();
   const go = useAppNavigate();
   const [revealed, setRevealed] = useState(false);
-  const [feeRate, setFeeRate] = useState<number>((globalThis as any).__serverFeeRate ?? 0.05);
+  const [feeRate, setFeeRate] = useState<number>((globalThis as any).__serverFeeRate ?? 0.03);
 
   useEffect(() => {
     const timer = setTimeout(() => setRevealed(true), 300);
@@ -177,7 +177,17 @@ export function ResultScreen() {
     }
   }, [result, feeRate]);
 
-  if (!result) return null;
+  if (!result) return (
+    <div style={{ padding: '40px', textAlign: 'center', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '16px' }}>
+      <p style={{ fontSize: '16px', color: theme.text.secondary }}>Round result not available</p>
+      <button
+        onClick={() => { resetRound(); go('lobby'); }}
+        style={{ padding: '10px 24px', background: theme.bg.secondary, border: `1px solid ${theme.border.medium}`, borderRadius: '8px', color: theme.text.primary, cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px', fontWeight: 600 }}
+      >
+        Back to Lobby
+      </button>
+    </div>
+  );
 
   // M1+M2: Account for fee in victory determination and display
   const fee = Math.floor(result.playerState.betAmount * feeRate);

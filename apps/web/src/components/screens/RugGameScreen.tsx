@@ -497,11 +497,11 @@ export function RugGameScreen() {
           const res = await api.getRugGameRecentRounds(10);
           return (res.rounds || []).map((r: any) => ({
             id: r.id,
-            result: r.rugged ? 'loss' : 'win',
-            multiplier: r.crashMultiplier || r.multiplier || 1,
-            amount: r.totalPool ? r.totalPool / (r.playerCount || 1) : 0,
-            payout: r.totalPayout || 0,
-            time: r.createdAt || r.resolvedAt,
+            result: 'loss',
+            multiplier: parseFloat(r.rugMultiplier || '1'),
+            amount: 0,
+            payout: 0,
+            time: r.resolvedAt,
           }));
         }}
       />

@@ -183,6 +183,20 @@ export function PredictionScreen() {
         useGameStore.setState((s) => ({
           profile: { ...s.profile, balance: Math.max(0, s.profile.balance - totalCost) },
         }));
+
+        // Server returns chartDirection (the direction the chart should animate).
+        // Map backend directions to frontend: 'up' → 'long', 'down' → 'short', 'sideways' → 'range'
+        if (lockResult.chartDirection && roundConfig) {
+          const REVERSE_DIR_MAP: Record<string, PredictionDirection> = {
+            up: 'long',
+            down: 'short',
+            sideways: 'range',
+          };
+          const targetOutcome = REVERSE_DIR_MAP[lockResult.chartDirection] || 'long';
+          if (roundConfig.outcome !== targetOutcome) {
+            setRoundConfig(regenerateWithOutcome(roundConfig, targetOutcome));
+          }
+        }
       } catch (err: any) {
         setLocking(false);
         toast.error('Bet Failed', err?.message || 'Could not lock funds for prediction');
@@ -197,8 +211,6 @@ export function PredictionScreen() {
     playBetPlaced();
     hapticMedium();
 
-    // Chart outcome will be adjusted at resolve time once server tells us win/loss
-    // For now just start the countdown — no client-side manipulation
     setPhase('countdown');
   }
 
@@ -217,18 +229,8 @@ export function PredictionScreen() {
 
           const isWin = saveResponse.result === 'win';
 
-          // Adjust chart candles to match server-determined outcome
-          let finalConfig = roundConfig;
-          if (isWin && roundConfig.outcome !== prediction) {
-            finalConfig = regenerateWithOutcome(roundConfig, prediction);
-          } else if (!isWin && roundConfig.outcome === prediction) {
-            const alternatives: PredictionDirection[] = (['long', 'short', 'range'] as const).filter(d => d !== prediction);
-            const altTarget = alternatives[Math.floor(Math.random() * alternatives.length)];
-            finalConfig = regenerateWithOutcome(roundConfig, altTarget);
-          }
-          setRoundConfig(finalConfig);
-
-          const predResult = calculatePredictionResult(prediction, finalConfig, betAmount);
+          // Chart was already generated to match the outcome before animation started
+          const predResult = calculatePredictionResult(prediction, roundConfig, betAmount);
           setResult(predResult);
           setPhase('result');
 

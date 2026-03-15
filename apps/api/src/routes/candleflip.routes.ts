@@ -17,7 +17,8 @@ export async function candleflipRoutes(server: FastifyInstance) {
 
   server.get('/rounds/recent', async (request) => {
     const { limit } = request.query as { limit?: string };
-    const rounds = await getRecentCandleflipRounds(parseInt(limit || '10'));
+    const parsedLimit = Math.min(Math.max(parseInt(limit || '20', 10) || 20, 1), 100);
+    const rounds = await getRecentCandleflipRounds(parsedLimit);
     return { rounds };
   });
 

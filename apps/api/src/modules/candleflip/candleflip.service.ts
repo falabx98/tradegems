@@ -60,11 +60,24 @@ export class CandleflipService {
       id: gameId,
     });
 
-    // Update game with opponent
-    await this.db
+    // Atomically claim the game — prevents two users from both joining
+    const [updated] = await this.db
       .update(candleflipGames)
       .set({ opponentId: userId, status: 'playing' })
-      .where(eq(candleflipGames.id, gameId));
+      .where(
+        and(
+          eq(candleflipGames.id, gameId),
+          eq(candleflipGames.status, 'open'),
+          sql`${candleflipGames.opponentId} IS NULL`,
+        ),
+      )
+      .returning();
+
+    if (!updated) {
+      // Game was already taken — release the locked funds
+      try { await this.wallet.releaseFunds(userId, game.betAmount, 'SOL', { type: 'candleflip', id: gameId }); } catch {}
+      throw new Error('Game is no longer open');
+    }
 
     // Resolve immediately
     return this.resolveGame(gameId);
@@ -106,16 +119,14 @@ export class CandleflipService {
     // Settle winner: unlock their bet + add winnings
     // fee=0: lockFunds only locked betAmount; house fee is taken from pool difference
     if (!winnerIsBot) {
-      try {
-        await this.wallet.settlePayout(
-          winnerId,
-          game.betAmount,
-          0,
-          prizeAmount,
-          'SOL',
-          { type: 'candleflip', id: gameId },
-        );
-      } catch { /* lock may already be released */ }
+      await this.wallet.settlePayout(
+        winnerId,
+        game.betAmount,
+        0,
+        prizeAmount,
+        'SOL',
+        { type: 'candleflip', id: gameId },
+      );
     }
 
     // Settle loser: unlock with zero payout (fee=0, betAmount is total locked)
@@ -129,7 +140,9 @@ export class CandleflipService {
           'SOL',
           { type: 'candleflip', id: gameId },
         );
-      } catch { /* lock may already be released */ }
+      } catch (err) {
+        console.error('[Candleflip] non-critical loser settlement failed:', err, { userId: loserId, gameId });
+      }
     }
 
     // Update game record

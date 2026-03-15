@@ -205,6 +205,27 @@ export class TradingSimService {
     });
     if (!participant) throw new Error('Not a participant in this room');
 
+    // Validate sell quantity against current position to prevent short selling
+    if (tradeType === 'sell') {
+      const existingTrades = await this.db
+        .select()
+        .from(tradingSimTrades)
+        .where(
+          and(
+            eq(tradingSimTrades.roomId, roomId),
+            eq(tradingSimTrades.userId, userId),
+          ),
+        );
+      let currentPosition = 0;
+      for (const t of existingTrades) {
+        if (t.tradeType === 'buy') currentPosition += t.quantity;
+        else currentPosition -= t.quantity;
+      }
+      if (quantity > currentPosition) {
+        throw new Error('Sell quantity exceeds current position');
+      }
+    }
+
     // H10 fix: Validate trade price against server chart data
     const chartData = room.chartData as { close: number }[];
     if (!chartData || chartData.length === 0) throw new Error('Chart data not available');
@@ -345,18 +366,15 @@ export class TradingSimService {
 
     if (winner && participantRoles.get(winner.userId) !== 'bot') {
       // fee=0: lockFunds only locked entryFee; platform fee taken from pool difference
-      try {
-        await this.walletService.settlePayout(
-          winner.userId,
-          room.entryFee,
-          0,
-          payoutAmount,
-          'SOL',
-          { type: 'trading_sim', id: roomId },
-        );
-      } catch {
-        // Non-critical: lock may already be released
-      }
+      // Critical: winner payout failure must prevent room from being marked as finished
+      await this.walletService.settlePayout(
+        winner.userId,
+        room.entryFee,
+        0,
+        payoutAmount,
+        'SOL',
+        { type: 'trading_sim', id: roomId },
+      );
     }
 
     // Settle losers: unlock with zero payout
@@ -371,8 +389,8 @@ export class TradingSimService {
           'SOL',
           { type: 'trading_sim', id: roomId },
         );
-      } catch {
-        // Non-critical: lock may already be released
+      } catch (err) {
+        console.error('[TradingSim] non-critical loser settlement failed:', err, { userId: r.userId, roomId });
       }
     }
 
@@ -417,8 +435,19 @@ export class TradingSimService {
       .innerJoin(users, eq(tradingSimParticipants.userId, users.id))
       .where(eq(tradingSimParticipants.roomId, roomId));
 
+    // Strip future chart candles to prevent clients from seeing the entire chart
+    let visibleChartData = room.chartData as any[] | null;
+    if (room.status === 'active' && room.startedAt && visibleChartData) {
+      const now = Date.now();
+      const elapsed = Math.floor((now - room.startedAt.getTime()) / 1000);
+      const candleDuration = room.duration / visibleChartData.length;
+      const visibleCount = Math.min(visibleChartData.length, Math.ceil(elapsed / candleDuration) + 1);
+      visibleChartData = visibleChartData.slice(0, visibleCount);
+    }
+
     return {
       ...room,
+      chartData: visibleChartData,
       participants,
     };
   }

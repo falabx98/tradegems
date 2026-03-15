@@ -6,9 +6,10 @@ import { getDb } from '../config/database.js';
 import { BetService } from '../modules/bet/bet.service.js';
 import { RoundService } from '../modules/round/round.service.js';
 import { requireAuth, requireAdmin, getAuthUser } from '../middleware/auth.js';
+import { AppError } from '../middleware/errorHandler.js';
 
 const placeBetSchema = z.object({
-  amount: z.number().int().positive().min(1_000_000), // min 0.001 SOL in lamports, no max
+  amount: z.number().int().positive().min(1_000_000).max(100_000_000_000), // min 0.001 SOL, max 100 SOL in lamports
   riskTier: z.enum(['conservative', 'balanced', 'aggressive']),
   idempotencyKey: z.string().min(1).max(128),
 });
@@ -40,6 +41,7 @@ export async function gameplayRoutes(server: FastifyInstance) {
   // Global recent solo games (public, all users)
   server.get('/recent', async (request) => {
     const { limit } = request.query as { limit?: string };
+    const parsedLimit = Math.min(Math.max(parseInt(limit || '20', 10) || 20, 1), 100);
     const db = getDb();
     const results = await db.select({
       id: betResults.id,
@@ -54,7 +56,7 @@ export async function gameplayRoutes(server: FastifyInstance) {
       .innerJoin(users, eq(betResults.userId, users.id))
       .innerJoin(bets, eq(betResults.betId, bets.id))
       .orderBy(desc(betResults.createdAt))
-      .limit(parseInt(limit || '20'));
+      .limit(parsedLimit);
     return { data: results };
   });
 
@@ -116,7 +118,7 @@ export async function gameplayRoutes(server: FastifyInstance) {
     const bets = await betService.getBetsForRound(id);
     const userBet = bets.find((b: any) => b.userId === userId);
     if (!userBet) {
-      return { error: 'NO_BET', message: 'You have no bet on this round' };
+      throw new AppError(400, 'NO_BET', 'You have no bet on this round');
     }
 
     await roundService.generateRoundPayload(id);

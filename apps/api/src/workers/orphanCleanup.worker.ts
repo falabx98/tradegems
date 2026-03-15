@@ -1,5 +1,6 @@
 import { getDb } from '../config/database.js';
-import { bets, candleflipGames, balances, balanceLedgerEntries } from '@tradingarena/db';
+import { getRedis } from '../config/redis.js';
+import { bets, candleflipGames, balances, balanceLedgerEntries, predictionRounds } from '@tradingarena/db';
 import { eq, and, sql, lt } from 'drizzle-orm';
 import { WalletService } from '../modules/wallet/wallet.service.js';
 
@@ -112,6 +113,87 @@ async function cleanupStaleCandleflipLobbies(): Promise<number> {
   return cleaned;
 }
 
+// ─── Stale Prediction Locks (>30s in Redis) ─────────────────
+// Instead of refunding, we settle as the predetermined outcome so users can't
+// exploit disconnects to avoid losses.
+
+const PREDICTION_MULTIPLIERS: Record<string, number> = { up: 1.9, down: 1.9, sideways: 3.0 };
+
+async function cleanupStalePredictionLocks(): Promise<number> {
+  const redis = getRedis();
+  const db = getDb();
+  const wallet = new WalletService();
+  const STALE_THRESHOLD_MS = 30_000; // 30 seconds
+  const now = Date.now();
+
+  let cleaned = 0;
+  let cursor = '0';
+
+  do {
+    const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', 'prediction:lock:*', 'COUNT', 100);
+    cursor = nextCursor;
+
+    for (const key of keys) {
+      try {
+        const lockJson = await redis.get(key);
+        if (!lockJson) continue;
+
+        const lock = JSON.parse(lockJson) as {
+          userId: string;
+          betAmount: number;
+          fee: number;
+          totalCost: number;
+          refId: string;
+          direction: 'up' | 'down' | 'sideways';
+          serverOutcome: 'win' | 'loss';
+          createdAt?: number;
+        };
+
+        // Skip locks without createdAt (legacy) or that are still fresh
+        if (!lock.createdAt || now - lock.createdAt < STALE_THRESHOLD_MS) continue;
+
+        const ref = { type: 'orphan_cleanup', id: `prediction-${lock.refId}` };
+        const multiplier = PREDICTION_MULTIPLIERS[lock.direction] ?? 1.9;
+
+        // Apply the predetermined outcome (NOT a refund)
+        if (lock.serverOutcome === 'win') {
+          const payout = Math.floor(lock.betAmount * multiplier);
+          await wallet.settlePayout(lock.userId, lock.betAmount, lock.fee, payout, 'SOL', ref);
+        } else {
+          // Loss: payout is 0 — house keeps the bet
+          await wallet.settlePayout(lock.userId, lock.betAmount, lock.fee, 0, 'SOL', ref);
+        }
+
+        // Log the prediction round to DB so the game is recorded
+        try {
+          const safeMultiplier = lock.serverOutcome === 'win' ? multiplier : 0;
+          const actualPayout = lock.serverOutcome === 'win' ? Math.floor(lock.betAmount * multiplier) : 0;
+          await db.insert(predictionRounds).values({
+            userId: lock.userId,
+            direction: lock.direction,
+            betAmount: lock.betAmount,
+            result: lock.serverOutcome,
+            payout: actualPayout,
+            multiplier: String(safeMultiplier),
+            pattern: null,
+            metadata: { settledBy: 'orphan_cleanup', fee: lock.fee, ref: lock.refId },
+          });
+        } catch {
+          // Non-critical — settlement already happened
+        }
+
+        // Delete the Redis key after settlement
+        await redis.del(key);
+        cleaned++;
+      } catch {
+        // Settlement failed for this lock — will retry next tick
+      }
+    }
+  } while (cursor !== '0');
+
+  return cleaned;
+}
+
 // ─── Orphaned Locked Balances (no active games for 3+ min) ──
 
 async function cleanupOrphanedLockedBalances(): Promise<number> {
@@ -192,16 +274,17 @@ async function cleanupOrphanedLockedBalances(): Promise<number> {
 
 async function tick(): Promise<void> {
   try {
-    const [soloBets, candleflipLobbies, orphanedLocks] = await Promise.all([
+    const [soloBets, candleflipLobbies, predictionLocks, orphanedLocks] = await Promise.all([
       cleanupStaleSoloBets(),
       cleanupStaleCandleflipLobbies(),
+      cleanupStalePredictionLocks(),
       cleanupOrphanedLockedBalances(),
     ]);
 
-    const total = soloBets + candleflipLobbies + orphanedLocks;
+    const total = soloBets + candleflipLobbies + predictionLocks + orphanedLocks;
     if (total > 0) {
       console.log(
-        `[OrphanCleanup] Cleaned: ${soloBets} stale bets, ${candleflipLobbies} candleflip lobbies, ${orphanedLocks} orphaned locks`,
+        `[OrphanCleanup] Cleaned: ${soloBets} stale bets, ${candleflipLobbies} candleflip lobbies, ${predictionLocks} prediction locks, ${orphanedLocks} orphaned locks`,
       );
     }
   } catch (err: any) {

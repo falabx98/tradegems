@@ -467,10 +467,10 @@ export function CandleflipScreen() {
           return (res.rounds || []).map((r: any) => ({
             id: r.id,
             result: r.result === 'bullish' ? 'win' : 'loss',
-            multiplier: r.multiplier || 1.9,
-            amount: r.totalPool ? r.totalPool / 2 : 0,
-            payout: r.totalPool || 0,
-            time: r.createdAt || r.resolvedAt,
+            multiplier: parseFloat(r.resultMultiplier || '1'),
+            amount: 0,
+            payout: 0,
+            time: r.resolvedAt,
           }));
         }}
       />

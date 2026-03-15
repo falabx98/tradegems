@@ -41,6 +41,7 @@ interface CandleflipState {
 
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 let state: CandleflipState | null = null;
+const inFlightBets = new Set<string>();
 let hiddenSeed = '';
 let hiddenResult: 'bullish' | 'bearish' = 'bullish';
 let hiddenMultiplier = 1.0;
@@ -134,6 +135,7 @@ async function transitionToResolved() {
 
   // Settle all bets
   const database = db();
+  const failedSettlements: { userId: string; betAmount: number; payout: number }[] = [];
   for (const bet of state.bets) {
     const won = bet.pick === hiddenResult;
     bet.status = won ? 'won' : 'lost';
@@ -151,8 +153,17 @@ async function transitionToResolved() {
     if (user && user.role !== 'bot') {
       try {
         await wallet.settlePayout(bet.userId, bet.betAmount, 0, bet.payout, 'SOL', { type: 'candleflip_round', id: state.roundId });
-      } catch { /* already settled or bot */ }
+      } catch (err) {
+        console.error('[CandleflipRound] settlePayout failed:', err, { userId: bet.userId, roundId: state.roundId, payout: bet.payout });
+        if (bet.payout > 0) {
+          failedSettlements.push({ userId: bet.userId, betAmount: bet.betAmount, payout: bet.payout });
+        }
+      }
     }
+  }
+
+  if (failedSettlements.length > 0) {
+    console.error('[CandleflipRound] Round has failed winner settlements, not marking as fully resolved:', { roundId: state.roundId, failedSettlements });
   }
 
   await database.update(candleflipRounds)
@@ -167,6 +178,16 @@ async function transitionToResolved() {
       totalBearish: state.bets.filter(b => b.pick === 'bearish').length,
     })
     .where(eq(candleflipRounds.id, state.roundId));
+
+  // Retry failed settlements once
+  for (const failed of failedSettlements) {
+    try {
+      await wallet.settlePayout(failed.userId, failed.betAmount, 0, failed.payout, 'SOL', { type: 'candleflip_round', id: state.roundId });
+      console.log('[CandleflipRound] Retry succeeded for user:', failed.userId);
+    } catch (retryErr) {
+      console.error('[CandleflipRound] Retry also failed for user:', failed.userId, retryErr);
+    }
+  }
 
   await saveToRedis();
 }
@@ -203,34 +224,51 @@ export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', be
     return { success: false, message: 'Already bet in this round.' };
   }
 
-  const database = db();
-  const user = await database.query.users.findFirst({ where: eq(users.id, userId) });
-  if (!user) return { success: false, message: 'User not found.' };
-
-  if (user.role !== 'bot') {
-    await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId });
+  // Prevent concurrent bets from the same user
+  if (inFlightBets.has(userId)) {
+    return { success: false, message: 'Bet already in progress.' };
   }
+  inFlightBets.add(userId);
+  try {
+    const database = db();
+    const user = await database.query.users.findFirst({ where: eq(users.id, userId) });
+    if (!user) return { success: false, message: 'User not found.' };
 
-  await database.insert(candleflipRoundBets).values({
-    roundId: state.roundId,
-    userId,
-    pick,
-    betAmount,
-    status: 'pending',
-  });
+    if (user.role !== 'bot') {
+      await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId });
+    }
 
-  state.bets.push({
-    userId,
-    username: user.username || 'Player',
-    avatarUrl: user.avatarUrl || null,
-    pick,
-    betAmount,
-    payout: 0,
-    status: 'pending',
-  });
+    try {
+      await database.insert(candleflipRoundBets).values({
+        roundId: state.roundId,
+        userId,
+        pick,
+        betAmount,
+        status: 'pending',
+      });
+    } catch (err) {
+      // DB insert failed — rollback the fund lock
+      if (user.role !== 'bot') {
+        try { await wallet.releaseFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId }); } catch {}
+      }
+      throw err;
+    }
 
-  await saveToRedis();
-  return { success: true };
+    state.bets.push({
+      userId,
+      username: user.username || 'Player',
+      avatarUrl: user.avatarUrl || null,
+      pick,
+      betAmount,
+      payout: 0,
+      status: 'pending',
+    });
+
+    await saveToRedis();
+    return { success: true };
+  } finally {
+    inFlightBets.delete(userId);
+  }
 }
 
 export async function getRecentCandleflipRounds(limit: number = 10) {

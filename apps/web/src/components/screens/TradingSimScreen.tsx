@@ -11,6 +11,7 @@ import { playButtonClick, playBetPlaced, playRoundEnd, hapticLight, hapticMedium
 import { LiveDot, LiveRoundBanner, StatusBadge, WinAmountDisplay, timeAgo } from '../ui/LiveIndicators';
 import { BetPanel } from '../ui/BetPanel';
 import { RecentGames } from '../ui/RecentGames';
+import { toast } from '../../stores/toastStore';
 
 interface Candle { open: number; high: number; low: number; close: number; volume: number; timestamp: number; }
 interface Participant { id: string; userId: string; username?: string; startBalance: number; finalBalance?: number; finalPnl?: number; rank?: number; }
@@ -345,7 +346,14 @@ export function TradingSimScreen() {
   };
 
   const handleJoinRoom = async () => {
-    await handleCreate(entryAmount);
+    // Try to join an existing room with matching entry fee first
+    const matchingRoom = rooms.find(r => Number(r.entryFee) === entryAmount && r.status === 'waiting');
+    if (matchingRoom) {
+      await handleJoin(matchingRoom.id);
+    } else {
+      // No matching room available, create a new one
+      await handleCreate(entryAmount);
+    }
   };
 
   const handleJoin = async (roomId: string) => {
@@ -571,24 +579,32 @@ export function TradingSimScreen() {
     const spendAmount = cash * (buyQty / 100);
     const qty = Math.floor(spendAmount / currentPrice);
     if (qty <= 0) return;
-    setPosition(p => p + qty);
-    setCash(c => c - qty * currentPrice);
     setTradeFlash('buy');
     playBetPlaced(); hapticMedium();
     setTimeout(() => setTradeFlash(null), 400);
-    try { await api.executeTradingSimTrade(activeRoom.id, 'buy', qty, currentPrice, elapsed); } catch { /* ignore */ }
+    try {
+      await api.executeTradingSimTrade(activeRoom.id, 'buy', qty, currentPrice, Date.now());
+      setPosition(p => p + qty);
+      setCash(c => c - qty * currentPrice);
+    } catch (err: any) {
+      toast.error('Trade Failed', err?.message || 'Buy order could not be executed');
+    }
   };
 
   const handleSell = async () => {
     if (!activeRoom || position <= 0) return;
     const sellQty = Math.ceil(position * (buyQty / 100));
     if (sellQty <= 0) return;
-    setCash(c => c + sellQty * currentPrice);
-    setPosition(p => p - sellQty);
     setTradeFlash('sell');
     playBetPlaced(); hapticMedium();
     setTimeout(() => setTradeFlash(null), 400);
-    try { await api.executeTradingSimTrade(activeRoom.id, 'sell', sellQty, currentPrice, elapsed); } catch { /* ignore */ }
+    try {
+      await api.executeTradingSimTrade(activeRoom.id, 'sell', sellQty, currentPrice, Date.now());
+      setCash(c => c + sellQty * currentPrice);
+      setPosition(p => p - sellQty);
+    } catch (err: any) {
+      toast.error('Trade Failed', err?.message || 'Sell order could not be executed');
+    }
   };
 
   const pnl = cash + position * currentPrice - 10000;

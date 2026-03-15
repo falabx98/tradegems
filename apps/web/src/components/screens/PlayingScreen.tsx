@@ -13,11 +13,13 @@ import {
   playCountdownBeep,
   playRoundEnd,
 } from '../../utils/sounds';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
 
 const ROUND_DURATION = 15;
 const COUNTDOWN_DURATION = 3;
 
 export function PlayingScreen() {
+  const go = useAppNavigate();
   const {
     roundConfig,
     phase,
@@ -123,7 +125,17 @@ export function PlayingScreen() {
     playNearMiss();
   }, [nearMissNode]);
 
-  if (!roundConfig) return null;
+  if (!roundConfig) return (
+    <div style={{ padding: '40px', textAlign: 'center', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '16px' }}>
+      <p style={{ fontSize: '16px', color: theme.text.secondary }}>Round data not available</p>
+      <button
+        onClick={() => go('lobby')}
+        style={{ padding: '10px 24px', background: theme.bg.secondary, border: `1px solid ${theme.border.medium}`, borderRadius: '8px', color: theme.text.primary, cursor: 'pointer', fontFamily: 'inherit', fontSize: '14px', fontWeight: 600 }}
+      >
+        Back to Lobby
+      </button>
+    </div>
+  );
 
   return (
     <div style={styles.container}>

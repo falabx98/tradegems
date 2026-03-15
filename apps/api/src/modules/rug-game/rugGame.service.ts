@@ -149,7 +149,7 @@ export class RugGameService {
   }
 
   private async resolveRug(gameId: string, game: any) {
-    // Player got rugged — lose bet
+    // Player got rugged — lose bet (payout=0, non-critical but log errors)
     try {
       await this.wallet.settlePayout(
         game.userId,
@@ -159,7 +159,9 @@ export class RugGameService {
         'SOL',
         { type: 'rug_game', id: gameId },
       );
-    } catch { /* lock may already be released */ }
+    } catch (err) {
+      console.error('[RugGame] resolveRug settlement failed:', err, { userId: game.userId, gameId });
+    }
 
     const [resolved] = await this.db
       .update(rugGames)

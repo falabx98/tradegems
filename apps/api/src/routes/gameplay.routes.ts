@@ -37,6 +37,36 @@ export async function gameplayRoutes(server: FastifyInstance) {
     return round ?? { message: 'No rounds available' };
   });
 
+  // Global recent solo games (public, all users)
+  server.get('/recent', async (request) => {
+    const { limit } = request.query as { limit?: string };
+    const db = getDb();
+    const results = await db.select({
+      id: betResults.id,
+      username: users.username,
+      finalMultiplier: betResults.finalMultiplier,
+      amount: bets.amount,
+      payoutAmount: betResults.payoutAmount,
+      resultType: betResults.resultType,
+      createdAt: betResults.createdAt,
+    })
+      .from(betResults)
+      .innerJoin(users, eq(betResults.userId, users.id))
+      .innerJoin(bets, eq(betResults.betId, bets.id))
+      .orderBy(desc(betResults.createdAt))
+      .limit(parseInt(limit || '20'));
+    return { data: results };
+  });
+
+  server.get('/history', { preHandler: [requireAuth] }, async (request) => {
+    const { limit } = request.query as { limit?: string };
+    const results = await roundService.getUserHistory(
+      getAuthUser(request).userId,
+      limit ? parseInt(limit) : 20,
+    );
+    return { data: results };
+  });
+
   // ─── Authenticated ───────────────────────────────────────
 
   server.get('/:id', { preHandler: [requireAuth] }, async (request) => {
@@ -68,36 +98,6 @@ export async function gameplayRoutes(server: FastifyInstance) {
     const { id } = request.params as { id: string };
     await betService.cancelBet(getAuthUser(request).userId, id);
     return { success: true };
-  });
-
-  server.get('/history', { preHandler: [requireAuth] }, async (request) => {
-    const { limit } = request.query as { limit?: string };
-    const results = await roundService.getUserHistory(
-      getAuthUser(request).userId,
-      limit ? parseInt(limit) : 20,
-    );
-    return { data: results };
-  });
-
-  // Global recent solo games (public, all users)
-  server.get('/recent', async (request) => {
-    const { limit } = request.query as { limit?: string };
-    const db = getDb();
-    const results = await db.select({
-      id: betResults.id,
-      username: users.username,
-      finalMultiplier: betResults.finalMultiplier,
-      amount: bets.amount,
-      payoutAmount: betResults.payoutAmount,
-      resultType: betResults.resultType,
-      createdAt: betResults.createdAt,
-    })
-      .from(betResults)
-      .innerJoin(users, eq(betResults.userId, users.id))
-      .innerJoin(bets, eq(betResults.betId, bets.id))
-      .orderBy(desc(betResults.createdAt))
-      .limit(parseInt(limit || '20'));
-    return { data: results };
   });
 
   // ─── Solo round lifecycle (any authenticated user) ──────

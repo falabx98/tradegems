@@ -4,13 +4,16 @@ import { rugRounds, rugRoundBets, users } from '@tradingarena/db';
 import { eq, and, desc } from 'drizzle-orm';
 import { getRedis } from '../../config/redis.js';
 import { WalletService } from '../wallet/wallet.service.js';
-import { generateRugCandle, generateCrashCandles, type Candle } from '../../utils/chartGenerator.js';
+import { generateRugCandle, generateCrashCandles, estimateRoundTicks, type Candle } from '../../utils/chartGenerator.js';
+import { recordFailedSettlement } from '../../utils/settlementRecovery.js';
+import { createWorkerReporter, withWorkerRecovery } from '../../utils/workerHealth.js';
 
-const HOUSE_EDGE = 0.04;
+const HOUSE_EDGE = 0.05;
 const WAITING_DURATION = 5000; // 5s
 const RESOLVED_DURATION = 4000; // 4s pause after rug
 const TICK_INTERVAL = 250; // 250ms per candle
 const REDIS_KEY = 'rug:current';
+const MAX_DISPLAY_RATIO = 0.995; // Multiplier display never exceeds 99.5% of crash point
 
 interface RoundBet {
   userId: string;
@@ -19,6 +22,7 @@ interface RoundBet {
   betAmount: number;
   cashOutMultiplier: number | null;
   status: 'active' | 'cashed_out' | 'rugged';
+  isDemo: boolean;
 }
 
 interface RoundState {
@@ -57,14 +61,12 @@ async function withStateLock<T>(fn: () => Promise<T>): Promise<T> {
 const db = () => getDb();
 const wallet = new WalletService();
 
-function generateCrashPoint(seed: string, gameId: string): number {
-  const hash = crypto.createHash('sha256').update(seed + ':' + gameId).digest('hex');
-  const h = parseInt(hash.slice(0, 13), 16);
-  if (h % 25 === 0) return 1.00;
-  const e = Math.pow(2, 52);
-  const raw = e / (e - (h % e));
-  const result = Math.max(1.00, raw * (1 - HOUSE_EDGE));
-  return Math.min(parseFloat(result.toFixed(2)), 100.00);
+// Client seed for multi-player rounds is the roundId itself (public, known before bets)
+// This ensures the crash point depends on something players can verify
+import { generateCrashPoint as pfCrashPoint } from '../../utils/provablyFair.js';
+
+function generateCrashPoint(seed: string, roundId: string): number {
+  return pfCrashPoint(seed, roundId, 0, HOUSE_EDGE);
 }
 
 async function saveToRedis() {
@@ -148,7 +150,7 @@ async function settleAllBets() {
         const user = await database.query.users.findFirst({ where: eq(users.id, bet.userId) });
         if (user && user.role !== 'bot') {
           try {
-            await wallet.settlePayout(bet.userId, bet.betAmount, 0, 0, 'SOL', { type: 'rug_round', id: state.roundId });
+            await wallet.settlePayout(bet.userId, bet.betAmount, 0, 0, 'SOL', { type: 'rug_round', id: state.roundId }, bet.isDemo);
           } catch (err) {
             console.error('[RugRound] settleAllBets settlement failed:', err, { userId: bet.userId, roundId: state.roundId });
           }
@@ -201,15 +203,36 @@ async function tick() {
       await transitionToActive();
     }
   } else if (state.status === 'active') {
-    // Generate new candle
+    // Generate new candle — TIME-BASED progress drives the crash curve
     const prevClose = state.candles.length > 0 ? state.candles[state.candles.length - 1].close : 1.0;
-    const progress = Math.min(1.0, state.currentMultiplier / hiddenRugMultiplier);
-    const candle = generateRugCandle(prevClose, hiddenRugMultiplier, progress);
-    candle.timestamp = state.candles.length;
-    state.candles.push(candle);
-    state.currentMultiplier = candle.close;
+    const expectedTicks = estimateRoundTicks(hiddenRugMultiplier);
+    const timeProgress = state.candles.length / expectedTicks;
 
-    // Check if we hit the rug point
+    // CRITICAL FIX: If we've exceeded the expected round duration, force the rug.
+    // The crash curve ceiling (crashPoint * 0.995) can never reach crashPoint,
+    // so without this check the round would run forever for low crash points.
+    // We add a small buffer (20% overtime) for visual smoothness, then force rug.
+    if (timeProgress >= 1.2) {
+      state.currentMultiplier = hiddenRugMultiplier;
+      await transitionToResolved();
+      return;
+    }
+
+    const clampedProgress = Math.min(timeProgress, 1.0);
+    const candle = generateRugCandle(prevClose, hiddenRugMultiplier, clampedProgress);
+    candle.timestamp = state.candles.length;
+
+    // CRITICAL: Clamp candle values to NEVER exceed the crash point
+    // This prevents the chart from showing impossible multipliers
+    const maxAllowed = hiddenRugMultiplier * MAX_DISPLAY_RATIO;
+    candle.close = Math.min(candle.close, maxAllowed);
+    candle.high = Math.min(candle.high, hiddenRugMultiplier);
+    candle.open = Math.min(candle.open, maxAllowed);
+
+    state.candles.push(candle);
+    state.currentMultiplier = parseFloat(candle.close.toFixed(4));
+
+    // Check if we hit the rug point (uses >= so crash triggers reliably)
     if (state.currentMultiplier >= hiddenRugMultiplier) {
       state.currentMultiplier = hiddenRugMultiplier;
       await transitionToResolved();
@@ -239,7 +262,7 @@ export async function getCurrentRound(): Promise<RoundState | null> {
   } : null;
 }
 
-export async function joinRound(userId: string, betAmount: number): Promise<{ success: boolean; message?: string }> {
+export async function joinRound(userId: string, betAmount: number, isDemoBet = false): Promise<{ success: boolean; message?: string }> {
   if (!state || state.status !== 'waiting') {
     return { success: false, message: 'No round in waiting phase. Wait for next round.' };
   }
@@ -263,7 +286,7 @@ export async function joinRound(userId: string, betAmount: number): Promise<{ su
 
       // Lock funds (skip for bots)
       if (user.role !== 'bot') {
-        await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state!.roundId });
+        await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state!.roundId }, isDemoBet);
       }
 
       try {
@@ -273,11 +296,12 @@ export async function joinRound(userId: string, betAmount: number): Promise<{ su
           userId,
           betAmount,
           status: 'active',
+          isDemo: isDemoBet,
         });
       } catch (err) {
         // DB insert failed — rollback the fund lock
         if (user.role !== 'bot') {
-          try { await wallet.releaseFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state!.roundId }); } catch {}
+          try { await wallet.releaseFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state!.roundId }, isDemoBet); } catch {}
         }
         throw err;
       }
@@ -290,6 +314,7 @@ export async function joinRound(userId: string, betAmount: number): Promise<{ su
         betAmount,
         cashOutMultiplier: null,
         status: 'active',
+        isDemo: isDemoBet,
       });
 
       await saveToRedis();
@@ -311,6 +336,7 @@ export async function cashOut(userId: string): Promise<{ success: boolean; multi
       return { success: false, message: 'No active bet in this round.' };
     }
 
+    // currentMultiplier is already clamped at MAX_DISPLAY_RATIO by tick()
     const multiplier = state!.currentMultiplier;
 
     // Already past rug? (race condition protection)
@@ -318,7 +344,11 @@ export async function cashOut(userId: string): Promise<{ success: boolean; multi
       return { success: false, message: 'Too late — rugged!' };
     }
 
-    const payout = Math.floor(bet.betAmount * multiplier);
+    // FINANCIAL SAFETY: payout can NEVER exceed betAmount × crashPoint
+    const payout = Math.min(
+      Math.floor(bet.betAmount * multiplier),
+      Math.floor(bet.betAmount * hiddenRugMultiplier),
+    );
     bet.cashOutMultiplier = parseFloat(multiplier.toFixed(4));
     bet.status = 'cashed_out';
 
@@ -340,8 +370,17 @@ export async function cashOut(userId: string): Promise<{ success: boolean; multi
     // Settle wallet (skip for bots)
     const user = await database.query.users.findFirst({ where: eq(users.id, userId) });
     if (user && user.role !== 'bot') {
-      // fee=0 because house edge is embedded in the crash point algorithm; lockFunds only locked betAmount
-      await wallet.settlePayout(userId, bet.betAmount, 0, payout, 'SOL', { type: 'rug_round', id: state!.roundId });
+      try {
+        await wallet.settlePayout(userId, bet.betAmount, 0, payout, 'SOL', { type: 'rug_round', id: state!.roundId }, bet.isDemo);
+      } catch (settleErr: any) {
+        await recordFailedSettlement({
+          userId, game: 'rug-game', gameRefType: 'rug_round', gameRefId: state!.roundId,
+          betAmount: bet.betAmount, fee: 0, payoutAmount: payout,
+          errorMessage: settleErr.message || 'Settlement failed',
+          metadata: { multiplier: bet.cashOutMultiplier },
+        });
+        throw settleErr;
+      }
     }
 
     await saveToRedis();
@@ -363,13 +402,17 @@ export async function getRecentRounds(limit: number = 10) {
   .limit(limit);
 }
 
+const rugReporter = createWorkerReporter('rug-round-manager');
+
 export async function startRugRoundManager() {
   console.log('[RugRoundManager] Starting...');
   await startNewRound();
-  tickTimer = setInterval(() => tick().catch(err => console.error('[RugRoundManager] tick error:', err)), TICK_INTERVAL);
+  const wrappedTick = withWorkerRecovery('rug-round-manager', tick, rugReporter);
+  tickTimer = setInterval(wrappedTick, TICK_INTERVAL);
 }
 
 export function stopRugRoundManager() {
+  rugReporter.stop();
   if (tickTimer) {
     clearInterval(tickTimer);
     tickTimer = null;

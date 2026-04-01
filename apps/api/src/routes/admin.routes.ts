@@ -5,17 +5,158 @@ import {
   engineConfigs, adminAuditLogs, balances, balanceLedgerEntries,
   deposits, withdrawals, roundPools, roundNodes, riskFlags,
   userDepositWallets, referralCodes, referrals, referralEarnings,
-  chatMessages, bonusCodes, bonusCodeRedemptions,
+  chatMessages, bonusCodes, bonusCodeRedemptions, failedSettlements,
 } from '@tradingarena/db';
 import { getDb } from '../config/database.js';
-import { requireAdmin, getAuthUser } from '../middleware/auth.js';
+import { requireAdmin, requireRole, getAuthUser } from '../middleware/auth.js';
 import { getTreasuryAddress, getSolanaConnection } from '../modules/solana/treasury.js';
 import { DepositWalletService } from '../modules/solana/depositWallet.service.js';
+import { retrySettlement } from '../utils/settlementRecovery.js';
+import { getObservedRTP } from '../utils/payoutMonitor.js';
+import { getPerformanceStats, getMoneyRoutePerformance } from '../utils/perfMonitor.js';
+import { getRedis } from '../config/redis.js';
+import { z, ZodError } from 'zod';
+
+// ─── Admin Zod Schemas ──────────────────────────────────────
+
+const uuidParams = z.object({ id: z.string().uuid() });
+const userIdParams = z.object({ userId: z.string().uuid() });
+const keyParams = z.object({ key: z.string().min(1).max(100) });
+
+const updateUserBody = z.object({
+  status: z.enum(['active', 'suspended', 'banned']).optional(),
+  role: z.enum(['user', 'admin', 'superadmin']).optional(),
+}).refine(d => d.status || d.role, { message: 'At least one field required' });
+
+const resetAllDataBody = z.object({
+  confirm: z.literal('RESET_ALL_DATA'),
+});
+
+const resetCasinoDataBody = z.object({
+  confirmation: z.literal('RESET_CASINO_DATA'),
+  reason: z.string().min(5).max(500),
+});
+
+const resetStatsBody = z.object({
+  confirmation: z.literal('RESET_STATS'),
+  reason: z.string().min(5).max(500),
+});
+
+const balanceAdjustmentBody = z.object({
+  amount: z.number().int(),
+  reason: z.string().min(5).max(500),
+  asset: z.string().optional(),
+});
+
+const withdrawalApprovalBody = z.object({
+  status: z.enum(['approved', 'rejected']),
+  reason: z.string().optional(),
+});
+
+const engineConfigBody = z.object({
+  config: z.record(z.unknown()),
+});
+
+const featureFlagUpdateBody = z.object({
+  enabled: z.boolean().optional(),
+  config: z.unknown().optional(),
+}).refine(d => d.enabled !== undefined || d.config !== undefined, { message: 'At least one field required' });
+
+const featureFlagCreateBody = z.object({
+  flagKey: z.string().min(1).max(100),
+  description: z.string().min(1).max(500),
+  enabled: z.boolean().optional(),
+  config: z.unknown().optional(),
+});
+
+const riskFlagResolveBody = z.object({
+  notes: z.string().min(1).max(1000),
+});
+
+const bonusCodeCreateBody = z.object({
+  code: z.string().min(2).max(50),
+  description: z.string().optional(),
+  type: z.string().optional(),
+  amountLamports: z.number().int().positive(),
+  maxUses: z.number().int().positive().optional(),
+  maxPerUser: z.number().int().positive().optional(),
+  minLevel: z.number().int().min(0).optional(),
+  expiresAt: z.string().optional(),
+});
+
+const bonusCodeUpdateBody = z.object({
+  active: z.boolean().optional(),
+  maxUses: z.number().int().positive().optional(),
+  expiresAt: z.string().optional(),
+  description: z.string().optional(),
+});
+
+/** Parse body with Zod — throws 400 on invalid input */
+function parseBody<T>(schema: z.ZodSchema<T>, body: unknown): T {
+  try {
+    return schema.parse(body);
+  } catch (err) {
+    if (err instanceof ZodError) {
+      const issues = err.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ');
+      const error = new Error(`Invalid input: ${issues}`) as any;
+      error.statusCode = 400;
+      throw error;
+    }
+    throw err;
+  }
+}
+
+function parseParams<T>(schema: z.ZodSchema<T>, params: unknown): T {
+  try {
+    return schema.parse(params);
+  } catch (err) {
+    if (err instanceof ZodError) {
+      const error = new Error('Invalid parameters') as any;
+      error.statusCode = 400;
+      throw error;
+    }
+    throw err;
+  }
+}
+
+// ─── Admin Rate Limit Tiers ─────────────────────────────────
+// Tier 1 (READ): 60 req/min — all GET endpoints
+// Tier 2 (WRITE): 10 req/min — POST/PATCH/DELETE (normal ops)
+// Tier 3 (DANGEROUS): 1 req/hour — destructive operations
+const RATE_LIMIT_READ = { max: 60, timeWindow: '1 minute' };
+const RATE_LIMIT_WRITE = { max: 10, timeWindow: '1 minute' };
+const RATE_LIMIT_DANGEROUS = { max: 1, timeWindow: '1 hour' };
 
 export async function adminRoutes(server: FastifyInstance) {
   const db = getDb();
 
   server.addHook('preHandler', requireAdmin);
+
+  // Apply Redis-based rate limiting for admin GET endpoints (read tier)
+  // Write/dangerous tiers use Fastify per-route config above
+  server.addHook('preHandler', async (request, reply) => {
+    if (request.method !== 'GET') return; // Write endpoints handled by per-route config
+
+    const user = getAuthUser(request);
+    const redis = getRedis();
+    const windowMinute = Math.floor(Date.now() / 60000);
+    const key = `ratelimit:admin:read:${user.userId}:${windowMinute}`;
+
+    const current = await redis.incr(key);
+    if (current === 1) await redis.expire(key, 65); // slightly longer than window
+
+    const remaining = Math.max(0, RATE_LIMIT_READ.max - current);
+    reply.header('X-RateLimit-Tier', 'read');
+    reply.header('X-RateLimit-Limit', RATE_LIMIT_READ.max);
+    reply.header('X-RateLimit-Remaining', remaining);
+
+    if (current > RATE_LIMIT_READ.max) {
+      const ttl = await redis.ttl(key);
+      reply.header('Retry-After', ttl > 0 ? ttl : 60);
+      reply.code(429);
+      throw new Error('Admin read rate limit exceeded (60/min)');
+    }
+  });
 
   // ═══════════════════════════════════════════════════════════
   //  DASHBOARD
@@ -89,7 +230,7 @@ export async function adminRoutes(server: FastifyInstance) {
   });
 
   server.get('/users/:id', async (request) => {
-    const { id } = request.params as { id: string };
+    const { id } = parseParams(uuidParams, request.params);
 
     const user = await db.query.users.findFirst({ where: eq(users.id, id) });
     if (!user) return { error: 'User not found' };
@@ -143,9 +284,9 @@ export async function adminRoutes(server: FastifyInstance) {
     };
   });
 
-  server.patch('/users/:id', async (request) => {
-    const { id } = request.params as { id: string };
-    const { status, role } = request.body as { status?: string; role?: string };
+  server.patch('/users/:id', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('support', 'operator', 'admin', 'superadmin')] }, async (request) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const { status, role } = parseBody(updateUserBody, request.body);
     const actor = getAuthUser(request);
 
     const update: Record<string, unknown> = { updatedAt: new Date() };
@@ -166,11 +307,155 @@ export async function adminRoutes(server: FastifyInstance) {
     return { success: true };
   });
 
-  server.post('/users/:id/balance-adjustment', async (request) => {
-    const { id } = request.params as { id: string };
-    const { amount, reason, asset } = request.body as { amount: number; reason: string; asset?: string };
+  // Reset user game stats (removes from leaderboards while keeping account)
+  server.post('/users/:id/reset-stats', { config: { rateLimit: RATE_LIMIT_DANGEROUS }, preHandler: [requireRole('superadmin')] }, async (request) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const { reason } = parseBody(resetStatsBody, request.body);
+    const actor = getAuthUser(request);
+
+    await db.execute(sql`
+      UPDATE user_profiles
+      SET total_wagered = 0,
+          total_won = 0,
+          rounds_played = 0,
+          best_multiplier = '1.0',
+          win_rate = '0.0',
+          current_streak = 0,
+          best_streak = 0,
+          updated_at = now()
+      WHERE user_id = ${id}
+    `);
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'user_stats_reset',
+      targetType: 'user',
+      targetId: id,
+      payload: { reason },
+      ipAddress: request.ip,
+    });
+
+    return { success: true, message: 'User stats reset' };
+  });
+
+  // ── FULL CASINO RESET — wipe all game data, keep user accounts ──
+  // BLOCKED in production — use CLI script instead
+  server.post('/reset-all-data', { config: { rateLimit: RATE_LIMIT_DANGEROUS } }, async (request, reply) => {
+    // Block in production
+    if (process.env.NODE_ENV === 'production' || process.env.RAILWAY_ENVIRONMENT) {
+      reply.code(403);
+      return { error: 'Reset is disabled in production. Use CLI: npx tradegems-reset' };
+    }
+    const actor = getAuthUser(request);
+    // Only superadmin can reset
+    if (actor.role !== 'superadmin') {
+      reply.code(403);
+      return { error: 'Only superadmin can perform full reset' };
+    }
+    parseBody(resetAllDataBody, request.body);
+
+    // Order matters: delete children before parents (FK constraints)
+    await db.execute(sql`
+      -- Game results and bets
+      DELETE FROM candleflip_round_bets;
+      DELETE FROM candleflip_rounds;
+      DELETE FROM rug_round_bets;
+      DELETE FROM rug_rounds;
+      DELETE FROM rug_games;
+      DELETE FROM candleflip_games;
+      DELETE FROM trading_sim_trades;
+      DELETE FROM trading_sim_participants;
+      DELETE FROM trading_sim_rooms;
+      DELETE FROM lottery_winners;
+      DELETE FROM lottery_tickets;
+      DELETE FROM lottery_draws;
+      DELETE FROM prediction_rounds;
+
+      -- Solo/Battle game data
+      DELETE FROM bet_results;
+      DELETE FROM bets;
+      DELETE FROM round_nodes;
+      DELETE FROM round_events;
+      DELETE FROM round_pools;
+      DELETE FROM rounds;
+      DELETE FROM tournament_participants;
+      DELETE FROM tournaments;
+
+      -- Activity and social
+      DELETE FROM activity_feed_items;
+      DELETE FROM leaderboard_snapshots;
+      DELETE FROM chat_messages;
+
+      -- Rewards and progression
+      DELETE FROM daily_rewards;
+      DELETE FROM user_mission_progress;
+      DELETE FROM user_achievements;
+      DELETE FROM season_pass_claims;
+      DELETE FROM referral_earnings;
+      DELETE FROM bonus_code_redemptions;
+
+      -- Ledger (transaction history)
+      DELETE FROM balance_ledger_entries;
+
+      -- Reset all balances to 0
+      UPDATE balances SET
+        available_amount = 0,
+        locked_amount = 0,
+        pending_amount = 0,
+        bonus_amount = 0,
+        updated_at = now();
+
+      -- Reset all user stats
+      UPDATE user_profiles SET
+        total_wagered = 0,
+        total_won = 0,
+        rounds_played = 0,
+        best_multiplier = '1.0',
+        win_rate = '0.0',
+        current_streak = 0,
+        best_streak = 0,
+        updated_at = now();
+
+      -- Reset user XP and level (fresh start)
+      UPDATE users SET
+        level = 1,
+        xp_total = 0,
+        xp_current = 0,
+        xp_to_next = 100,
+        bonus_claimed = false,
+        vip_tier = 'bronze',
+        updated_at = now();
+    `);
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'full_casino_reset',
+      targetType: 'system',
+      targetId: 'all',
+      payload: { timestamp: Date.now() },
+      ipAddress: request.ip,
+    });
+
+    return { success: true, message: 'All game data wiped. Casino is fresh.' };
+  });
+
+  server.post('/users/:id/balance-adjustment', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request, reply) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const { amount, reason, asset } = parseBody(balanceAdjustmentBody, request.body);
     const actor = getAuthUser(request);
     const assetType = asset || 'SOL';
+
+    // Safeguard: max 1000 SOL per adjustment
+    const MAX_ADJUSTMENT = 1_000_000_000_000;
+    if (Math.abs(amount) > MAX_ADJUSTMENT) {
+      reply.code(400);
+      return { error: `Adjustment exceeds max of 1000 SOL. Contact superadmin for larger adjustments.` };
+    }
+    // Safeguard: large adjustments (>100 SOL) require detailed reason
+    if (Math.abs(amount) > 100_000_000_000 && reason.length < 20) {
+      reply.code(400);
+      return { error: 'Adjustments > 10 SOL require a reason of at least 20 characters' };
+    }
 
     // M7 fix: For negative adjustments, guard against driving balance below zero
     let updated;
@@ -278,10 +563,19 @@ export async function adminRoutes(server: FastifyInstance) {
     return { data };
   });
 
-  server.patch('/treasury/withdrawals/:id', async (request) => {
-    const { id } = request.params as { id: string };
-    const { status, reason } = request.body as { status: 'approved' | 'rejected'; reason?: string };
+  server.patch('/treasury/withdrawals/:id', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request, reply) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const { status, reason } = parseBody(withdrawalApprovalBody, request.body);
     const actor = getAuthUser(request);
+
+    // Safeguard: large withdrawals (>50 SOL) require superadmin
+    if (status === 'approved') {
+      const [withdrawal] = await db.select().from(withdrawals).where(eq(withdrawals.id, id));
+      if (withdrawal && Number(withdrawal.amount) > 500_000_000_000 && actor.role !== 'superadmin') {
+        reply.code(403);
+        return { error: 'Withdrawals > 500 SOL require superadmin approval' };
+      }
+    }
 
     await db.update(withdrawals).set({
       status,
@@ -313,7 +607,7 @@ export async function adminRoutes(server: FastifyInstance) {
   });
 
   server.get('/rounds/:id', async (request) => {
-    const { id } = request.params as { id: string };
+    const { id } = parseParams(uuidParams, request.params);
 
     const round = await db.query.rounds.findFirst({ where: eq(rounds.id, id) });
     if (!round) return { error: 'Round not found' };
@@ -392,7 +686,7 @@ export async function adminRoutes(server: FastifyInstance) {
   });
 
   server.get('/fairness/round/:id', async (request) => {
-    const { id } = request.params as { id: string };
+    const { id } = parseParams(uuidParams, request.params);
     const round = await db.query.rounds.findFirst({ where: eq(rounds.id, id) });
     if (!round) return { error: 'Round not found' };
 
@@ -416,8 +710,8 @@ export async function adminRoutes(server: FastifyInstance) {
     return { data };
   });
 
-  server.post('/engine-config', async (request) => {
-    const { config } = request.body as { config: unknown };
+  server.post('/engine-config', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('superadmin')] }, async (request) => {
+    const { config } = parseBody(engineConfigBody, request.body);
     const actor = getAuthUser(request);
 
     const [latest] = await db.select({ maxVersion: sql<number>`COALESCE(MAX(${engineConfigs.version}), 0)` }).from(engineConfigs);
@@ -442,8 +736,8 @@ export async function adminRoutes(server: FastifyInstance) {
     return created;
   });
 
-  server.patch('/engine-config/:id/activate', async (request) => {
-    const { id } = request.params as { id: string };
+  server.patch('/engine-config/:id/activate', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('superadmin')] }, async (request) => {
+    const { id } = parseParams(uuidParams, request.params);
     const actor = getAuthUser(request);
 
     await db.update(engineConfigs).set({ isActive: false });
@@ -469,9 +763,9 @@ export async function adminRoutes(server: FastifyInstance) {
     return db.query.featureFlags.findMany();
   });
 
-  server.patch('/feature-flags/:key', async (request) => {
-    const { key } = request.params as { key: string };
-    const { enabled, config } = request.body as { enabled?: boolean; config?: unknown };
+  server.patch('/feature-flags/:key', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request) => {
+    const { key } = parseParams(keyParams, request.params);
+    const { enabled, config } = parseBody(featureFlagUpdateBody, request.body);
     const actor = getAuthUser(request);
 
     const update: Record<string, unknown> = { updatedAt: new Date(), updatedBy: actor.userId };
@@ -479,6 +773,12 @@ export async function adminRoutes(server: FastifyInstance) {
     if (config !== undefined) update.config = config;
 
     await db.update(featureFlags).set(update).where(eq(featureFlags.flagKey, key));
+
+    // Invalidate cached game gate so change takes effect immediately
+    try {
+      const { invalidateGameFlag } = await import('../utils/gameGates.js');
+      await invalidateGameFlag(key);
+    } catch { /* non-critical */ }
 
     await db.insert(adminAuditLogs).values({
       actorUserId: actor.userId,
@@ -492,10 +792,8 @@ export async function adminRoutes(server: FastifyInstance) {
     return { success: true };
   });
 
-  server.post('/feature-flags', async (request) => {
-    const { flagKey, description, enabled, config } = request.body as {
-      flagKey: string; description: string; enabled?: boolean; config?: unknown;
-    };
+  server.post('/feature-flags', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request) => {
+    const { flagKey, description, enabled, config } = parseBody(featureFlagCreateBody, request.body);
     const actor = getAuthUser(request);
 
     const [created] = await db.insert(featureFlags).values({
@@ -540,9 +838,9 @@ export async function adminRoutes(server: FastifyInstance) {
     return { data };
   });
 
-  server.patch('/risk-flags/:id/resolve', async (request) => {
-    const { id } = request.params as { id: string };
-    const { notes } = request.body as { notes: string };
+  server.patch('/risk-flags/:id/resolve', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const { notes } = parseBody(riskFlagResolveBody, request.body);
     const actor = getAuthUser(request);
 
     await db.update(riskFlags).set({
@@ -697,7 +995,7 @@ export async function adminRoutes(server: FastifyInstance) {
   });
 
   server.get('/deposit-wallets/:userId/balance', async (request) => {
-    const { userId } = request.params as { userId: string };
+    const { userId } = parseParams(userIdParams, request.params);
     const address = await depositWalletService.getWalletAddress(userId);
     if (!address) return { error: 'No deposit wallet found for user' };
 
@@ -705,8 +1003,8 @@ export async function adminRoutes(server: FastifyInstance) {
     return { address, balance, balanceSol: balance / 1_000_000_000 };
   });
 
-  server.post('/deposit-wallets/:userId/sweep', async (request) => {
-    const { userId } = request.params as { userId: string };
+  server.post('/deposit-wallets/:userId/sweep', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('superadmin')] }, async (request) => {
+    const { userId } = parseParams(userIdParams, request.params);
     const actor = getAuthUser(request);
 
     const txHash = await depositWalletService.sweepToTreasury(userId);
@@ -801,8 +1099,8 @@ export async function adminRoutes(server: FastifyInstance) {
     return { messages: messages.reverse() };
   });
 
-  server.delete('/chat/messages/:id', async (request) => {
-    const { id } = request.params as { id: string };
+  server.delete('/chat/messages/:id', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('support', 'operator', 'admin', 'superadmin')] }, async (request) => {
+    const { id } = parseParams(uuidParams, request.params);
     const actor = getAuthUser(request);
 
     await db.delete(chatMessages).where(eq(chatMessages.id, id));
@@ -838,17 +1136,8 @@ export async function adminRoutes(server: FastifyInstance) {
     return { data };
   });
 
-  server.post('/bonus-codes', async (request) => {
-    const { code, description, type, amountLamports, maxUses, maxPerUser, minLevel, expiresAt } = request.body as {
-      code: string;
-      description?: string;
-      type?: string;
-      amountLamports: number;
-      maxUses?: number;
-      maxPerUser?: number;
-      minLevel?: number;
-      expiresAt?: string;
-    };
+  server.post('/bonus-codes', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request) => {
+    const { code, description, type, amountLamports, maxUses, maxPerUser, minLevel, expiresAt } = parseBody(bonusCodeCreateBody, request.body);
     const actor = getAuthUser(request);
 
     const [created] = await db.insert(bonusCodes).values({
@@ -875,14 +1164,9 @@ export async function adminRoutes(server: FastifyInstance) {
     return created;
   });
 
-  server.patch('/bonus-codes/:id', async (request) => {
-    const { id } = request.params as { id: string };
-    const { active, maxUses, expiresAt, description } = request.body as {
-      active?: boolean;
-      maxUses?: number;
-      expiresAt?: string;
-      description?: string;
-    };
+  server.patch('/bonus-codes/:id', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const { active, maxUses, expiresAt, description } = parseBody(bonusCodeUpdateBody, request.body);
     const actor = getAuthUser(request);
 
     const update: Record<string, unknown> = {};
@@ -905,8 +1189,8 @@ export async function adminRoutes(server: FastifyInstance) {
     return { success: true };
   });
 
-  server.delete('/bonus-codes/:id', async (request) => {
-    const { id } = request.params as { id: string };
+  server.delete('/bonus-codes/:id', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request) => {
+    const { id } = parseParams(uuidParams, request.params);
     const actor = getAuthUser(request);
 
     await db.update(bonusCodes).set({ active: false }).where(eq(bonusCodes.id, id));
@@ -924,7 +1208,7 @@ export async function adminRoutes(server: FastifyInstance) {
   });
 
   server.get('/bonus-codes/:id/redemptions', async (request) => {
-    const { id } = request.params as { id: string };
+    const { id } = parseParams(uuidParams, request.params);
 
     const data = await db
       .select({
@@ -941,5 +1225,391 @@ export async function adminRoutes(server: FastifyInstance) {
       .limit(100);
 
     return { data };
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  FAILED SETTLEMENT RECOVERY
+  // ═══════════════════════════════════════════════════════════
+
+  // List failed settlements (filterable by status)
+  server.get('/failed-settlements', async (request) => {
+    const { status } = request.query as { status?: string };
+    const query = status
+      ? db.select().from(failedSettlements).where(eq(failedSettlements.status, status))
+      : db.select().from(failedSettlements);
+    const data = await query.orderBy(desc(failedSettlements.createdAt)).limit(100);
+    return { data, count: data.length };
+  });
+
+  // Retry a specific failed settlement
+  server.post('/failed-settlements/:id/retry', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const actor = getAuthUser(request);
+    const result = await retrySettlement(id, actor.userId);
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'settlement_retry',
+      targetType: 'failed_settlement',
+      targetId: id,
+      payload: { result },
+      ipAddress: request.ip,
+    });
+
+    return result;
+  });
+
+  // Abandon a failed settlement (mark as unrecoverable)
+  server.post('/failed-settlements/:id/abandon', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const actor = getAuthUser(request);
+
+    await db.update(failedSettlements).set({
+      status: 'abandoned',
+      resolvedBy: actor.userId,
+      resolvedAt: new Date(),
+    }).where(eq(failedSettlements.id, id));
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'settlement_abandon',
+      targetType: 'failed_settlement',
+      targetId: id,
+      payload: {},
+      ipAddress: request.ip,
+    });
+
+    return { success: true };
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  OPS DASHBOARD — Live operational visibility
+  // ═══════════════════════════════════════════════════════════
+
+  // Ops health overview — single endpoint for operator dashboard
+  server.get('/ops/health', async () => {
+    const now = new Date();
+    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+    // Failed settlements
+    const failedSettlementsData = await db.execute(sql`
+      SELECT
+        count(*) FILTER (WHERE status = 'pending') as pending_count,
+        count(*) FILTER (WHERE status = 'resolved') as resolved_count,
+        count(*) FILTER (WHERE status = 'abandoned') as abandoned_count,
+        count(*) FILTER (WHERE created_at >= ${oneDayAgo}) as last_24h_count
+      FROM failed_settlements
+    `);
+
+    // Ops alerts (last 24h)
+    const alertsData = await db.execute(sql`
+      SELECT
+        count(*) FILTER (WHERE severity = 'critical') as critical_count,
+        count(*) FILTER (WHERE severity = 'warning') as warning_count,
+        count(*) FILTER (WHERE acknowledged = false) as unacked_count,
+        count(*) FILTER (WHERE created_at >= ${oneHourAgo}) as last_hour_count
+      FROM ops_alerts
+      WHERE created_at >= ${oneDayAgo}
+    `);
+
+    // Game flags
+    const flags = await db.query.featureFlags.findMany();
+    const gameFlags = flags.filter(f => f.flagKey.startsWith('game_')).map(f => ({
+      game: f.flagKey.replace('game_', '').replace('_enabled', ''),
+      enabled: f.enabled,
+    }));
+
+    // Recent critical alerts (last 10)
+    const recentAlerts = await db.execute(sql`
+      SELECT id, severity, category, message, user_id, game, request_id, created_at, acknowledged
+      FROM ops_alerts
+      WHERE created_at >= ${oneDayAgo}
+      ORDER BY created_at DESC
+      LIMIT 10
+    `);
+
+    return {
+      timestamp: now.toISOString(),
+      settlements: (failedSettlementsData as any)[0] || { pending_count: 0, resolved_count: 0, abandoned_count: 0, last_24h_count: 0 },
+      alerts: (alertsData as any)[0] || { critical_count: 0, warning_count: 0, unacked_count: 0, last_hour_count: 0 },
+      gameFlags,
+      recentAlerts: recentAlerts || [],
+    };
+  });
+
+  // List ops alerts (filterable)
+  server.get('/ops/alerts', async (request) => {
+    const { severity, category, acknowledged, limit: lim } = request.query as { severity?: string; category?: string; acknowledged?: string; limit?: string };
+    const parsedLimit = Math.min(Math.max(parseInt(lim || '50', 10) || 50, 1), 200);
+
+    let query = sql`SELECT * FROM ops_alerts WHERE 1=1`;
+    if (severity) query = sql`${query} AND severity = ${severity}`;
+    if (category) query = sql`${query} AND category = ${category}`;
+    if (acknowledged === 'false') query = sql`${query} AND acknowledged = false`;
+    if (acknowledged === 'true') query = sql`${query} AND acknowledged = true`;
+    query = sql`${query} ORDER BY created_at DESC LIMIT ${parsedLimit}`;
+
+    const data = await db.execute(query);
+    return { data, count: (data as any[]).length };
+  });
+
+  // Acknowledge an ops alert
+  server.post('/ops/alerts/:id/acknowledge', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('support', 'operator', 'admin', 'superadmin')] }, async (request) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const actor = getAuthUser(request);
+
+    await db.execute(sql`
+      UPDATE ops_alerts SET acknowledged = true, acknowledged_by = ${actor.userId}, acknowledged_at = now()
+      WHERE id = ${id}::uuid
+    `);
+
+    return { success: true };
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  ECONOMY MONITORING — Observed RTP vs Expected
+  // ═══════════════════════════════════════════════════════════
+
+  server.get('/ops/rtp', async (request) => {
+    const { window } = request.query as { window?: string };
+    const windowHours = Math.min(Math.max(parseInt(window || '24', 10) || 24, 1), 720); // max 30 days
+    const data = await getObservedRTP(windowHours);
+    return {
+      windowHours,
+      games: data,
+      summary: {
+        gamesWithData: data.filter(g => g.sampleSize > 0).length,
+        totalGames: data.length,
+        driftWarnings: data.filter(g => g.delta !== null && Math.abs(g.delta) > 0.05 && g.sampleSize >= 20).map(g => ({
+          game: g.game,
+          observedRtp: g.observedRtp,
+          expectedRtp: g.expectedRtp,
+          delta: g.delta,
+          sampleSize: g.sampleSize,
+        })),
+      },
+    };
+  });
+
+  // Payout outliers — list recent outlier alerts
+  server.get('/ops/outliers', async (request) => {
+    const { limit: lim } = request.query as { limit?: string };
+    const parsedLimit = Math.min(Math.max(parseInt(lim || '50', 10) || 50, 1), 200);
+
+    const data = await db.execute(sql`
+      SELECT * FROM ops_alerts
+      WHERE category = 'payout_outlier'
+      ORDER BY created_at DESC
+      LIMIT ${parsedLimit}
+    `);
+
+    return { data, count: (data as any[]).length };
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  PERFORMANCE MONITORING
+  // ═══════════════════════════════════════════════════════════
+
+  // Full performance stats — all routes
+  server.get('/ops/perf', async (request) => {
+    const { window } = request.query as { window?: string };
+    const windowMinutes = Math.min(Math.max(parseInt(window || '60', 10) || 60, 1), 1440);
+    return getPerformanceStats(windowMinutes);
+  });
+
+  // Money-critical routes only
+  server.get('/ops/perf/money', async (request) => {
+    const { window } = request.query as { window?: string };
+    const windowMinutes = Math.min(Math.max(parseInt(window || '60', 10) || 60, 1), 1440);
+    return getMoneyRoutePerformance(windowMinutes);
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  //  WORKER HEALTH
+  // ═══════════════════════════════════════════════════════════
+
+  server.get('/workers/health', async () => {
+    const { getAllWorkerHealth } = await import('../utils/workerHealth.js');
+    const { getSolanaCircuitBreaker } = await import('../utils/circuitBreaker.js');
+    const statuses = await getAllWorkerHealth();
+    const healthy = statuses.filter(s => s.health === 'healthy').length;
+    const degraded = statuses.filter(s => s.health === 'degraded').length;
+    const dead = statuses.filter(s => s.health === 'dead').length;
+    const circuitBreaker = getSolanaCircuitBreaker().getStatus();
+    return {
+      summary: { total: statuses.length, healthy, degraded, dead },
+      workers: statuses,
+      solanaRpc: circuitBreaker,
+    };
+  });
+
+  // ── NUCLEAR RESET — delete all non-admin users + all game data ──
+  // Casino becomes brand new. Keeps admin accounts, config, bonus codes, audit logs.
+  server.post('/reset-casino-data', { config: { rateLimit: RATE_LIMIT_DANGEROUS }, preHandler: [requireRole('superadmin')] }, async (request) => {
+    const { reason } = parseBody(resetCasinoDataBody, request.body);
+    const actor = getAuthUser(request);
+
+    // Collect admin user IDs to preserve
+    const adminUsers = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(or(eq(users.role, 'admin'), eq(users.role, 'superadmin'), eq(users.role, 'operator')));
+    const adminIds = adminUsers.map(u => u.id);
+
+    if (adminIds.length === 0) {
+      return { error: 'No admin users found — aborting to prevent data loss' };
+    }
+
+    // Build exclusion clause for admin users
+    const adminIdList = adminIds.map(id => `'${id}'`).join(',');
+
+    // Execute deletes in FK-safe order: deepest children first, parents last
+    // Each statement returns row count via a CTE trick
+    const result = await db.execute(sql.raw(`
+      -- Phase 1: Game-specific child tables (no user FK dependency issues)
+      WITH
+        d01 AS (DELETE FROM weekly_race_prizes RETURNING 1),
+        d02 AS (DELETE FROM weekly_race_entries RETURNING 1),
+        d03 AS (DELETE FROM weekly_races RETURNING 1),
+        d04 AS (DELETE FROM candleflip_round_bets RETURNING 1),
+        d05 AS (DELETE FROM candleflip_rounds RETURNING 1),
+        d06 AS (DELETE FROM rug_round_bets RETURNING 1),
+        d07 AS (DELETE FROM rug_rounds RETURNING 1),
+        d08 AS (DELETE FROM rug_games RETURNING 1),
+        d09 AS (DELETE FROM candleflip_games RETURNING 1),
+        d10 AS (DELETE FROM mines_games RETURNING 1),
+        d11 AS (DELETE FROM trading_sim_trades RETURNING 1),
+        d12 AS (DELETE FROM trading_sim_participants RETURNING 1),
+        d13 AS (DELETE FROM trading_sim_rooms RETURNING 1),
+        d14 AS (DELETE FROM lottery_winners RETURNING 1),
+        d15 AS (DELETE FROM lottery_tickets RETURNING 1),
+        d16 AS (DELETE FROM lottery_draws RETURNING 1),
+        d17 AS (DELETE FROM prediction_rounds RETURNING 1),
+        d18 AS (DELETE FROM referral_earnings RETURNING 1),
+        d19 AS (DELETE FROM bet_results RETURNING 1),
+        d20 AS (DELETE FROM bets RETURNING 1),
+        d21 AS (DELETE FROM round_nodes RETURNING 1),
+        d22 AS (DELETE FROM round_events RETURNING 1),
+        d23 AS (DELETE FROM round_pools RETURNING 1),
+        d24 AS (DELETE FROM rounds RETURNING 1),
+        d25 AS (DELETE FROM tournament_participants RETURNING 1),
+        d26 AS (DELETE FROM tournaments RETURNING 1),
+        d27 AS (DELETE FROM failed_settlements RETURNING 1),
+        d28 AS (DELETE FROM activity_feed_items RETURNING 1),
+        d29 AS (DELETE FROM leaderboard_snapshots RETURNING 1),
+        d30 AS (DELETE FROM chat_messages RETURNING 1),
+        d31 AS (DELETE FROM daily_rewards RETURNING 1),
+        d32 AS (DELETE FROM user_mission_progress RETURNING 1),
+        d33 AS (DELETE FROM user_achievements RETURNING 1),
+        d34 AS (DELETE FROM season_pass_claims RETURNING 1),
+        d35 AS (DELETE FROM bonus_code_redemptions RETURNING 1),
+        d36 AS (DELETE FROM balance_ledger_entries RETURNING 1),
+        d37 AS (DELETE FROM balances RETURNING 1),
+        d38 AS (DELETE FROM deposits RETURNING 1),
+        d39 AS (DELETE FROM withdrawals RETURNING 1),
+        d40 AS (DELETE FROM risk_flags RETURNING 1),
+        d41 AS (DELETE FROM self_exclusions RETURNING 1),
+        d42 AS (DELETE FROM user_limits RETURNING 1),
+        d43 AS (DELETE FROM outbox_events RETURNING 1),
+        d44 AS (DELETE FROM analytics_events RETURNING 1),
+        d45 AS (DELETE FROM referral_codes RETURNING 1),
+        d46 AS (DELETE FROM referrals RETURNING 1),
+        d47 AS (DELETE FROM user_deposit_wallets RETURNING 1),
+        d48 AS (DELETE FROM linked_wallets RETURNING 1),
+        d49 AS (DELETE FROM user_sessions WHERE user_id NOT IN (${adminIdList}) RETURNING 1),
+        d50 AS (DELETE FROM user_profiles WHERE user_id NOT IN (${adminIdList}) RETURNING 1),
+        d51 AS (DELETE FROM users WHERE role NOT IN ('admin', 'superadmin', 'operator') RETURNING 1)
+      SELECT
+        (SELECT count(*) FROM d01) AS weekly_race_prizes,
+        (SELECT count(*) FROM d02) AS weekly_race_entries,
+        (SELECT count(*) FROM d03) AS weekly_races,
+        (SELECT count(*) FROM d04) AS candleflip_round_bets,
+        (SELECT count(*) FROM d05) AS candleflip_rounds,
+        (SELECT count(*) FROM d06) AS rug_round_bets,
+        (SELECT count(*) FROM d07) AS rug_rounds,
+        (SELECT count(*) FROM d08) AS rug_games,
+        (SELECT count(*) FROM d09) AS candleflip_games,
+        (SELECT count(*) FROM d10) AS mines_games,
+        (SELECT count(*) FROM d11) AS trading_sim_trades,
+        (SELECT count(*) FROM d12) AS trading_sim_participants,
+        (SELECT count(*) FROM d13) AS trading_sim_rooms,
+        (SELECT count(*) FROM d14) AS lottery_winners,
+        (SELECT count(*) FROM d15) AS lottery_tickets,
+        (SELECT count(*) FROM d16) AS lottery_draws,
+        (SELECT count(*) FROM d17) AS prediction_rounds,
+        (SELECT count(*) FROM d18) AS referral_earnings,
+        (SELECT count(*) FROM d19) AS bet_results,
+        (SELECT count(*) FROM d20) AS bets,
+        (SELECT count(*) FROM d21) AS round_nodes,
+        (SELECT count(*) FROM d22) AS round_events,
+        (SELECT count(*) FROM d23) AS round_pools,
+        (SELECT count(*) FROM d24) AS rounds,
+        (SELECT count(*) FROM d25) AS tournament_participants,
+        (SELECT count(*) FROM d26) AS tournaments,
+        (SELECT count(*) FROM d27) AS failed_settlements,
+        (SELECT count(*) FROM d28) AS activity_feed_items,
+        (SELECT count(*) FROM d29) AS leaderboard_snapshots,
+        (SELECT count(*) FROM d30) AS chat_messages,
+        (SELECT count(*) FROM d31) AS daily_rewards,
+        (SELECT count(*) FROM d32) AS user_mission_progress,
+        (SELECT count(*) FROM d33) AS user_achievements,
+        (SELECT count(*) FROM d34) AS season_pass_claims,
+        (SELECT count(*) FROM d35) AS bonus_code_redemptions,
+        (SELECT count(*) FROM d36) AS balance_ledger_entries,
+        (SELECT count(*) FROM d37) AS balances,
+        (SELECT count(*) FROM d38) AS deposits,
+        (SELECT count(*) FROM d39) AS withdrawals,
+        (SELECT count(*) FROM d40) AS risk_flags,
+        (SELECT count(*) FROM d41) AS self_exclusions,
+        (SELECT count(*) FROM d42) AS user_limits,
+        (SELECT count(*) FROM d43) AS outbox_events,
+        (SELECT count(*) FROM d44) AS analytics_events,
+        (SELECT count(*) FROM d45) AS referral_codes,
+        (SELECT count(*) FROM d46) AS referrals,
+        (SELECT count(*) FROM d47) AS user_deposit_wallets,
+        (SELECT count(*) FROM d48) AS linked_wallets,
+        (SELECT count(*) FROM d49) AS user_sessions,
+        (SELECT count(*) FROM d50) AS user_profiles,
+        (SELECT count(*) FROM d51) AS users_deleted
+    `)) as unknown as any[];
+
+    const counts = result[0] || {};
+
+    // Reset admin users' bonus/XP/stats (keep accounts but clean slate)
+    await db.execute(sql`
+      UPDATE users SET
+        level = 1, xp_total = 0, xp_current = 0, xp_to_next = 100,
+        bonus_claimed = false, vip_tier = 'bronze',
+        demo_balance = 100000000000, demo_refills_used = 0,
+        updated_at = now()
+      WHERE role IN ('admin', 'superadmin', 'operator')
+    `);
+
+    // Reset admin bonus code used_count back to 0
+    await db.execute(sql`UPDATE bonus_codes SET used_count = 0`);
+
+    // Create fresh weekly race for current week
+    try {
+      const { WeeklyRaceService } = await import('../modules/weekly-race/weeklyRace.service.js');
+      await WeeklyRaceService.ensureActiveRace();
+    } catch { /* non-critical */ }
+
+    // Audit log
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'casino_data_reset',
+      targetType: 'system',
+      targetId: 'all',
+      payload: { reason, counts, adminIdsPreserved: adminIds.length, timestamp: Date.now() },
+      ipAddress: request.ip,
+    });
+
+    return {
+      success: true,
+      message: 'Casino reset complete. All non-admin users and game data deleted.',
+      adminUsersPreserved: adminIds.length,
+      deletedRows: counts,
+    };
   });
 }

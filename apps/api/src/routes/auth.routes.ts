@@ -62,6 +62,7 @@ export async function authRoutes(server: FastifyInstance) {
 
     return reply.status(201).send({
       accessToken,
+      refreshToken,
       expiresIn: 3600, // 1 hour (matches JWT_ACCESS_EXPIRY)
       userId,
     });
@@ -88,17 +89,19 @@ export async function authRoutes(server: FastifyInstance) {
       maxAge: 7 * 24 * 60 * 60,
     });
 
-    return { accessToken, expiresIn: 3600, userId };
+    return { accessToken, refreshToken, expiresIn: 3600, userId };
   });
 
   // ─── Refresh ─────────────────────────────────────────────
   server.post('/refresh', { config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request, reply) => {
-    const refreshToken = request.cookies.refreshToken;
-    if (!refreshToken) {
+    // Accept refresh token from cookie OR request body (cross-origin cookie fallback)
+    const body = (request.body as any) || {};
+    const rt = request.cookies.refreshToken || body.refreshToken;
+    if (!rt) {
       throw new AppError(401, 'NO_REFRESH_TOKEN', 'No refresh token provided');
     }
 
-    const result = await authService.refreshSession(refreshToken);
+    const result = await authService.refreshSession(rt);
     if (!result) {
       throw new AppError(401, 'INVALID_REFRESH_TOKEN', 'Invalid or expired refresh token');
     }
@@ -107,7 +110,7 @@ export async function authRoutes(server: FastifyInstance) {
       { sub: result.userId, role: result.role, sid: result.sessionId },
     );
 
-    // Set rotated refresh token cookie (M5 fix)
+    // Set rotated refresh token cookie (still try cookie for clients that support it)
     reply.setCookie('refreshToken', result.newRefreshToken, {
       httpOnly: true,
       secure: true,
@@ -116,7 +119,8 @@ export async function authRoutes(server: FastifyInstance) {
       maxAge: 7 * 24 * 60 * 60,
     });
 
-    return { accessToken, expiresIn: 3600 };
+    // Also return in body so frontend can store it (cross-origin cookie fallback)
+    return { accessToken, refreshToken: result.newRefreshToken, expiresIn: 3600 };
   });
 
   // ─── Logout ──────────────────────────────────────────────
@@ -220,6 +224,7 @@ export async function authRoutes(server: FastifyInstance) {
 
     return reply.status(isNew ? 201 : 200).send({
       accessToken,
+      refreshToken,
       expiresIn: 3600,
       userId,
       isNewAccount: isNew,

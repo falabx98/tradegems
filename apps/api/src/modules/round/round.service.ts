@@ -228,8 +228,12 @@ export class RoundService {
         settledAt: new Date(),
       }).where(eq(bets.id, bet.id));
 
-      // Award XP
+      // Award XP + track missions
       await this.userService.addXP(bet.userId, result.xpGained, 'round');
+      try {
+        const { MissionsService } = await import('../missions/missions.service.js');
+        await new MissionsService().trackProgress(bet.userId, 'solo_result', result.payout > bet.amount);
+      } catch {}
 
       // Insert activity feed item for real players
       try {

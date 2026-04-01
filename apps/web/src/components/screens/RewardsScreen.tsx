@@ -45,7 +45,7 @@ interface DailyBoxInfo {
 
 const RARITY_COLORS: Record<string, string> = {
   common: '#9ca3af',
-  uncommon: '#2ecc71',
+  uncommon: '#00E701',
   rare: '#5b8def',
   epic: '#3b82f6',
   legendary: '#8b5cf6',
@@ -259,7 +259,7 @@ export function RewardsScreen() {
                 <div style={styles.empty}>Loading missions...</div>
               ) : missions.length === 0 ? (
                 <div style={{ ...styles.empty, flexDirection: 'column', display: 'flex', alignItems: 'center', gap: '12px', padding: '40px 20px' }}>
-                  <div style={{ fontSize: '32px' }}>🎯</div>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.text.muted} strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></svg>
                   <div style={{ fontSize: '16px', fontWeight: 700, color: theme.text.secondary }}>Missions Coming Soon</div>
                   <div style={{ fontSize: '13px', color: theme.text.muted, textAlign: 'center', maxWidth: '300px', lineHeight: 1.5 }}>
                     Complete daily challenges to earn XP, SOL rewards, and climb the ranks. Check back soon!
@@ -282,7 +282,7 @@ export function RewardsScreen() {
                   }}>
                     <div style={styles.missionLeft}>
                       <div style={styles.missionTitle}>
-                        {m.completed && <span style={styles.checkMark}><CheckIcon size={12} color="#2ecc71" /></span>}
+                        {m.completed && <span style={styles.checkMark}><CheckIcon size={12} color="#00E701" /></span>}
                         {m.title}
                       </div>
                       <div style={styles.missionDesc}>{m.description}</div>
@@ -316,7 +316,7 @@ export function RewardsScreen() {
                         </button>
                       )}
                       {m.completed && m.claimed && (
-                        <span style={{ fontSize: 13, color: '#2ecc71', fontWeight: 600 }}>Claimed ✓</span>
+                        <span style={{ fontSize: 13, color: '#00E701', fontWeight: 600 }}>Claimed ✓</span>
                       )}
                     </div>
                   </div>
@@ -490,7 +490,7 @@ export function RewardsScreen() {
                             }}
                           />
                           <button
-                            style={{ ...affStyles.copyBtn, background: 'rgba(46, 204, 113, 0.15)', color: '#2ecc71', border: '1px solid rgba(46, 204, 113, 0.3)' }}
+                            style={{ ...affStyles.copyBtn, background: 'rgba(46, 204, 113, 0.15)', color: '#00E701', border: '1px solid rgba(46, 204, 113, 0.3)' }}
                             disabled={savingCode || customCode.length < 3}
                             onClick={async () => {
                               setSavingCode(true);
@@ -510,7 +510,7 @@ export function RewardsScreen() {
                             {savingCode ? '...' : 'Save'}
                           </button>
                           <button
-                            style={{ ...affStyles.copyBtn, background: 'rgba(248, 113, 113, 0.1)', color: '#f87171', border: '1px solid rgba(248, 113, 113, 0.2)' }}
+                            style={{ ...affStyles.copyBtn, background: 'rgba(248, 113, 113, 0.1)', color: '#FF3333', border: '1px solid rgba(248, 113, 113, 0.2)' }}
                             onClick={() => { setEditingCode(false); setCodeMsg(null); }}
                           >
                             Cancel
@@ -522,7 +522,7 @@ export function RewardsScreen() {
                       </>
                     )}
                     {codeMsg && (
-                      <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '6px', color: codeMsg.type === 'success' ? '#2ecc71' : '#f87171' }}>
+                      <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '6px', color: codeMsg.type === 'success' ? '#00E701' : '#FF3333' }}>
                         {codeMsg.text}
                       </div>
                     )}
@@ -955,7 +955,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   claimBtn: {
     padding: '5px 14px',
-    background: '#2ecc71',
+    background: '#00E701',
     border: 'none',
     borderRadius: '8px',
     color: '#0e0a16',
@@ -1051,7 +1051,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   rakebackRate: {
     fontSize: '38px',
-    fontWeight: 900,
+    fontWeight: 700,
     color: '#3b82f6',
     lineHeight: 1,
     textShadow: '0 0 20px rgba(51, 227, 157, 0.5), 0 0 40px rgba(51, 227, 157, 0.2)',
@@ -1085,7 +1085,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   claimRakebackBtn: {
     padding: '12px 28px',
-    background: '#2ecc71',
+    background: '#00E701',
     border: 'none',
     borderRadius: '12px',
     color: '#0e0a16',
@@ -1225,7 +1225,7 @@ const affStyles: Record<string, React.CSSProperties> = {
   },
   code: {
     fontSize: '22px',
-    fontWeight: 900,
+    fontWeight: 700,
     color: '#3b82f6',
     letterSpacing: '2px',
     textShadow: '0 0 12px rgba(51, 227, 157, 0.4)',
@@ -1265,7 +1265,7 @@ const affStyles: Record<string, React.CSSProperties> = {
   },
   statValue: {
     fontSize: '16px',
-    fontWeight: 800,
+    fontWeight: 700,
     color: theme.text.primary,
     display: 'flex',
     alignItems: 'center',
@@ -1283,7 +1283,7 @@ const affStyles: Record<string, React.CSSProperties> = {
   },
   claimableAmount: {
     fontSize: '26px',
-    fontWeight: 900,
+    fontWeight: 700,
     color: theme.success,
     textShadow: '0 0 12px rgba(46, 204, 113, 0.4)',
     display: 'flex',

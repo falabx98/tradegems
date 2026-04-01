@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { api, setAccessToken, getAccessToken } from '../utils/api';
+import { api, setAccessToken, getAccessToken, setRefreshToken } from '../utils/api';
 import { connectPhantom, signMessage, disconnectPhantom } from '../utils/phantom';
+import { funnelTrack, track } from '../utils/analytics';
 
 interface AuthState {
   userId: string | null;
@@ -28,31 +29,40 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   register: async (email, username, password, referralCode?) => {
     set({ isLoading: true, error: null });
+    funnelTrack.authStart();
     try {
       const res = await api.register({ email, username, password, referralCode: referralCode || undefined });
       setAccessToken(res.accessToken);
+      if (res.refreshToken) setRefreshToken(res.refreshToken);
       set({
         userId: res.userId,
         username,
         isAuthenticated: true,
         isLoading: false,
       });
+      funnelTrack.authComplete();
+      track('auth.signup_completed');
     } catch (err: any) {
       set({ error: err.message, isLoading: false });
+      track('auth.signup_failed', { reason: err.message });
       throw err;
     }
   },
 
   login: async (email, password) => {
     set({ isLoading: true, error: null });
+    funnelTrack.authStart();
     try {
       const res = await api.login({ email, password });
       setAccessToken(res.accessToken);
+      if (res.refreshToken) setRefreshToken(res.refreshToken);
       set({
         userId: res.userId,
         isAuthenticated: true,
         isLoading: false,
       });
+      funnelTrack.authComplete();
+      track('auth.login_completed');
       try {
         const me = await api.getMe();
         set({ username: me.username });
@@ -71,6 +81,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const signature = await signMessage(message);
       const res = await api.walletVerify({ address, signature, nonce });
       setAccessToken(res.accessToken);
+      if (res.refreshToken) setRefreshToken(res.refreshToken);
       set({
         userId: res.userId,
         walletAddress: address,
@@ -88,6 +99,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   logout: async () => {
+    track('auth.logout');
     try {
       await api.logout();
     } catch {}
@@ -95,6 +107,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       await disconnectPhantom();
     } catch {}
     setAccessToken(null);
+    setRefreshToken(null);
     set({
       userId: null,
       username: null,
@@ -124,6 +137,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       // Only clear auth if it's truly a session error (not a network issue)
       if (err?.status === 401 || err?.code === 'SESSION_EXPIRED') {
         setAccessToken(null);
+        setRefreshToken(null);
         set({ isAuthenticated: false });
       }
       // For network errors, keep the token — user might just be offline

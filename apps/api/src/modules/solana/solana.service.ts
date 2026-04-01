@@ -10,6 +10,7 @@ import {
 import crypto from 'node:crypto';
 import bs58 from 'bs58';
 import { getSolanaConnection, getTreasuryKeypair, getTreasuryAddress } from './treasury.js';
+import { getSolanaCircuitBreaker, CircuitOpenError } from '../../utils/circuitBreaker.js';
 
 interface DepositVerification {
   valid: boolean;
@@ -29,6 +30,7 @@ interface SendResult {
 export class SolanaService {
   private connection: Connection;
   private treasury: Keypair;
+  private cb = getSolanaCircuitBreaker();
 
   constructor() {
     this.connection = getSolanaConnection();
@@ -37,15 +39,17 @@ export class SolanaService {
 
   /**
    * Verify a deposit transaction on-chain.
-   * @param txHash - The transaction hash to verify
-   * @param targetAddress - The expected recipient address (per-user deposit wallet or treasury)
+   * Protected by circuit breaker with 10s timeout per RPC call.
    */
   async verifyDepositTransaction(txHash: string, targetAddress?: string): Promise<DepositVerification> {
     try {
-      const tx = await this.connection.getTransaction(txHash, {
-        commitment: 'confirmed',
-        maxSupportedTransactionVersion: 0,
-      });
+      // RPC call 1: getTransaction (through circuit breaker)
+      const tx = await this.cb.execute(() =>
+        this.connection.getTransaction(txHash, {
+          commitment: 'confirmed',
+          maxSupportedTransactionVersion: 0,
+        })
+      );
 
       if (!tx) {
         return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: 'Transaction not found' };
@@ -62,13 +66,11 @@ export class SolanaService {
         keys.push(accountKeys.get(i)!.toBase58());
       }
 
-      // Find the target account index
       const targetIdx = keys.findIndex(k => k === checkAddress);
       if (targetIdx === -1) {
         return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: 'Transaction does not involve expected address' };
       }
 
-      // Calculate amount received from balance changes
       const preBalance = tx.meta!.preBalances[targetIdx];
       const postBalance = tx.meta!.postBalances[targetIdx];
       const amount = postBalance - preBalance;
@@ -77,19 +79,27 @@ export class SolanaService {
         return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: 'No SOL received' };
       }
 
-      // Sender is typically the first account (fee payer)
       const from = keys[0];
 
-      // Get current slot for confirmation count
-      const currentSlot = await this.connection.getSlot('confirmed');
+      // RPC call 2: getSlot (through circuit breaker)
+      const currentSlot = await this.cb.execute(() =>
+        this.connection.getSlot('confirmed')
+      );
       const confirmations = tx.slot ? currentSlot - tx.slot : 0;
 
       return { valid: true, amount, from, to: checkAddress, confirmations };
     } catch (err: any) {
+      if (err instanceof CircuitOpenError) {
+        return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: 'RPC_UNAVAILABLE' };
+      }
       return { valid: false, amount: 0, from: '', to: '', confirmations: 0, error: err.message };
     }
   }
 
+  /**
+   * Send SOL from treasury to destination.
+   * Protected by circuit breaker with 10s timeout.
+   */
   async sendSol(destination: string, amountLamports: number): Promise<SendResult> {
     try {
       const destPubkey = new PublicKey(destination);
@@ -102,15 +112,22 @@ export class SolanaService {
         }),
       );
 
-      const txHash = await sendAndConfirmTransaction(
-        this.connection,
-        transaction,
-        [this.treasury],
-        { commitment: 'confirmed' },
+      // RPC call: sendAndConfirmTransaction (through circuit breaker)
+      // Note: sendAndConfirmTransaction can take longer than 10s, so we use a 30s timeout
+      const txHash = await this.cb.execute(() =>
+        sendAndConfirmTransaction(
+          this.connection,
+          transaction,
+          [this.treasury],
+          { commitment: 'confirmed' },
+        )
       );
 
       return { txHash, success: true };
     } catch (err: any) {
+      if (err instanceof CircuitOpenError) {
+        return { txHash: '', success: false, error: 'RPC_UNAVAILABLE' };
+      }
       return { txHash: '', success: false, error: err.message };
     }
   }
@@ -121,7 +138,6 @@ export class SolanaService {
       const signatureBytes = bs58.decode(signature);
       const publicKeyBytes = bs58.decode(publicKey);
 
-      // Ed25519 DER SPKI header prefix
       const ed25519Header = Buffer.from('302a300506032b6570032100', 'hex');
       const derKey = Buffer.concat([ed25519Header, publicKeyBytes]);
 
@@ -137,7 +153,12 @@ export class SolanaService {
     }
   }
 
+  /**
+   * Get treasury balance. Protected by circuit breaker.
+   */
   async getTreasuryBalance(): Promise<number> {
-    return this.connection.getBalance(this.treasury.publicKey);
+    return this.cb.execute(() =>
+      this.connection.getBalance(this.treasury.publicKey)
+    );
   }
 }

@@ -30,10 +30,14 @@ import { lotteryRoutes } from './routes/lottery.routes.js';
 import { tradingSimRoutes } from './routes/trading-sim.routes.js';
 import { candleflipRoutes } from './routes/candleflip.routes.js';
 import { rugGameRoutes } from './routes/rug-game.routes.js';
+import { minesRoutes } from './routes/mines.routes.js';
+import { missionsRoutes } from './routes/missions.routes.js';
 import { startRugRoundManager } from './modules/round-manager/rugRoundManager.js';
 import { startCandleflipRoundManager } from './modules/round-manager/candleflipRoundManager.js';
 import { startSweepWorker } from './workers/sweepWorker.js';
 import { startOrphanCleanupWorker } from './workers/orphanCleanup.worker.js';
+import { startWeeklyRaceWorker } from './workers/weeklyRace.worker.js';
+import { weeklyRaceRoutes, weeklyRaceAdminRoutes } from './routes/weeklyRace.routes.js';
 
 
 export async function buildServer() {
@@ -52,10 +56,29 @@ export async function buildServer() {
   });
 
   // ─── Plugins ─────────────────────────────────────────────
+  // CORS: always include production domain + common dev origins
+  // env.CORS_ORIGINS can add extra domains but never removes the core set
+  const coreOrigins = [
+    'https://tradegems.gg',
+    'https://www.tradegems.gg',
+    'http://localhost:5173',
+    'http://localhost:3000',
+  ];
+  const extraOrigins = env.CORS_ORIGINS
+    ? env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+  const allOrigins = [...new Set([...coreOrigins, ...extraOrigins])];
+
   await server.register(cors, {
-    origin: env.CORS_ORIGINS
-      ? env.CORS_ORIGINS.split(',').map(s => s.trim())
-      : ['https://tradegems.app', 'https://tradesol-web.vercel.app', 'http://localhost:5173'],
+    origin: (origin, cb) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) return cb(null, true);
+      // Check exact match or Vercel preview pattern
+      if (allOrigins.includes(origin) || origin.endsWith('.vercel.app')) {
+        return cb(null, true);
+      }
+      cb(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -77,8 +100,19 @@ export async function buildServer() {
     redis: getRedis(),
   });
 
+  // ─── Request Performance Monitoring ─────────────────────
+  const { recordRequestMetric } = await import('./utils/perfMonitor.js');
+  server.addHook('onResponse', (request, reply, done) => {
+    // Normalize route pattern (remove UUIDs for grouping)
+    const route = (request.routeOptions?.url || request.url || 'unknown')
+      .replace(/\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '/:id');
+    recordRequestMetric(route, request.method, reply.statusCode, reply.elapsedTime, request.id);
+    done();
+  });
+
   // ─── Security Headers ───────────────────────────────────
-  server.addHook('onSend', (_request, reply, _payload, done) => {
+  server.addHook('onSend', (request, reply, _payload, done) => {
+    reply.header('X-Request-Id', request.id);
     reply.header('X-Content-Type-Options', 'nosniff');
     reply.header('X-Frame-Options', 'DENY');
     reply.header('X-XSS-Protection', '0');
@@ -102,7 +136,7 @@ export async function buildServer() {
   server.get('/v1/config', async () => ({
     feeRate: env.PLATFORM_FEE_RATE,
     minBetLamports: 1_000_000,
-    maxBetLamports: 10_000_000_000,
+    maxBetLamports: env.MAX_BET_LAMPORTS,
     buyInTiers: [100_000_000, 250_000_000, 500_000_000, 1_000_000_000, 2_000_000_000],
     tournamentRounds: 3,
     roundDurationMs: 15000,
@@ -156,6 +190,31 @@ export async function buildServer() {
   await server.register(tradingSimRoutes, { prefix: '/v1/trading-sim' });
   await server.register(candleflipRoutes, { prefix: '/v1/candleflip' });
   await server.register(rugGameRoutes, { prefix: '/v1/rug-game' });
+  await server.register(minesRoutes, { prefix: '/v1/mines' });
+  await server.register(missionsRoutes, { prefix: '/v1/missions' });
+  await server.register(weeklyRaceRoutes, { prefix: '/v1/races' });
+  await server.register(weeklyRaceAdminRoutes, { prefix: '/v1/admin' });
+
+  // Sponsored balances (streamer accounts)
+  const { sponsoredRoutes, sponsoredAdminRoutes } = await import('./routes/sponsored.routes.js');
+  await server.register(sponsoredRoutes, { prefix: '/v1/wallet' });
+  await server.register(sponsoredAdminRoutes, { prefix: '/v1/admin' });
+
+  // Simulation / bot testing (admin only)
+  const { simulationRoutes } = await import('./routes/simulation.routes.js');
+  await server.register(simulationRoutes, { prefix: '/v1/admin/simulation' });
+
+  // Return hooks / retention
+  const { returnHooksRoutes } = await import('./routes/returnHooks.routes.js');
+  await server.register(returnHooksRoutes, { prefix: '/v1/hooks' });
+
+  // Responsible gambling
+  const { responsibleGamblingRoutes } = await import('./routes/responsibleGambling.routes.js');
+  await server.register(responsibleGamblingRoutes, { prefix: '/v1/settings' });
+
+  // Analytics (no auth required — fire-and-forget from frontend)
+  const { analyticsRoutes } = await import('./routes/analytics.routes.js');
+  await server.register(analyticsRoutes, { prefix: '/v1/analytics' });
 
   // Start round managers (with error handling)
   try { startRugRoundManager(); } catch (e) { server.log.error(e, 'Failed to start rug round manager'); }
@@ -168,6 +227,13 @@ export async function buildServer() {
   try { startTradingSimWorker(); } catch (e) { server.log.error(e, 'Failed to start trading sim worker'); }
   try { startSweepWorker(); } catch (e) { server.log.error(e, 'Failed to start sweep worker'); }
   try { startOrphanCleanupWorker(); } catch (e) { server.log.error(e, 'Failed to start orphan cleanup worker'); }
+  try { startWeeklyRaceWorker(); } catch (e) { server.log.error(e, 'Failed to start weekly race worker'); }
+
+  // Start worker health supervisor
+  try {
+    const { startWorkerSupervisor } = await import('./utils/workerHealth.js');
+    startWorkerSupervisor();
+  } catch (e) { server.log.error(e, 'Failed to start worker supervisor'); }
 
   return server;
 }

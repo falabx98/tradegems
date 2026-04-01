@@ -4,6 +4,8 @@ import { lotteryDraws, lotteryTickets, lotteryWinners, balanceLedgerEntries, bal
 import { WalletService } from '../wallet/wallet.service.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { eq, and, desc, sql, lte } from 'drizzle-orm';
+import { auditLog } from '../../utils/auditLog.js';
+import { UserService } from '../user/user.service.js';
 
 // ─── Constants ───────────────────────────────────────────────
 const STANDARD_PRICE = 100_000_000;   // 0.10 SOL in lamports
@@ -22,34 +24,32 @@ const HOUSE_FEE_RATE = 0.05;
 // poolPercent: fraction of distributable pool allocated to this tier
 
 const PRIZE_TIERS = [
-  { tier: 1, label: 'Jackpot (5 + GB)',   mainMatch: 5, gemBallMatch: true,  poolPercent: 0.40 },
-  { tier: 2, label: '5 Numbers',          mainMatch: 5, gemBallMatch: false, poolPercent: 0.10 },
-  { tier: 3, label: '4 + GB',             mainMatch: 4, gemBallMatch: true,  poolPercent: 0.08 },
+  { tier: 1, label: 'Jackpot (5 + GB)',   mainMatch: 5, gemBallMatch: true,  poolPercent: 0.45 },
+  { tier: 2, label: '5 Numbers',          mainMatch: 5, gemBallMatch: false, poolPercent: 0.12 },
+  { tier: 3, label: '4 + GB',             mainMatch: 4, gemBallMatch: true,  poolPercent: 0.09 },
   { tier: 4, label: '4 Numbers',          mainMatch: 4, gemBallMatch: false, poolPercent: 0.07 },
   { tier: 5, label: '3 + GB',             mainMatch: 3, gemBallMatch: true,  poolPercent: 0.06 },
   { tier: 6, label: '3 Numbers',          mainMatch: 3, gemBallMatch: false, poolPercent: 0.05 },
   { tier: 7, label: '2 + GB',             mainMatch: 2, gemBallMatch: true,  poolPercent: 0.04 },
-  { tier: 8, label: '1 + GB',             mainMatch: 1, gemBallMatch: true,  poolPercent: 0.03 },
-  { tier: 9, label: 'GB Only',            mainMatch: 0, gemBallMatch: true,  poolPercent: 0.02 },
+  { tier: 8, label: '1 + GB',             mainMatch: 1, gemBallMatch: true,  poolPercent: 0.04 },
+  { tier: 9, label: 'GB Only',            mainMatch: 0, gemBallMatch: true,  poolPercent: 0.03 },
 ] as const;
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-function getNextFriday(): Date {
+/** Draw schedule: every 12 hours at 00:00 UTC and 12:00 UTC */
+function getNextDrawDate(): Date {
   const now = new Date();
-  const day = now.getUTCDay(); // 0=Sun, 5=Fri
-  let daysUntilFriday = (5 - day + 7) % 7;
-  if (daysUntilFriday === 0) {
-    // If it's already Friday, check if we passed 01:00 UTC
-    const fridayCutoff = new Date(now);
-    fridayCutoff.setUTCHours(1, 0, 0, 0);
-    if (now >= fridayCutoff) {
-      daysUntilFriday = 7; // next Friday
-    }
-  }
   const target = new Date(now);
-  target.setUTCDate(target.getUTCDate() + daysUntilFriday);
-  target.setUTCHours(1, 0, 0, 0);
+  const hours = now.getUTCHours();
+  if (hours < 12) {
+    // Next draw at 12:00 UTC today
+    target.setUTCHours(12, 0, 0, 0);
+  } else {
+    // Next draw at 00:00 UTC tomorrow
+    target.setUTCDate(target.getUTCDate() + 1);
+    target.setUTCHours(0, 0, 0, 0);
+  }
   return target;
 }
 
@@ -154,6 +154,7 @@ export class LotteryService {
     userId: string,
     drawId: string,
     tickets: { entryType: 'standard' | 'power'; numbers: number[]; gemBall: number }[],
+    isDemoBet = false,
   ) {
     const db = getDb();
 
@@ -204,7 +205,7 @@ export class LotteryService {
     await LotteryService.walletService.lockFunds(userId, totalCost, 'SOL', {
       type: 'lottery_ticket',
       id: drawId,
-    });
+    }, isDemoBet);
 
     await LotteryService.walletService.settlePayout(
       userId,
@@ -213,7 +214,15 @@ export class LotteryService {
       0,         // payoutAmount = 0 (no payout, just deduction)
       'SOL',
       { type: 'lottery_purchase', id: drawId },
+      isDemoBet,
     );
+
+    auditLog({ action: 'lottery_buy', userId, game: 'lottery', gameId: drawId, betAmount: totalCost, status: 'success', meta: { ticketCount: tickets.length } });
+
+    // Award XP + track missions for ticket purchase
+    new UserService().addXP(userId, tickets.length * 10, 'lottery').catch(() => {});
+    const { MissionsService } = await import('../missions/missions.service.js');
+    new MissionsService().trackProgress(userId, 'lottery_result').catch(() => {});
 
     // 4. Insert ticket rows
     const createdTickets = await db.insert(lotteryTickets).values(ticketValues).returning();
@@ -277,16 +286,30 @@ export class LotteryService {
       throw new AppError(409, 'DRAW_NOT_OPEN', 'Draw is not open or already in progress');
     }
 
-    // 2. Generate winning numbers
-    const winningNumbers = generateUniqueNumbers(MAIN_NUMBER_COUNT, MAIN_NUMBER_MAX);
-    const winningGemBall = crypto.randomInt(1, GEMBALL_MAX + 1);
+    // 2. Generate winning numbers PROVABLY FAIR
+    // Combine server seed with ticket IDs for client-side entropy
+    const { generateLotteryNumbers, generateHmacResult, hmacToInt, hashSeed: hashFn } = await import('../../utils/provablyFair.js');
 
-    // 3. Store winning numbers
+    const serverSeed = draw.drawSeed || crypto.randomBytes(32).toString('hex');
+
+    // Client seed = hash of all ticket IDs purchased for this draw (public, verifiable)
+    const allTickets = await db
+      .select({ id: lotteryTickets.id })
+      .from(lotteryTickets)
+      .where(eq(lotteryTickets.drawId, drawId));
+    const clientSeedCombined = hashFn(allTickets.map(t => t.id).sort().join(':'));
+
+    const winningNumbers = generateLotteryNumbers(serverSeed, clientSeedCombined, MAIN_NUMBER_COUNT, MAIN_NUMBER_MAX);
+    const gemHmac = generateHmacResult(serverSeed, clientSeedCombined, 'gemball');
+    const winningGemBall = hmacToInt(gemHmac, 1, GEMBALL_MAX);
+
+    // 3. Store winning numbers + reveal client seed
     await db
       .update(lotteryDraws)
       .set({
         winningNumbers,
         winningGemBall,
+        clientSeedCombined,
       })
       .where(eq(lotteryDraws.id, drawId));
 
@@ -317,12 +340,29 @@ export class LotteryService {
   static async resolveWinners(drawId: string) {
     const db = getDb();
 
+    // IDEMPOTENCY: Check if winners already exist for this draw
+    const existingWinners = await db
+      .select({ id: lotteryWinners.id })
+      .from(lotteryWinners)
+      .where(eq(lotteryWinners.drawId, drawId))
+      .limit(1);
+    if (existingWinners.length > 0) {
+      console.log(`[LotteryService] Draw ${drawId} already resolved — skipping (idempotent).`);
+      return;
+    }
+
     // 1. Get the draw
     const draw = await db.query.lotteryDraws.findFirst({
       where: eq(lotteryDraws.id, drawId),
     });
     if (!draw || !draw.winningNumbers || draw.winningGemBall == null) {
       throw new AppError(400, 'DRAW_NOT_DRAWN', 'Draw has not been drawn yet');
+    }
+
+    // Double-check draw is not already completed
+    if (draw.status === 'completed') {
+      console.log(`[LotteryService] Draw ${drawId} status=completed — skipping resolve.`);
+      return;
     }
 
     const winningNums = new Set(draw.winningNumbers as number[]);
@@ -382,6 +422,7 @@ export class LotteryService {
 
     // 5. Calculate prizes and determine rollover
     let totalPaidOut = 0;
+    let totalWinnersCount = 0;
     let rollover = 0;
     const winnerInserts: {
       drawId: string;
@@ -417,6 +458,8 @@ export class LotteryService {
           prizeAmount: prizePerWinner,
         });
         totalPaidOut += prizePerWinner;
+        totalWinnersCount++;
+        auditLog({ action: 'lottery_payout', userId: winner.userId, game: 'lottery', gameId: drawId, payoutAmount: prizePerWinner, status: 'success', meta: { tier: tierConfig.tier, matchedNumbers: tierConfig.mainMatch } });
       }
     }
 
@@ -432,6 +475,12 @@ export class LotteryService {
     }
 
     for (const [winnerId, amount] of payoutsByUser) {
+      // Track mission: lottery win
+      try {
+        const { MissionsService } = await import('../missions/missions.service.js');
+        new MissionsService().trackProgress(winnerId, 'lottery_result', true).catch(() => {});
+      } catch {}
+
       // Credit balance directly via SQL upsert + ledger entry
       await db.execute(sql`
         INSERT INTO balances (user_id, asset, available_amount, locked_amount, pending_amount)
@@ -473,6 +522,8 @@ export class LotteryService {
           .where(eq(lotteryDraws.id, nextDraw.id));
       }
     }
+
+    auditLog({ action: 'lottery_resolve', game: 'lottery', gameId: drawId, status: 'success', meta: { totalWinners: totalWinnersCount } });
 
     console.log(
       `[LotteryService] Draw ${drawId}: ${winnerInserts.length} winners, ${String(totalPaidOut)} lamports paid, ${String(rollover)} lamports rolled over`,
@@ -582,8 +633,13 @@ export class LotteryService {
       return LotteryService.formatDraw(existing);
     }
 
-    // Create next Friday draw
-    const drawDate = getNextFriday();
+    // Create next draw (every 12 hours)
+    const drawDate = getNextDrawDate();
+
+    // Provably fair: generate seed commitment at draw creation
+    const { generateServerSeed, hashSeed } = await import('../../utils/provablyFair.js');
+    const drawSeed = generateServerSeed();
+    const seedCommitment = hashSeed(drawSeed);
 
     const [newDraw] = await db
       .insert(lotteryDraws)
@@ -595,6 +651,8 @@ export class LotteryService {
         totalTickets: 0,
         prizePool: 0,
         rolloverPool: 0,
+        drawSeed,
+        seedCommitment,
       })
       .returning();
 

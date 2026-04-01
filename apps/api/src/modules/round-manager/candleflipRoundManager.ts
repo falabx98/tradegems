@@ -5,6 +5,9 @@ import { eq, and, desc } from 'drizzle-orm';
 import { getRedis } from '../../config/redis.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { generateCandleflipChart, type Candle } from '../../utils/chartGenerator.js';
+import { auditLog } from '../../utils/auditLog.js';
+import { recordFailedSettlement } from '../../utils/settlementRecovery.js';
+import { createWorkerReporter, withWorkerRecovery } from '../../utils/workerHealth.js';
 
 const WAITING_DURATION = 4000; // 4s
 const FLIPPING_DURATION = 5000; // 5s
@@ -21,6 +24,7 @@ interface RoundBet {
   betAmount: number;
   payout: number;
   status: 'pending' | 'won' | 'lost';
+  isDemo: boolean;
 }
 
 interface CandleflipState {
@@ -51,14 +55,11 @@ let phaseStartedAt = 0;
 const db = () => getDb();
 const wallet = new WalletService();
 
+import { generateBinaryResult } from '../../utils/provablyFair.js';
+
 function generateResult(seed: string, roundId: string): { result: 'bullish' | 'bearish'; multiplier: number } {
-  const hash = crypto.createHash('sha256').update(seed + ':' + roundId).digest('hex');
-  const value = parseInt(hash.slice(0, 8), 16);
-  const multiplier = parseFloat((0.50 + (value / 0xFFFFFFFF)).toFixed(4));
-  return {
-    result: multiplier >= 1.0 ? 'bullish' : 'bearish',
-    multiplier,
-  };
+  // Uses HMAC-SHA256(serverSeed, roundId:0) for deterministic, verifiable result
+  return generateBinaryResult(seed, roundId, 0);
 }
 
 async function saveToRedis() {
@@ -152,9 +153,15 @@ async function transitionToResolved() {
     const user = await database.query.users.findFirst({ where: eq(users.id, bet.userId) });
     if (user && user.role !== 'bot') {
       try {
-        await wallet.settlePayout(bet.userId, bet.betAmount, 0, bet.payout, 'SOL', { type: 'candleflip_round', id: state.roundId });
-      } catch (err) {
+        await wallet.settlePayout(bet.userId, bet.betAmount, 0, bet.payout, 'SOL', { type: 'candleflip_round', id: state.roundId }, bet.isDemo);
+        auditLog({ action: 'candleflip_round_settle', userId: bet.userId, game: 'candleflip_round', gameId: state.roundId, betAmount: bet.betAmount, payoutAmount: bet.payout, status: 'success' });
+      } catch (err: any) {
         console.error('[CandleflipRound] settlePayout failed:', err, { userId: bet.userId, roundId: state.roundId, payout: bet.payout });
+        await recordFailedSettlement({
+          userId: bet.userId, game: 'candleflip_round', gameRefType: 'candleflip_round', gameRefId: state.roundId,
+          betAmount: bet.betAmount, fee: 0, payoutAmount: bet.payout,
+          errorMessage: err.message || 'Round settlement failed',
+        });
         if (bet.payout > 0) {
           failedSettlements.push({ userId: bet.userId, betAmount: bet.betAmount, payout: bet.payout });
         }
@@ -184,8 +191,13 @@ async function transitionToResolved() {
     try {
       await wallet.settlePayout(failed.userId, failed.betAmount, 0, failed.payout, 'SOL', { type: 'candleflip_round', id: state.roundId });
       console.log('[CandleflipRound] Retry succeeded for user:', failed.userId);
-    } catch (retryErr) {
+    } catch (retryErr: any) {
       console.error('[CandleflipRound] Retry also failed for user:', failed.userId, retryErr);
+      await recordFailedSettlement({
+        userId: failed.userId, game: 'candleflip_round', gameRefType: 'candleflip_round', gameRefId: state.roundId,
+        betAmount: failed.betAmount, fee: 0, payoutAmount: failed.payout,
+        errorMessage: retryErr.message || 'Retry settlement failed',
+      });
     }
   }
 
@@ -216,7 +228,7 @@ export async function getCandleflipCurrentRound(): Promise<CandleflipState | nul
   return state ? { ...state, seed: state.status === 'resolved' ? state.seed : null } : null;
 }
 
-export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', betAmount: number): Promise<{ success: boolean; message?: string }> {
+export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', betAmount: number, isDemoBet = false): Promise<{ success: boolean; message?: string }> {
   if (!state || state.status !== 'waiting') {
     return { success: false, message: 'No round in waiting phase.' };
   }
@@ -235,7 +247,7 @@ export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', be
     if (!user) return { success: false, message: 'User not found.' };
 
     if (user.role !== 'bot') {
-      await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId });
+      await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId }, isDemoBet);
     }
 
     try {
@@ -245,11 +257,12 @@ export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', be
         pick,
         betAmount,
         status: 'pending',
+        isDemo: isDemoBet,
       });
     } catch (err) {
       // DB insert failed — rollback the fund lock
       if (user.role !== 'bot') {
-        try { await wallet.releaseFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId }); } catch {}
+        try { await wallet.releaseFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId }, isDemoBet); } catch {}
       }
       throw err;
     }
@@ -262,6 +275,7 @@ export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', be
       betAmount,
       payout: 0,
       status: 'pending',
+      isDemo: isDemoBet,
     });
 
     await saveToRedis();
@@ -286,12 +300,16 @@ export async function getRecentCandleflipRounds(limit: number = 10) {
   .limit(limit);
 }
 
+const cfReporter = createWorkerReporter('candleflip-round-manager');
+
 export async function startCandleflipRoundManager() {
   console.log('[CandleflipRoundManager] Starting...');
   await startNewRound();
-  tickTimer = setInterval(() => tick().catch(err => console.error('[CandleflipRoundManager] tick error:', err)), TICK_INTERVAL);
+  const wrappedTick = withWorkerRecovery('candleflip-round-manager', tick, cfReporter);
+  tickTimer = setInterval(wrappedTick, TICK_INTERVAL);
 }
 
 export function stopCandleflipRoundManager() {
+  cfReporter.stop();
   if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
 }

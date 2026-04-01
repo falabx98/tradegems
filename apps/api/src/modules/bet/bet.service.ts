@@ -6,6 +6,7 @@ import { getRedis } from '../../config/redis.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { AppError } from '../../middleware/errorHandler.js';
 import { env } from '../../config/env.js';
+import { auditLog } from '../../utils/auditLog.js';
 
 interface PlaceBetInput {
   userId: string;
@@ -13,6 +14,7 @@ interface PlaceBetInput {
   amount: number;
   riskTier: string;
   idempotencyKey: string;
+  isDemoBet?: boolean;
 }
 
 export class BetService {
@@ -64,7 +66,10 @@ export class BetService {
       totalCost,
       'SOL',
       { type: 'bet', id: 'pending' },
+      input.isDemoBet,
     );
+
+    auditLog({ action: 'solo_bet_lock', userId: input.userId, game: 'solo', gameId: input.roundId, betAmount: input.amount, fee, status: 'success' });
 
     // Get or create pool
     let pool = await this.db.query.roundPools.findFirst({

@@ -21,78 +21,33 @@ import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { toast } from '../../stores/toastStore';
 import { BetPanel } from '../ui/BetPanel';
 import { RecentGames } from '../ui/RecentGames';
+import { WinCard } from '../ui/WinCard';
+import { GameHeader } from '../game/GameHeader';
+import { StatusBadge, type GamePhase } from '../game/StatusBadge';
+import { RoundInfoFooter } from '../game/RoundInfoFooter';
+import { HowToPlayInline } from '../game/HowToPlayInline';
+import { CasinoGameLayout, GameControlRail, GameStage, GameFooterBar } from '../game/CasinoGameLayout';
+import { gameTrack } from '../../utils/analytics';
+import { Button } from '../primitives/Button';
+import { Card } from '../primitives/Card';
+import { Badge } from '../primitives/Badge';
+import { ResultOverlay } from '../game/ResultOverlay';
+import { CountUpNumber } from '../game/CountUpNumber';
+import { WinConfetti } from '../game/WinConfetti';
+import { SolIcon } from '../ui/SolIcon';
 
-// ─── Confetti (lightweight version) ──────────────────────────────────────────
+// ─── Predictions atmosphere ─────────────────────────────────
+const PRED_ATMOSPHERE = 'radial-gradient(ellipse at 50% 50%, rgba(59,130,246,0.04) 0%, transparent 70%)';
 
-function ConfettiCanvas({ active }: { active: boolean }) {
-  const ref = useRef<HTMLCanvasElement>(null);
+// ─── Direction descriptions ─────────────────────────────────
 
-  useEffect(() => {
-    if (!active) return;
-    const canvas = ref.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+const DIRECTION_INFO: Record<PredictionDirection, { label: string; desc: string; color: string; icon: React.ReactNode }> = {
+  long: { label: 'Up', desc: 'Price closes higher', color: theme.accent.neonGreen, icon: <ArrowUpIcon size={24} color={theme.accent.neonGreen} /> },
+  range: { label: 'Range', desc: 'Price stays within range', color: theme.accent.green, icon: <ArrowSidewaysIcon size={24} color={theme.accent.green} /> },
+  short: { label: 'Down', desc: 'Price closes lower', color: theme.accent.red, icon: <ArrowDownIcon size={24} color={theme.accent.red} /> },
+};
 
-    canvas.width = canvas.offsetWidth * 2;
-    canvas.height = canvas.offsetHeight * 2;
-    ctx.scale(2, 2);
-    const w = canvas.offsetWidth;
-    const h = canvas.offsetHeight;
-
-    const colors = ['#2ecc71', '#8b5cf6', '#a78bfa', '#3b82f6', '#5b8def', '#f472b6'];
-    const particles = Array.from({ length: 80 }, () => ({
-      x: w / 2 + (Math.random() - 0.5) * w * 0.3,
-      y: h * 0.4,
-      vx: (Math.random() - 0.5) * 8,
-      vy: -Math.random() * 8 - 2,
-      size: Math.random() * 4 + 2,
-      color: colors[Math.floor(Math.random() * colors.length)],
-      rotation: Math.random() * 360,
-      rotSpeed: (Math.random() - 0.5) * 12,
-      alpha: 1,
-    }));
-
-    let frame = 0;
-    let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
-      ctx.clearRect(0, 0, w, h);
-      let alive = false;
-      for (const p of particles) {
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.18;
-        p.vx *= 0.99;
-        p.rotation += p.rotSpeed;
-        p.alpha = Math.max(0, p.alpha - 0.006);
-        if (p.alpha <= 0) continue;
-        alive = true;
-        ctx.save();
-        ctx.globalAlpha = p.alpha;
-        ctx.translate(p.x, p.y);
-        ctx.rotate((p.rotation * Math.PI) / 180);
-        ctx.fillStyle = p.color;
-        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
-        ctx.restore();
-      }
-      frame++;
-      if (alive && frame < 200) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-    return () => { cancelled = true; };
-  }, [active]);
-
-  if (!active) return null;
-  return (
-    <canvas
-      ref={ref}
-      style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5 }}
-    />
-  );
-}
-
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ─── Main Component ─────────────────────────────────────────
 
 export function PredictionScreen() {
   const { betAmount, setBetAmount, profile, syncProfile } = useGameStore();
@@ -102,15 +57,16 @@ export function PredictionScreen() {
 
   const [phase, setPhase] = useState<PredictionPhase>('setup');
   const [roundConfig, setRoundConfig] = useState<PredictionRoundConfig | null>(null);
+  const [selectedDir, setSelectedDir] = useState<PredictionDirection | null>(null);
   const [prediction, setPrediction] = useState<PredictionDirection | null>(null);
   const [result, setResult] = useState<PredictionResult | null>(null);
+  const [showWinCard, setShowWinCard] = useState(false);
   const [revealProgress, setRevealProgress] = useState(0);
   const [countdown, setCountdown] = useState(3);
   const [lockRef, setLockRef] = useState<string | null>(null);
   const [locking, setLocking] = useState(false);
   const [feeRate, setFeeRate] = useState(0.03);
 
-  // Generate round & fetch config on mount
   useEffect(() => {
     setRoundConfig(generatePredictionRound());
     getServerConfig().then(cfg => setFeeRate(cfg.feeRate));
@@ -121,15 +77,11 @@ export function PredictionScreen() {
     if (phase !== 'countdown') return;
     playCountdownBeep(3);
     setCountdown(3);
-
     const id = setInterval(() => {
       setCountdown((c) => {
         const next = c - 1;
         if (next > 0) playCountdownBeep(next);
-        if (next <= 0) {
-          clearInterval(id);
-          setPhase('revealing');
-        }
+        if (next <= 0) { clearInterval(id); setPhase('revealing'); }
         return next;
       });
     }, 1000);
@@ -140,77 +92,62 @@ export function PredictionScreen() {
   useEffect(() => {
     if (phase !== 'revealing' || !roundConfig) return;
     const start = performance.now();
-    const TOTAL_DURATION = 10 * 1500; // 10 candles * 1.5s each
-
+    const TOTAL_DURATION = 10 * 1500;
     const tick = (now: number) => {
       const elapsed = (now - start) / 1000;
       setRevealProgress(elapsed);
-
-      if (elapsed * 1000 >= TOTAL_DURATION) {
-        resolveRound();
-        return;
-      }
+      if (elapsed * 1000 >= TOTAL_DURATION) { resolveRound(); return; }
       requestAnimationFrame(tick);
     };
     const raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [phase, roundConfig]);
 
-  // Map frontend direction names to backend enum
   const DIR_MAP: Record<PredictionDirection, 'up' | 'down' | 'sideways'> = {
-    long: 'up',
-    short: 'down',
-    range: 'sideways',
+    long: 'up', short: 'down', range: 'sideways',
   };
 
-  async function handlePrediction(dir: PredictionDirection) {
-    if (!roundConfig || locking) return;
-    // Balance pre-check: prevent betting more than available
+  async function handleConfirmPrediction() {
+    if (!roundConfig || !selectedDir || locking) return;
+
     if (isAuthenticated && betAmount > profile.balance) {
-      toast.error('Insufficient Balance', 'You don\'t have enough SOL for this bet');
+      toast.error('Insufficient Balance', "You don't have enough SOL for this bet");
       return;
     }
 
-    // Pre-lock funds on server before starting the game (server determines outcome)
     if (isAuthenticated) {
       setLocking(true);
+      let lockSuccess = false;
       try {
-        const lockResult = await api.lockPrediction(betAmount, DIR_MAP[dir]);
+        const lockResult = await api.lockPrediction(betAmount, DIR_MAP[selectedDir]);
         setLockRef(lockResult.lockRef);
-        // Deduct from local balance immediately for UI feedback
         const fee = Math.floor(betAmount * feeRate);
         const totalCost = betAmount + fee;
         useGameStore.setState((s) => ({
           profile: { ...s.profile, balance: Math.max(0, s.profile.balance - totalCost) },
         }));
 
-        // Server returns chartDirection (the direction the chart should animate).
-        // Map backend directions to frontend: 'up' → 'long', 'down' → 'short', 'sideways' → 'range'
         if (lockResult.chartDirection && roundConfig) {
-          const REVERSE_DIR_MAP: Record<string, PredictionDirection> = {
-            up: 'long',
-            down: 'short',
-            sideways: 'range',
-          };
+          const REVERSE_DIR_MAP: Record<string, PredictionDirection> = { up: 'long', down: 'short', sideways: 'range' };
           const targetOutcome = REVERSE_DIR_MAP[lockResult.chartDirection] || 'long';
           if (roundConfig.outcome !== targetOutcome) {
             setRoundConfig(regenerateWithOutcome(roundConfig, targetOutcome));
           }
         }
+        lockSuccess = true;
       } catch (err: any) {
-        setLocking(false);
         toast.error('Bet Failed', err?.message || 'Could not lock funds for prediction');
-        // Sync real balance in case it's stale
         syncProfile();
-        return;
+      } finally {
+        setLocking(false);
       }
-      setLocking(false);
+      if (!lockSuccess) return;
     }
 
-    setPrediction(dir);
+    setPrediction(selectedDir);
     playBetPlaced();
     hapticMedium();
-
+    gameTrack.start('predictions', betAmount);
     setPhase('countdown');
   }
 
@@ -218,30 +155,25 @@ export function PredictionScreen() {
     if (!roundConfig || !prediction) return;
 
     if (isAuthenticated && lockRef) {
-      // ── Server-authoritative flow: ask server for result, then show it ──
       (async () => {
         try {
           const saveResponse = await api.savePredictionRound({
             lockRef,
             direction: DIR_MAP[prediction],
-            result: 'loss', // placeholder — server ignores this
+            result: 'loss',
           });
-
           const isWin = saveResponse.result === 'win';
-
-          // Chart was already generated to match the outcome before animation started
           const predResult = calculatePredictionResult(prediction, roundConfig, betAmount);
           setResult(predResult);
           setPhase('result');
-
-          if (isWin) {
-            playLevelUp();
-            hapticHeavy();
-          } else {
-            playRoundEnd(false);
+          if (isWin) { playLevelUp(); hapticHeavy(); }
+          else { playRoundEnd(false); }
+          // Settlement toast
+          if (isWin && saveResponse.payout > betAmount) {
+            toast.success('Prediction Correct!', `+${((saveResponse.payout - betAmount) / 1e9).toFixed(4)} SOL added`);
+          } else if (!isWin) {
+            toast.info('Wrong Prediction', `${(betAmount / 1e9).toFixed(4)} SOL lost`);
           }
-
-          // Update local balance with server-confirmed payout
           if (saveResponse.payout > 0) {
             useGameStore.setState((s) => ({
               profile: { ...s.profile, balance: s.profile.balance + saveResponse.payout },
@@ -250,7 +182,6 @@ export function PredictionScreen() {
         } catch (err: any) {
           console.warn('Failed to save prediction round:', err);
           toast.error('Save Failed', err?.message || 'Prediction could not be saved to server');
-          // Fallback: show client-calculated result
           const predResult = calculatePredictionResult(prediction, roundConfig, betAmount);
           setResult(predResult);
           setPhase('result');
@@ -261,23 +192,18 @@ export function PredictionScreen() {
         }
       })();
     } else {
-      // ── Guest/unauthenticated: use client-side chart outcome ──
       const predResult = calculatePredictionResult(prediction, roundConfig, betAmount);
       setResult(predResult);
       setPhase('result');
-
-      if (predResult.correct) {
-        playLevelUp();
-        hapticHeavy();
-      } else {
-        playRoundEnd(false);
-      }
+      if (predResult.correct) { playLevelUp(); hapticHeavy(); }
+      else { playRoundEnd(false); }
     }
   }
 
   function handlePlayAgain() {
     setPhase('setup');
     setPrediction(null);
+    setSelectedDir(null);
     setResult(null);
     setRevealProgress(0);
     setCountdown(3);
@@ -287,21 +213,169 @@ export function PredictionScreen() {
 
   if (!roundConfig) return null;
 
-  return (
-    <div style={{ ...s.container, ...(isMobile ? { padding: '10px' } : {}) }}>
-      {/* Header */}
-      <div style={s.header}>
-        <h2 style={s.title}>Price Prediction</h2>
-        <div style={s.betBadge}>
-          <img src="/sol-coin.png" alt="SOL" style={{ width: '18px', height: '18px' }} />
-          <span className="mono" style={{ fontWeight: 700, color: theme.accent.purple }}>
-            {formatSol(betAmount)}
-          </span>
-        </div>
-      </div>
+  const fee = Math.floor(betAmount * feeRate);
+  const totalCost = betAmount + fee;
 
-      {/* Chart */}
-      <div style={{ ...s.chartWrap, height: isMobile ? 280 : 400, position: 'relative' }}>
+  // Phase mapping for StatusBadge
+  const badgePhase: GamePhase | null =
+    phase === 'setup' ? 'waiting' :
+    phase === 'countdown' || phase === 'revealing' ? 'active' :
+    phase === 'result' ? 'result' : null;
+
+  const { gap, textSize } = theme;
+  const ts = (key: keyof typeof textSize) => isMobile ? textSize[key].mobile : textSize[key].desktop;
+
+  /* ─── HEADER ─── */
+  const headerEl = (
+    <GameHeader
+      title="Predictions"
+      subtitle="Predict the price direction"
+      icon={
+        <div style={{ width: 36, height: 36, borderRadius: theme.radius.md, background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+        </div>
+      }
+      rightSlot={badgePhase && <StatusBadge phase={badgePhase} label={
+        phase === 'setup' ? undefined :
+        phase === 'countdown' ? `${countdown}s` :
+        phase === 'revealing' ? `${Math.min(10, Math.floor(revealProgress / 1.5) + 1)}/10` :
+        'RESULT'
+      } />}
+      howToPlay={
+        <HowToPlayInline steps={[
+          { icon: '💰', label: 'Set your bet amount', desc: 'Choose how much SOL to wager' },
+          { icon: '📊', label: 'Pick a direction', desc: 'Up, Down, or Range (price stays flat)' },
+          { icon: '⏳', label: 'Watch 10 candles reveal', desc: 'The chart animates the real price movement' },
+          { icon: '✅', label: 'Win if your prediction was correct', desc: 'Up/Down pay 1.9x, Range pays 3.0x' },
+        ]} />
+      }
+    />
+  );
+
+  /* ─── CONTROL RAIL ─── */
+  const railContent = (
+    <GameControlRail>
+      {/* Setup: Direction + Bet */}
+      {phase === 'setup' && (
+        <>
+          <Card variant="panel">
+            <div style={{ fontSize: ts('xs'), fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: gap.sm }}>
+              Select Direction
+            </div>
+            <div style={{ display: 'flex', gap: gap.sm }}>
+              {(['long', 'range', 'short'] as PredictionDirection[]).map((dir) => {
+                const info = DIRECTION_INFO[dir];
+                const isActive = selectedDir === dir;
+                return (
+                  <button key={dir} onClick={() => setSelectedDir(dir)} style={{
+                    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: gap.sm,
+                    padding: `${gap.md}px ${gap.sm}px`, borderRadius: theme.radius.md,
+                    border: `1.5px solid ${isActive ? info.color : theme.border.medium}`,
+                    background: isActive ? `${info.color}0F` : theme.bg.card,
+                    cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s ease', minHeight: 44,
+                  }}>
+                    {info.icon}
+                    <span style={{ fontSize: ts('md'), fontWeight: 700, color: isActive ? info.color : theme.text.primary, letterSpacing: '0.5px' }}>{info.label}</span>
+                    <span style={{ fontSize: ts('xs'), color: theme.text.muted, lineHeight: 1.3, textAlign: 'center' }}>{info.desc}</span>
+                    <Badge variant={dir === 'range' ? 'success' : 'default'} size="sm">{dir === 'range' ? '3.0x' : '1.9x'}</Badge>
+                  </button>
+                );
+              })}
+            </div>
+          </Card>
+          <BetPanel
+            presets={[
+              { label: '0.1', lamports: 100_000_000 },
+              { label: '0.5', lamports: 500_000_000 },
+              { label: '1', lamports: 1_000_000_000 },
+              { label: '5', lamports: 5_000_000_000 },
+              { label: '10', lamports: 10_000_000_000 },
+              { label: '50', lamports: 50_000_000_000 },
+              { label: '100', lamports: 100_000_000_000 },
+            ]}
+            selectedAmount={betAmount}
+            onAmountChange={setBetAmount}
+            balance={profile.balance}
+          demoBalance={profile.demoBalance}
+            feeRate={feeRate}
+            submitLabel={selectedDir ? `Confirm ${DIRECTION_INFO[selectedDir].label}` : 'Select a Direction'}
+            onSubmit={handleConfirmPrediction}
+            submitDisabled={!selectedDir || betAmount <= 0 || totalCost > profile.balance}
+            submitLoading={locking}
+          />
+          <RecentGames
+            title="Recent Predictions"
+            fetchGames={async () => {
+              const res = await api.getRecentPredictions(10);
+              return (res.data || []).map((r: any) => ({
+                id: r.id,
+                result: r.result === 'win' ? 'win' as const : 'loss' as const,
+                multiplier: parseFloat(r.multiplier) || 0,
+                amount: r.betAmount || 0,
+                payout: r.payout || 0,
+                time: r.createdAt,
+              }));
+            }}
+          />
+        </>
+      )}
+
+      {/* Reveal progress */}
+      {phase === 'revealing' && (
+        <Card variant="panel" padding={`${gap.md}px ${gap.lg}px`}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: gap.md }}>
+            <div style={revealBar}>
+              <div style={{ ...revealFill, width: `${Math.min(100, (revealProgress / 15) * 100)}%` }} />
+            </div>
+            <span className="mono" style={{ fontSize: ts('sm'), fontWeight: 600, color: theme.text.muted, flexShrink: 0 }}>
+              {Math.min(10, Math.floor(revealProgress / 1.5) + 1)}/10
+            </span>
+          </div>
+        </Card>
+      )}
+
+      {/* Result: stats + actions */}
+      {phase === 'result' && result && (
+        <>
+          <div style={{ display: 'flex', gap: gap.sm, flexWrap: 'wrap' }}>
+            <Card variant="stat" style={{ flex: '1 1 70px' }}>
+              <div style={{ fontSize: ts('xs'), fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Predicted</div>
+              <div style={{ fontSize: ts('md'), fontWeight: 700, color: prediction ? DIRECTION_INFO[prediction].color : theme.text.primary, marginTop: 2 }}>{prediction ? DIRECTION_INFO[prediction].label : '—'}</div>
+            </Card>
+            <Card variant="stat" style={{ flex: '1 1 70px' }}>
+              <div style={{ fontSize: ts('xs'), fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Entry</div>
+              <div className="mono" style={{ fontSize: ts('md'), fontWeight: 700, color: theme.text.primary, marginTop: 2 }}>${result.entryPrice.toFixed(2)}</div>
+            </Card>
+            <Card variant="stat" style={{ flex: '1 1 70px' }}>
+              <div style={{ fontSize: ts('xs'), fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Exit</div>
+              <div className="mono" style={{ fontSize: ts('md'), fontWeight: 700, color: theme.text.primary, marginTop: 2 }}>${result.exitPrice.toFixed(2)}</div>
+            </Card>
+            <Card variant="stat" style={{ flex: '1 1 70px' }}>
+              <div style={{ fontSize: ts('xs'), fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Change</div>
+              <div className="mono" style={{ fontSize: ts('md'), fontWeight: 700, color: result.priceChangePercent >= 0 ? theme.accent.neonGreen : theme.accent.red, marginTop: 2 }}>
+                {result.priceChangePercent >= 0 ? '+' : ''}{result.priceChangePercent.toFixed(2)}%
+              </div>
+            </Card>
+          </div>
+          <div style={{ display: 'flex', gap: gap.sm }}>
+            <Button variant="primary" size="lg" fullWidth onClick={handlePlayAgain}>Predict Again</Button>
+            <Button variant="ghost" size="lg" onClick={() => go('lobby')} style={{ flexShrink: 0 }}>Lobby</Button>
+          </div>
+          {result.correct && (
+            <Button variant="ghost-accent" size="sm" fullWidth onClick={() => setShowWinCard(true)}>Share Win</Button>
+          )}
+        </>
+      )}
+    </GameControlRail>
+  );
+
+  /* ─── GAME STAGE ─── */
+  const stageContent = (
+    <GameStage atmosphere={PRED_ATMOSPHERE} style={{ position: 'relative' }}>
+      {!isMobile && <div style={{ padding: `${gap.sm}px ${gap.md}px 0` }}>{headerEl}</div>}
+      <div style={{ position: 'relative', flex: isMobile ? undefined : 1, height: isMobile ? 240 : undefined, minHeight: isMobile ? undefined : 200 }}>
         <CandlestickChart
           historicalCandles={roundConfig.historicalCandles}
           revealCandles={roundConfig.revealCandles}
@@ -311,338 +385,111 @@ export function PredictionScreen() {
           prediction={prediction}
           isMobile={isMobile}
         />
-
-        {/* Countdown overlay */}
-        {phase === 'countdown' && (
-          <div style={s.countdownOverlay}>
-            <span style={s.countdownNum}>{countdown}</span>
-            <span style={{ ...s.countdownLabel, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {prediction === 'long' && <><ArrowUpIcon size={24} color="#2ecc71" /> LONG</>}
-              {prediction === 'short' && <><ArrowDownIcon size={24} color="#f87171" /> SHORT</>}
-              {prediction === 'range' && <><ArrowSidewaysIcon size={24} color="#00dc82" /> RANGE</>}
-            </span>
-          </div>
-        )}
-
-        {/* Confetti on win */}
-        <ConfettiCanvas active={phase === 'result' && !!result?.correct} />
       </div>
-
-      {/* Controls / Result */}
-      {phase === 'setup' && (
-        <div style={s.setupPanel}>
-          <BetPanel
-            presets={[
-              { label: '0.01', lamports: 10_000_000 },
-              { label: '0.05', lamports: 50_000_000 },
-              { label: '0.1', lamports: 100_000_000 },
-              { label: '0.25', lamports: 250_000_000 },
-              { label: '0.5', lamports: 500_000_000 },
-              { label: '1', lamports: 1_000_000_000 },
-              { label: '2', lamports: 2_000_000_000 },
-              { label: '5', lamports: 5_000_000_000 },
-            ]}
-            selectedAmount={betAmount}
-            onAmountChange={setBetAmount}
-            balance={profile.balance}
-            feeRate={feeRate}
-            choices={[
-              { id: 'long', label: 'LONG', color: '#2ecc71', icon: <ArrowUpIcon size={28} color="#2ecc71" />, payout: '1.9x' },
-              { id: 'range', label: 'RANGE', color: '#00dc82', icon: <ArrowSidewaysIcon size={28} color="#00dc82" />, payout: '3.0x' },
-              { id: 'short', label: 'SHORT', color: '#f87171', icon: <ArrowDownIcon size={28} color="#f87171" />, payout: '1.9x' },
-            ]}
-            selectedChoice={null}
-            onChoiceSelect={(id) => handlePrediction(id as PredictionDirection)}
-            submitLabel="SELECT A DIRECTION"
-            onSubmit={() => {}}
-            submitDisabled={true}
-            submitLoading={locking}
-            compact
-          />
-        </div>
-      )}
-
-      <RecentGames
-        title="Recent Predictions"
-        fetchGames={async () => {
-          const res = await api.getRecentPredictions(10);
-          return (res.data || []).map((r: any) => ({
-            id: r.id,
-            result: r.result === 'win' ? 'win' : 'loss',
-            multiplier: parseFloat(r.multiplier) || 0,
-            amount: r.betAmount || 0,
-            payout: r.payout || 0,
-            time: r.createdAt,
-          }));
-        }}
-      />
-
-      {phase === 'revealing' && (
-        <div style={s.revealPanel}>
-          <div style={s.revealBar}>
-            <div style={{
-              ...s.revealFill,
-              width: `${Math.min(100, (revealProgress / 15) * 100)}%`,
-            }} />
-          </div>
-          <p style={s.revealText}>
-            Revealing candles... {Math.min(10, Math.floor(revealProgress / 1.5) + 1)} / 10
-          </p>
-        </div>
-      )}
-
-      {phase === 'result' && result && (
-        <div style={s.resultPanel}>
-          <div style={{
-            ...s.resultBadge,
-            background: result.correct ? 'rgba(46, 204, 113, 0.12)' : 'rgba(248, 113, 113, 0.12)',
-            borderColor: result.correct ? 'rgba(46, 204, 113, 0.3)' : 'rgba(248, 113, 113, 0.3)',
-          }}>
-            {result.correct ? <TrophyIcon size={32} color="#2ecc71" /> : <ExplosionIcon size={32} color="#f87171" />}
-            <div style={{ flex: 1 }}>
-              <div style={{
-                fontSize: '22px',
-                fontWeight: 800,
-                color: result.correct ? '#2ecc71' : '#f87171',
-                fontFamily: "inherit",
-              }}>
-                {result.correct ? 'CORRECT!' : 'WRONG'}
-              </div>
-              <div style={{ fontSize: '14px', color: theme.text.secondary }}>
-                Price went <span style={{
-                  color: result.outcome === 'long' ? '#2ecc71' : result.outcome === 'short' ? '#f87171' : '#00dc82',
-                  fontWeight: 700,
-                }}>
-                  {result.outcome === 'long' ? 'UP' : result.outcome === 'short' ? 'DOWN' : 'SIDEWAYS'}
-                </span>
-                {' '}({result.priceChangePercent >= 0 ? '+' : ''}{result.priceChangePercent.toFixed(2)}%)
-              </div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div className="mono" style={{ fontSize: '24px', fontWeight: 800, color: result.correct ? '#2ecc71' : '#f87171' }}>
-                {result.correct ? result.multiplier + 'x' : '0x'}
-              </div>
-              <div className="mono" style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: 'flex-end', fontSize: '16px', fontWeight: 700, color: result.correct ? '#2ecc71' : '#f87171' }}>
-                <img src="/sol-coin.png" alt="SOL" style={{ width: '18px', height: '18px' }} />
-                {result.correct ? '+' : '-'}{formatSol(result.correct ? result.payout - result.betAmount : result.betAmount)} SOL
-              </div>
-            </div>
-          </div>
-
-          {/* Stats row */}
-          <div style={s.statsRow}>
-            <div style={s.statItem}>
-              <span style={s.statLabel}>Predicted</span>
-              <span style={{
-                ...s.statValue,
-                color: prediction === 'long' ? '#2ecc71' : prediction === 'short' ? '#f87171' : '#00dc82',
-              }}>
-                {prediction === 'long' ? 'LONG' : prediction === 'short' ? 'SHORT' : 'RANGE'}
+      {phase === 'countdown' && (
+        <div style={countdownOverlay}>
+          <span className="mono" style={countdownNum}>{countdown}</span>
+          <span style={countdownLabel}>
+            {prediction && DIRECTION_INFO[prediction] && (
+              <span style={{ display: 'flex', alignItems: 'center', gap: gap.sm, color: DIRECTION_INFO[prediction].color }}>
+                {DIRECTION_INFO[prediction].icon}
+                {DIRECTION_INFO[prediction].label.toUpperCase()}
               </span>
-            </div>
-            <div style={s.statItem}>
-              <span style={s.statLabel}>Entry</span>
-              <span className="mono" style={s.statValue}>${result.entryPrice.toFixed(2)}</span>
-            </div>
-            <div style={s.statItem}>
-              <span style={s.statLabel}>Exit</span>
-              <span className="mono" style={s.statValue}>${result.exitPrice.toFixed(2)}</span>
-            </div>
-            <div style={s.statItem}>
-              <span style={s.statLabel}>Change</span>
-              <span className="mono" style={{
-                ...s.statValue,
-                color: result.priceChangePercent >= 0 ? '#2ecc71' : '#f87171',
-              }}>
-                {result.priceChangePercent >= 0 ? '+' : ''}{result.priceChangePercent.toFixed(2)}%
-              </span>
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={s.actionRow}>
-            <button onClick={handlePlayAgain} className="btn-3d btn-3d-primary" style={s.playAgainBtn}>
-              Predict Again
-            </button>
-            <button onClick={() => go('lobby')} style={s.backBtn}>
-              Back to Lobby
-            </button>
-          </div>
+            )}
+          </span>
         </div>
       )}
-    </div>
+      <WinConfetti active={phase === 'result' && !!result?.correct} zIndex={8} />
+      <ResultOverlay visible={phase === 'result' && !!result} variant={result?.correct ? 'win' : 'loss'} actionsDelay={result?.correct ? 1500 : 800}>
+        {result?.correct ? (
+          <>
+            <div style={{ fontSize: ts('sm'), fontWeight: 600, color: theme.accent.neonGreen, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: gap.xs }}>CORRECT — {DIRECTION_INFO[result.outcome]?.label.toUpperCase()}</div>
+            <CountUpNumber value={result.multiplier} from={1} duration={1000} decimals={1} suffix="x" style={{ fontSize: ts('hero'), fontWeight: 800, color: theme.accent.neonGreen, fontFamily: "'JetBrains Mono', monospace", textShadow: '0 0 24px rgba(0, 231, 1, 0.4)' }} />
+            <CountUpNumber value={(result.payout - result.betAmount) / 1e9} from={0} duration={1200} decimals={(result.payout - result.betAmount) >= 1e9 ? 2 : 4} prefix="+" suffix={<> <SolIcon size="0.9em" /></>} style={{ fontSize: ts('xl'), fontWeight: 700, color: theme.accent.neonGreen, fontFamily: "'JetBrains Mono', monospace", marginTop: gap.xs }} />
+          </>
+        ) : result ? (
+          <>
+            <div style={{ fontSize: ts('sm'), fontWeight: 600, color: theme.accent.red, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: gap.xs }}>WRONG — Price went {DIRECTION_INFO[result.outcome]?.label}</div>
+            <div style={{ fontSize: ts('hero'), fontWeight: 800, color: theme.accent.red, fontFamily: "'JetBrains Mono', monospace", opacity: 0.8 }}>0x</div>
+            <div style={{ fontSize: ts('xl'), fontWeight: 700, color: theme.accent.red, fontFamily: "'JetBrains Mono', monospace", marginTop: gap.xs, opacity: 0.7 }}>-{formatSol(result.betAmount)} <SolIcon size="0.9em" /></div>
+          </>
+        ) : null}
+      </ResultOverlay>
+    </GameStage>
+  );
+
+  /* ─── FOOTER ─── */
+  const footerContent = (
+    <GameFooterBar>
+      <RoundInfoFooter seedHash={roundConfig.seed || undefined} />
+    </GameFooterBar>
+  );
+
+  return (
+    <>
+      {isMobile && <div style={{ padding: `${gap.sm}px 12px` }}>{headerEl}</div>}
+      <CasinoGameLayout rail={railContent} stage={stageContent} footer={footerContent} />
+      {showWinCard && result && result.correct && (
+        <WinCard
+          gameType="prediction"
+          multiplier={result.multiplier}
+          betAmount={result.betAmount}
+          payout={result.payout}
+          profit={result.payout - result.betAmount}
+          timestamp={new Date()}
+          username={profile?.username || 'Player'}
+          level={profile?.level || 1}
+          vipTier={profile?.vipTier || 'bronze'}
+          direction={result.outcome}
+          entryPrice={result.entryPrice}
+          exitPrice={result.exitPrice}
+          priceChangePercent={result.priceChangePercent}
+          onClose={() => setShowWinCard(false)}
+        />
+      )}
+    </>
   );
 }
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ─── Styles ─────────────────────────────────────────────────
 
-const s: Record<string, CSSProperties> = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    padding: '16px 24px',
-    width: '100%',
-    minHeight: '100%',
-    boxSizing: 'border-box' as const,
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  title: {
-    fontSize: '24px',
-    fontWeight: 800,
-    color: theme.text.primary,
-    fontFamily: "inherit",
-    margin: 0,
-    letterSpacing: '1px',
-    textTransform: 'uppercase' as const,
-  },
-  betBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '6px 12px',
-    borderRadius: '20px',
-    background: 'rgba(139, 92, 246, 0.1)',
-    border: `1px solid ${theme.border.subtle}`,
-  },
-  chartWrap: {
-    flexShrink: 0,
-    overflow: 'hidden',
-  },
+const countdownOverlay: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: 'rgba(10, 10, 10, 0.45)',
+  zIndex: 10,
+};
 
-  // Setup
-  setupPanel: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px',
-    flexShrink: 0,
-  },
-  // Countdown
-  countdownOverlay: {
-    position: 'absolute',
-    inset: 0,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: '12px',
-    zIndex: 10,
-  },
-  countdownNum: {
-    fontSize: '72px',
-    fontWeight: 900,
-    color: '#fff',
-    fontFamily: "inherit",
-    textShadow: '0 0 30px rgba(139, 92, 246, 0.6)',
-  },
-  countdownLabel: {
-    fontSize: '20px',
-    fontWeight: 700,
-    color: theme.text.secondary,
-    marginTop: '8px',
-  },
+const countdownNum: CSSProperties = {
+  fontSize: 56,
+  fontWeight: 900,
+  color: '#fff',
+  textShadow: '0 0 24px rgba(139, 92, 246, 0.6), 0 0 60px rgba(139, 92, 246, 0.2)',
+  lineHeight: 1,
+};
 
-  // Reveal
-  revealPanel: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '8px',
-    flexShrink: 0,
-  },
-  revealBar: {
-    width: '100%',
-    maxWidth: '400px',
-    height: '6px',
-    background: theme.bg.secondary,
-    borderRadius: '3px',
-    overflow: 'hidden',
-  },
-  revealFill: {
-    height: '100%',
-    background: '#8b5cf6',
-    borderRadius: '3px',
-    transition: 'width 0.3s',
-  },
-  revealText: {
-    margin: 0,
-    fontSize: '13px',
-    fontWeight: 600,
-    color: theme.text.muted,
-    fontFamily: "'JetBrains Mono', monospace",
-  },
+const countdownLabel: CSSProperties = {
+  fontSize: 18,
+  fontWeight: 700,
+  color: theme.text.secondary,
+  marginTop: theme.gap.sm,
+};
 
-  // Result
-  resultPanel: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-    flexShrink: 0,
-  },
-  resultBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-    padding: '16px',
-    borderRadius: '14px',
-    border: '1px solid',
-  },
-  statsRow: {
-    display: 'flex',
-    gap: '8px',
-    flexWrap: 'wrap',
-  },
-  statItem: {
-    flex: 1,
-    minWidth: '80px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
-    padding: '10px',
-    borderRadius: '10px',
-    background: theme.bg.secondary,
-    border: `1px solid ${theme.border.subtle}`,
-  },
-  statLabel: {
-    fontSize: '11px',
-    fontWeight: 600,
-    color: theme.text.muted,
-    textTransform: 'uppercase',
-    letterSpacing: '0.5px',
-  },
-  statValue: {
-    fontSize: '14px',
-    fontWeight: 700,
-    color: theme.text.primary,
-  },
-  actionRow: {
-    display: 'flex',
-    gap: '10px',
-  },
-  playAgainBtn: {
-    flex: 1,
-    padding: '12px',
-    fontSize: '15px',
-    fontWeight: 700,
-    fontFamily: "inherit",
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-  },
-  backBtn: {
-    padding: '12px 20px',
-    background: 'transparent',
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: '10px',
-    color: theme.text.secondary,
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: 600,
-    fontFamily: "inherit",
-  },
+const revealBar: CSSProperties = {
+  flex: 1,
+  height: 4,
+  background: theme.bg.primary,
+  borderRadius: 2,
+  overflow: 'hidden',
+};
+
+const revealFill: CSSProperties = {
+  height: '100%',
+  background: theme.accent.purple,
+  borderRadius: 2,
+  transition: 'width 0.3s',
 };

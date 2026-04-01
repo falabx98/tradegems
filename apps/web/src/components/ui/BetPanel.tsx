@@ -1,9 +1,12 @@
 import { ReactNode, useState } from 'react';
 import { theme } from '../../styles/theme';
 import { formatSol, solToLamports } from '../../utils/sol';
-import { Button } from './Button';
+import { useAuthStore } from '../../stores/authStore';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
+import { Button } from '../primitives/Button';
+import { SolIcon } from './SolIcon';
 
-interface BetChoice {
+export interface BetChoice {
   id: string;
   label: string;
   color: string;
@@ -12,7 +15,7 @@ interface BetChoice {
   count?: number;
 }
 
-interface BetPanelProps {
+export interface BetPanelProps {
   presets: Array<{ label: string; lamports: number }>;
   selectedAmount: number;
   onAmountChange: (lamports: number) => void;
@@ -30,6 +33,8 @@ interface BetPanelProps {
   submitLoading?: boolean;
   submitVariant?: 'primary' | 'success' | 'danger';
   compact?: boolean;
+  /** Demo balance in lamports — if > 0 and balance === 0, show demo mode */
+  demoBalance?: number;
 }
 
 export function BetPanel({
@@ -50,11 +55,18 @@ export function BetPanel({
   submitLoading,
   submitVariant = 'primary',
   compact,
+  demoBalance = 0,
 }: BetPanelProps) {
   const [customBet, setCustomBet] = useState('');
+  const { isAuthenticated } = useAuthStore();
+  const go = useAppNavigate();
+
+  const isDemo = balance === 0 && demoBalance > 0;
+  const effectiveBalance = isDemo ? demoBalance : balance;
+
   const fee = Math.floor(selectedAmount * feeRate);
   const totalCost = selectedAmount + fee;
-  const canAfford = totalCost <= balance;
+  const canAfford = totalCost <= effectiveBalance;
   const meetsMin = selectedAmount >= minBet;
 
   const handleCustomBet = () => {
@@ -63,31 +75,73 @@ export function BetPanel({
     const lamports = solToLamports(val);
     if (lamports < minBet) return;
     const cFee = Math.floor(lamports * feeRate);
-    if (lamports + cFee > balance) return;
+    if (lamports + cFee > effectiveBalance) return;
     onAmountChange(lamports);
     setCustomBet('');
   };
 
   const isCustomActive = selectedAmount > 0 && !presets.some(p => p.lamports === selectedAmount);
-
   const disabled = submitDisabled || !canAfford || !meetsMin || submitLoading;
 
+  // Unauthenticated state
+  if (!isAuthenticated) {
+    return (
+      <div style={{ ...s.panel, ...(compact ? { gap: '8px' } : {}) }}>
+        <div style={s.signInWrap}>
+          <div style={s.signInTitle}>Sign in to play</div>
+          <div style={s.signInSub}>Connect your wallet to start betting</div>
+          <Button variant="primary" size="lg" fullWidth onClick={() => go('auth')}>
+            Sign In
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div style={{ ...s.panel, ...(compact ? { gap: '10px' } : {}) }}>
+    <div style={{ ...s.panel, ...(compact ? { gap: '8px' } : {}) }}>
       {/* Amount Section */}
+      {/* Demo mode banner */}
+      {isDemo && (
+        <div style={{
+          padding: '8px 12px',
+          background: 'rgba(139, 92, 246, 0.08)',
+          border: '1px solid rgba(139, 92, 246, 0.2)',
+          borderRadius: 10,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontSize: 12,
+          marginBottom: 8,
+        }}>
+          <span style={{ color: '#A78BFA', fontWeight: 600 }}>Playing with demo balance</span>
+          <span style={{ color: theme.accent.purple, fontWeight: 700, cursor: 'pointer', fontSize: 11 }} onClick={() => go('wallet')}>Deposit →</span>
+        </div>
+      )}
+
       <div style={s.section}>
         <div style={s.sectionHeader}>
           <span style={s.sectionLabel}>AMOUNT</span>
-          <span className="mono" style={s.selectedBadge}>
-            <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px' }} />
-            {formatSol(selectedAmount)}
-          </span>
+          <div style={s.balanceRow}>
+            <span style={s.balanceLabel}>{isDemo ? 'Demo:' : 'Bal:'}</span>
+            <span className="mono" style={{ ...s.balanceValue, color: isDemo ? '#A78BFA' : undefined }}>
+              {formatSol(effectiveBalance)} {isDemo ? <span style={{ fontSize: 9, fontWeight: 700, color: '#8B5CF6' }}>DEMO</span> : <SolIcon size="0.9em" />}
+            </span>
+          </div>
         </div>
+
+        {/* Selected amount badge */}
+        <div style={s.selectedRow}>
+          <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px' }} />
+          <span className="mono" style={s.selectedAmount}>{formatSol(selectedAmount)}</span>
+        </div>
+
+        {/* Presets */}
         <div style={s.presetGrid}>
           {presets.map((p) => {
             const active = selectedAmount === p.lamports;
             const pFee = Math.floor(p.lamports * feeRate);
-            const affordable = p.lamports + pFee <= balance;
+            const affordable = p.lamports + pFee <= effectiveBalance;
             return (
               <button
                 key={p.lamports}
@@ -167,13 +221,35 @@ export function BetPanel({
                 2×
               </button>
             )}
+            {showModifiers && (
+              <button
+                onClick={() => {
+                  const maxLamports = Math.floor(effectiveBalance / (1 + feeRate));
+                  if (maxLamports >= minBet) {
+                    onAmountChange(maxLamports);
+                    setCustomBet('');
+                  }
+                }}
+                disabled={Math.floor(balance / (1 + feeRate)) < minBet}
+                style={{
+                  ...s.modBtn,
+                  ...s.maxBtn,
+                  opacity: Math.floor(balance / (1 + feeRate)) < minBet ? 0.35 : 1,
+                }}
+              >
+                MAX
+              </button>
+            )}
           </div>
         )}
 
-        {/* Fee line */}
+        {/* Fee + Total */}
         <div style={s.feeLine}>
           <span>Fee ({(feeRate * 100).toFixed(0)}%)</span>
-          <span className="mono" style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}><img src="/sol-coin.png" alt="SOL" style={{ width: '12px', height: '12px' }} />{formatSol(fee)}</span>
+          <span className="mono" style={s.feeValue}>
+            <img src="/sol-coin.png" alt="SOL" style={{ width: '12px', height: '12px' }} />
+            {formatSol(fee)}
+          </span>
         </div>
       </div>
 
@@ -214,24 +290,17 @@ export function BetPanel({
         fullWidth
         onClick={onSubmit}
         disabled={disabled}
-        style={{ opacity: disabled ? 0.4 : 1 }}
+        loading={submitLoading}
       >
-        {submitLoading ? (
-          <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={s.spinner} />
+        <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
+          <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' as const }}>
             {submitLabel}
           </span>
-        ) : (
-          <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-            <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' as const }}>
-              {submitLabel}
-            </span>
-            <span className="mono" style={{ fontSize: '12px', fontWeight: 500, opacity: 0.7, display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <img src="/sol-coin.png" alt="SOL" style={{ width: '14px', height: '14px' }} />
-              {formatSol(totalCost)} SOL
-            </span>
+          <span className="mono" style={{ fontSize: '12px', fontWeight: 500, opacity: 0.7, display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <img src="/sol-coin.png" alt="SOL" style={{ width: '14px', height: '14px' }} />
+            {formatSol(totalCost)} <SolIcon size="0.9em" />
           </span>
-        )}
+        </span>
       </Button>
     </div>
   );
@@ -241,9 +310,9 @@ const s: Record<string, React.CSSProperties> = {
   panel: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '14px',
+    gap: '12px',
     padding: '16px',
-    background: theme.bg.tertiary,
+    background: theme.bg.secondary,
     border: `1px solid ${theme.border.subtle}`,
     borderRadius: theme.radius.lg,
   },
@@ -259,14 +328,30 @@ const s: Record<string, React.CSSProperties> = {
   },
   sectionLabel: {
     fontSize: '11px',
-    fontWeight: 700,
+    fontWeight: 600,
     color: theme.text.muted,
-    letterSpacing: '1px',
+    letterSpacing: '0.8px',
   },
-  selectedBadge: {
+  balanceRow: {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
+  },
+  balanceLabel: {
+    fontSize: '11px',
+    color: theme.text.muted,
+  },
+  balanceValue: {
+    fontSize: '12px',
+    fontWeight: 600,
+    color: theme.text.secondary,
+  },
+  selectedRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  selectedAmount: {
     fontSize: '14px',
     fontWeight: 700,
     color: theme.accent.purple,
@@ -277,49 +362,50 @@ const s: Record<string, React.CSSProperties> = {
     gap: '6px',
   },
   preset: {
-    padding: '9px 16px',
+    padding: '8px 16px',
     fontSize: '14px',
     fontWeight: 700,
     fontFamily: '"JetBrains Mono", monospace',
     color: theme.text.secondary,
     background: theme.bg.card,
     border: `1px solid ${theme.border.medium}`,
-    borderRadius: '8px',
+    borderRadius: theme.radius.md,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
   },
   presetActive: {
-    background: 'linear-gradient(135deg, #7c3aed 0%, #8b5cf6 100%)',
+    background: theme.gradient.primary,
     color: '#fff',
     borderColor: 'transparent',
-    boxShadow: '0 0 12px rgba(139, 92, 246, 0.3)',
   },
   modRow: {
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
+    flexWrap: 'wrap' as const,
   },
   modBtn: {
-    padding: '8px 14px',
+    padding: '8px 10px',
     background: theme.bg.elevated,
     border: `1px solid ${theme.border.medium}`,
-    borderRadius: '8px',
+    borderRadius: theme.radius.md,
     cursor: 'pointer',
     fontFamily: 'inherit',
-    fontSize: '14px',
+    fontSize: '13px',
     fontWeight: 700,
     color: theme.accent.purple,
-    transition: 'all 0.12s ease',
+    transition: 'all 0.15s ease',
     flexShrink: 0,
+    minWidth: 0,
   },
   customWrap: {
     flex: 1,
     display: 'flex',
     alignItems: 'center',
     gap: '6px',
-    background: theme.bg.card,
-    borderRadius: '8px',
-    padding: '0 10px',
+    background: theme.bg.input,
+    borderRadius: theme.radius.md,
+    padding: '0 8px',
     border: `1px solid ${theme.border.medium}`,
   },
   customInput: {
@@ -336,16 +422,16 @@ const s: Record<string, React.CSSProperties> = {
     minWidth: 0,
   },
   customSetBtn: {
-    padding: '5px 10px',
-    background: 'rgba(139, 92, 246, 0.15)',
-    border: '1px solid rgba(139, 92, 246, 0.25)',
-    borderRadius: '6px',
+    padding: '4px 8px',
+    background: 'rgba(139, 92, 246, 0.12)',
+    border: '1px solid rgba(139, 92, 246, 0.20)',
+    borderRadius: theme.radius.sm,
     cursor: 'pointer',
     fontFamily: 'inherit',
     fontSize: '13px',
     fontWeight: 700,
     color: theme.accent.purple,
-    transition: 'all 0.12s ease',
+    transition: 'all 0.15s ease',
     flexShrink: 0,
   },
   feeLine: {
@@ -354,6 +440,11 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: '12px',
     color: theme.text.muted,
     padding: '2px 0',
+  },
+  feeValue: {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
   },
   choiceGrid: {
     display: 'flex',
@@ -365,12 +456,13 @@ const s: Record<string, React.CSSProperties> = {
     flexDirection: 'column' as const,
     alignItems: 'center',
     gap: '6px',
-    padding: '14px 12px',
-    borderRadius: '10px',
+    padding: '12px 8px',
+    borderRadius: theme.radius.md,
     border: '1.5px solid',
     cursor: 'pointer',
     fontFamily: 'inherit',
     transition: 'all 0.15s ease',
+    minHeight: '44px',
   },
   choiceLabel: {
     fontSize: '14px',
@@ -387,15 +479,31 @@ const s: Record<string, React.CSSProperties> = {
     fontWeight: 600,
     color: theme.text.muted,
     padding: '2px 8px',
-    borderRadius: '10px',
+    borderRadius: theme.radius.sm,
     background: 'rgba(255,255,255,0.04)',
   },
-  spinner: {
-    width: '16px',
-    height: '16px',
-    border: '2px solid rgba(255,255,255,0.3)',
-    borderTopColor: '#fff',
-    borderRadius: '50%',
-    animation: 'spin 0.6s linear infinite',
+  maxBtn: {
+    color: theme.accent.neonGreen,
+    borderColor: 'rgba(0, 231, 1, 0.15)',
+    background: 'rgba(0, 231, 1, 0.06)',
+    letterSpacing: '0.5px',
+  },
+  signInWrap: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+    padding: '16px',
+    textAlign: 'center',
+  },
+  signInTitle: {
+    fontSize: '16px',
+    fontWeight: 700,
+    color: theme.text.primary,
+  },
+  signInSub: {
+    fontSize: '13px',
+    color: theme.text.muted,
+    marginBottom: '4px',
   },
 };

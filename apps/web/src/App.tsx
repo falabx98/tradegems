@@ -22,6 +22,13 @@ import { TradingSimScreen } from './components/screens/TradingSimScreen';
 import { LotteryScreen } from './components/screens/LotteryScreen';
 import { CandleflipScreen } from './components/screens/CandleflipScreen';
 import { RugGameScreen } from './components/screens/RugGameScreen';
+import { MinesScreen } from './components/screens/MinesScreen';
+import { MyBetsScreen } from './components/screens/MyBetsScreen';
+import { AboutScreen } from './components/screens/AboutScreen';
+import { ResponsibleGamblingScreen } from './components/screens/ResponsibleGamblingScreen';
+import { PrivacyScreen } from './components/screens/PrivacyScreen';
+import { TermsScreen } from './components/screens/TermsScreen';
+import { SessionTimeReminder, FooterDisclaimer } from './components/ResponsibleGambling';
 import { OnboardingModal, useOnboarding } from './components/OnboardingModal';
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggle } from './components/layout/ChatToggle';
@@ -104,44 +111,49 @@ export default function App() {
   }
 
   // All other screens get the full layout shell
+  const authOverlay = screen === 'auth' ? (
+    <AuthScreen onSuccess={() => {
+      syncProfile();
+      setScreen('lobby');
+      navigate('/');
+    }} />
+  ) : null;
+
   return (
-    <AppLayout>
-      {showOnboarding && !isAuthenticated && (
-        <OnboardingModal onClose={() => {
-          closeOnboarding();
-          if (!isAuthenticated) {
-            setScreen('auth');
-            navigate('/auth');
-          }
-        }} />
-      )}
-      {(screen === 'lobby' || screen === 'auth') && <LobbyScreen />}
-      {screen === 'setup' && <SoloSetupScreen />}
-      {screen === 'result' && <ResultScreen />}
-      {screen === 'wallet' && <WalletScreen />}
-      {screen === 'history' && <HistoryScreen />}
-      {screen === 'leaderboard' && <LeaderboardScreen />}
-      {screen === 'rewards' && <RewardsScreen />}
-      {screen === 'settings' && <SettingsScreen />}
-      {screen === 'prediction' && <PredictionScreen />}
-      {screen === 'fairness' && <FairnessScreen />}
-      {screen === 'season' && <SeasonScreen />}
-      {screen === 'admin' && <AdminScreen />}
-      {screen === 'profile' && <PlayerProfileScreen />}
-      {screen === 'trading-sim' && <TradingSimScreen />}
-      {screen === 'lottery' && <LotteryScreen />}
-      {screen === 'candleflip' && <CandleflipScreen />}
-      {screen === 'rug-game' && <RugGameScreen />}
-      {screen === 'auth' && (
-        <AuthScreen onSuccess={() => {
-          syncProfile();
-          setScreen('lobby');
-          navigate('/');
-        }} />
-      )}
-      {isAuthenticated && <ChatToggle />}
-      {isAuthenticated && <ChatPanel />}
-      <ToastOverlay />
-    </AppLayout>
+    <>
+      <AppLayout>
+        {showOnboarding && <OnboardingModal onClose={closeOnboarding} />}
+        {(screen === 'lobby' || screen === 'auth') && <LobbyScreen />}
+        {screen === 'setup' && <SoloSetupScreen />}
+        {screen === 'result' && <ResultScreen />}
+        {screen === 'wallet' && <WalletScreen />}
+        {screen === 'history' && <HistoryScreen />}
+        {screen === 'leaderboard' && <LeaderboardScreen />}
+        {screen === 'rewards' && <RewardsScreen />}
+        {screen === 'settings' && <SettingsScreen />}
+        {screen === 'prediction' && <PredictionScreen />}
+        {screen === 'fairness' && <FairnessScreen />}
+        {screen === 'season' && <SeasonScreen />}
+        {screen === 'admin' && <AdminScreen />}
+        {screen === 'profile' && <PlayerProfileScreen />}
+        {screen === 'trading-sim' && <TradingSimScreen />}
+        {screen === 'lottery' && <LotteryScreen />}
+        {screen === 'candleflip' && <CandleflipScreen />}
+        {screen === 'rug-game' && <RugGameScreen />}
+        {screen === 'mines' && <MinesScreen />}
+        {screen === 'my-bets' && <MyBetsScreen />}
+        {screen === 'about' && <AboutScreen />}
+        {screen === 'responsible-gambling' && <ResponsibleGamblingScreen />}
+        {screen === 'privacy' && <PrivacyScreen />}
+        {screen === 'terms' && <TermsScreen />}
+        {/* Chat disabled for now */}
+        {/* {isAuthenticated && <ChatToggle />} */}
+        {/* {isAuthenticated && <ChatPanel />} */}
+        <SessionTimeReminder />
+        <FooterDisclaimer onNavigate={(s) => { setScreen(s as any); navigate(`/${s}`); }} />
+        <ToastOverlay />
+      </AppLayout>
+      {authOverlay}
+    </>
   );
 }

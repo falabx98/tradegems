@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { getDb } from '../config/database.js';
+import { createWorkerReporter, withWorkerRecovery } from '../utils/workerHealth.js';
 import { users, userProfiles, chatMessages, activityFeedItems, rounds, bets, betResults, predictionRounds, candleflipGames, rugGames, tradingSimRooms, tradingSimParticipants, lotteryDraws, lotteryTickets } from '@tradingarena/db';
 import { desc } from 'drizzle-orm';
 import { eq, sql, and, inArray } from 'drizzle-orm';
@@ -869,12 +870,10 @@ export async function startBotEngine(): Promise<void> {
     trackOnline(bot.id);
   }
 
-  // Run engine tick every 5 seconds
-  engineTimer = setInterval(() => {
-    engineTick().catch((err) => {
-      console.error('[BotEngine] Tick error:', err);
-    });
-  }, 5000);
+  // Run engine tick every 5 seconds with health reporting
+  const botReporter = createWorkerReporter('bot-engine');
+  const wrappedTick = withWorkerRecovery('bot-engine', engineTick, botReporter);
+  engineTimer = setInterval(wrappedTick, 5000);
 
   // Cleanup stale rounds every 60 seconds (cancel entry_open rounds older than 10 min with no bets)
   cleanupTimer = setInterval(async () => {

@@ -26,6 +26,12 @@ export const SCREEN_TO_PATH: Record<string, string> = {
   lottery: '/lottery',
   candleflip: '/candleflip',
   'rug-game': '/rug-game',
+  mines: '/mines',
+  'my-bets': '/my-bets',
+  about: '/about',
+  'responsible-gambling': '/responsible-gambling',
+  privacy: '/privacy',
+  terms: '/terms',
 };
 
 export const PATH_TO_SCREEN: Record<string, string> = Object.fromEntries(

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, type CSSProperties } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
@@ -7,51 +7,57 @@ import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { getAvatarGradient, getInitials } from '../../utils/avatars';
 import { playBetPlaced, playRoundEnd, hapticMedium } from '../../utils/sounds';
+import { SolIcon } from '../ui/SolIcon';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { BetPanel } from '../ui/BetPanel';
-import { RecentGames } from '../ui/RecentGames';
+import { WinCard } from '../ui/WinCard';
+import { GameHeader } from '../game/GameHeader';
+import { StatusBadge } from '../game/StatusBadge';
+import { RoundInfoFooter } from '../game/RoundInfoFooter';
+import { HowToPlayInline } from '../game/HowToPlayInline';
+import { Badge } from '../primitives/Badge';
+import { Button } from '../primitives/Button';
+import { Card } from '../primitives/Card';
+import { CasinoGameLayout, GameControlRail, GameStage, GameFooterBar } from '../game/CasinoGameLayout';
+import { EmptyState } from '../primitives/EmptyState';
+import { ResultOverlay } from '../game/ResultOverlay';
+import { CountUpNumber } from '../game/CountUpNumber';
+import { WinConfetti } from '../game/WinConfetti';
+import { MultiplierPulse } from '../game/MultiplierPulse';
+import { gameTrack } from '../../utils/analytics';
+import { toast } from '../../stores/toastStore';
+
+// ─── Types ───────────────────────────────────────────────────
 
 interface Candle {
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-  timestamp: number;
+  open: number; high: number; low: number; close: number;
+  volume: number; timestamp: number;
 }
 
 interface RoundBet {
-  userId: string;
-  username: string;
-  avatarUrl: string | null;
-  betAmount: number;
-  cashOutMultiplier: number | null;
+  userId: string; username: string; avatarUrl: string | null;
+  betAmount: number; cashOutMultiplier: number | null;
   status: 'active' | 'cashed_out' | 'rugged';
 }
 
 interface RoundState {
-  roundId: string;
-  roundNumber: number;
+  roundId: string; roundNumber: number;
   status: 'waiting' | 'active' | 'resolved';
-  seedHash: string;
-  seed: string | null;
-  rugMultiplier: number | null;
-  currentMultiplier: number;
-  candles: Candle[];
-  bets: RoundBet[];
-  waitEndsAt: number | null;
-  activeStartedAt: number | null;
+  seedHash: string; seed: string | null;
+  rugMultiplier: number | null; currentMultiplier: number;
+  candles: Candle[]; bets: RoundBet[];
+  waitEndsAt: number | null; activeStartedAt: number | null;
   resolvedAt: number | null;
 }
 
-// ─── OHLC Candlestick Chart Component ───────────────────────
+// ─── Amber atmosphere for Rug Game identity ─────────────────
+const RUG_ATMOSPHERE = 'radial-gradient(ellipse at 50% 60%, rgba(245,158,11,0.04) 0%, transparent 70%)';
+
+// ─── Candlestick Chart ──────────────────────────────────────
 
 function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isMobile }: {
-  candles: Candle[];
-  currentMultiplier: number;
-  status: string;
-  rugMultiplier: number | null;
-  isMobile: boolean;
+  candles: Candle[]; currentMultiplier: number; status: string;
+  rugMultiplier: number | null; isMobile: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -69,18 +75,15 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
     const w = rect.width;
     const h = rect.height;
 
-    // Background
-    ctx.fillStyle = '#0a0c10';
-    ctx.beginPath();
-    ctx.roundRect(0, 0, w, h, 12);
-    ctx.fill();
+    // Background — transparent (atmosphere handled by GameCanvas)
+    ctx.clearRect(0, 0, w, h);
 
-    const pad = { top: 36, bottom: 20, left: 10, right: isMobile ? 48 : 56 };
+    const pad = { top: 30, bottom: 20, left: 10, right: isMobile ? 48 : 56 };
     const chartW = w - pad.left - pad.right;
     const chartH = h - pad.top - pad.bottom;
 
     if (status === 'waiting' || candles.length === 0) {
-      // Empty grid during waiting
+      // Grid
       for (let i = 0; i < 5; i++) {
         const y = pad.top + (chartH / 4) * i;
         ctx.strokeStyle = 'rgba(255,255,255,0.03)';
@@ -91,7 +94,7 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
         ctx.stroke();
       }
 
-      // 1.0x reference line
+      // 1.0x ref line
       const midY = pad.top + chartH * 0.8;
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
       ctx.setLineDash([4, 3]);
@@ -101,32 +104,41 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
       ctx.stroke();
       ctx.setLineDash([]);
 
+      // Waiting text
       ctx.fillStyle = '#8b5cf6';
-      ctx.font = `900 ${isMobile ? 20 : 28}px 'JetBrains Mono', monospace`;
+      ctx.font = `700 ${isMobile ? 20 : 28}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(139,92,246,0.4)';
+      ctx.shadowColor = 'rgba(139,92,246,0.3)';
       ctx.shadowBlur = 12;
-      ctx.fillText('PRESALE', w / 2, h * 0.38);
+      ctx.fillText('BETTING OPEN', w / 2, h * 0.38);
       ctx.shadowBlur = 0;
 
-      ctx.fillStyle = 'rgba(255,255,255,0.4)';
-      ctx.font = `600 ${isMobile ? 12 : 14}px 'Inter', system-ui, sans-serif`;
-      ctx.fillText('Place your bets before launch!', w / 2, h * 0.38 + 26);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.font = `500 ${isMobile ? 12 : 14}px 'Inter', system-ui, sans-serif`;
+      ctx.fillText('Place your bets before launch', w / 2, h * 0.38 + 26);
       return;
     }
 
-    // Calculate price range from candles
+    // Price range
     let pMin = Infinity, pMax = -Infinity;
     for (const c of candles) {
       pMin = Math.min(pMin, c.low);
       pMax = Math.max(pMax, c.high);
     }
-    pMin = Math.max(0.8, pMin - (pMax - pMin) * 0.1);
-    pMax += (pMax - pMin) * 0.1;
+    const rawRange = pMax - pMin;
+    const mid = (pMax + pMin) / 2;
+    const minRange = Math.max(0.3, mid * 0.15);
+    if (rawRange < minRange) {
+      const expand = (minRange - rawRange) / 2;
+      pMax += expand;
+      pMin = Math.max(0.5, pMin - expand);
+    }
+    pMin = Math.max(0.5, pMin - rawRange * 0.08);
+    pMax += rawRange * 0.08;
     const pRange = pMax - pMin || 0.1;
     const toY = (v: number) => pad.top + ((pMax - v) / pRange) * chartH;
 
-    // Grid lines and labels
+    // Grid + labels
     const gridSteps = 5;
     for (let i = 0; i <= gridSteps; i++) {
       const val = pMin + (pRange / gridSteps) * (gridSteps - i);
@@ -137,14 +149,13 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
       ctx.moveTo(pad.left, y);
       ctx.lineTo(w - pad.right, y);
       ctx.stroke();
-
       ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.font = `500 ${isMobile ? 9 : 10}px 'JetBrains Mono', monospace`;
+      ctx.font = `500 ${isMobile ? 10 : 11}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'right';
       ctx.fillText(`${val.toFixed(2)}x`, w - 4, y + 3);
     }
 
-    // 1.0x reference line
+    // 1.0x ref
     if (pMin < 1.0 && pMax > 1.0) {
       const refY = toY(1.0);
       ctx.strokeStyle = 'rgba(255,255,255,0.08)';
@@ -156,7 +167,7 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
       ctx.setLineDash([]);
     }
 
-    // Draw candles
+    // Candles
     const maxVisible = isMobile ? 40 : 60;
     const visibleCandles = candles.length > maxVisible ? candles.slice(candles.length - maxVisible) : candles;
     const spacing = chartW / Math.max(visibleCandles.length, 10);
@@ -167,9 +178,8 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
       const x = pad.left + (i + 0.5) * spacing;
       const isGreen = c.close >= c.open;
       const isCrash = status === 'resolved' && i >= visibleCandles.length - 3 && rugMultiplier !== null;
-      const color = isCrash ? '#ef4444' : isGreen ? '#22c55e' : '#ef4444';
+      const color = isCrash ? '#FF3333' : isGreen ? '#22c55e' : '#FF3333';
 
-      // Wick
       ctx.strokeStyle = color;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -177,43 +187,14 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
       ctx.lineTo(x, toY(c.low));
       ctx.stroke();
 
-      // Body
       const bTop = toY(Math.max(c.open, c.close));
       const bBot = toY(Math.min(c.open, c.close));
       ctx.fillStyle = color;
       ctx.fillRect(x - candleW / 2, bTop, candleW, Math.max(2, bBot - bTop));
     }
 
-    // Current multiplier overlay
-    if (status === 'active') {
-      const multColor = currentMultiplier >= 2 ? '#2ecc71' : currentMultiplier >= 1.5 ? '#22c55e' : '#00dc82';
-      ctx.fillStyle = multColor;
-      ctx.font = `900 ${isMobile ? 28 : 36}px 'JetBrains Mono', monospace`;
-      ctx.textAlign = 'center';
-      ctx.shadowColor = `${multColor}80`;
-      ctx.shadowBlur = 20;
-      ctx.fillText(`${currentMultiplier.toFixed(2)}x`, w / 2, pad.top - 6);
-      ctx.shadowBlur = 0;
-    }
-
-    // Resolved overlay
-    if (status === 'resolved' && rugMultiplier !== null) {
-      // Semi-transparent overlay
-      ctx.fillStyle = 'rgba(10, 12, 16, 0.6)';
-      ctx.fillRect(0, 0, w, h);
-
-      ctx.fillStyle = '#ef4444';
-      ctx.font = `900 ${isMobile ? 32 : 42}px 'JetBrains Mono', monospace`;
-      ctx.textAlign = 'center';
-      ctx.shadowColor = 'rgba(239,68,68,0.5)';
-      ctx.shadowBlur = 24;
-      ctx.fillText('RUGGED', w / 2, h * 0.4);
-      ctx.shadowBlur = 0;
-
-      ctx.fillStyle = '#8b5cf6';
-      ctx.font = `800 ${isMobile ? 20 : 26}px 'JetBrains Mono', monospace`;
-      ctx.fillText(`at ${rugMultiplier.toFixed(2)}x`, w / 2, h * 0.4 + (isMobile ? 30 : 36));
-    }
+    // NO multiplier overlay on canvas during active phase (hero is external now)
+    // NO resolved overlay on canvas (handled by ResultOverlay component)
   }, [candles, currentMultiplier, status, rugMultiplier, isMobile]);
 
   useEffect(() => { draw(); }, [draw]);
@@ -223,11 +204,10 @@ function RugCandleChart({ candles, currentMultiplier, status, rugMultiplier, isM
     return () => window.removeEventListener('resize', handleResize);
   }, [draw]);
 
-  const chartHeight = isMobile ? 220 : 300;
   return (
     <canvas
       ref={canvasRef}
-      style={{ width: '100%', height: `${chartHeight}px`, display: 'block', borderRadius: '12px' }}
+      style={{ width: '100%', height: '100%', display: 'block', position: 'relative', zIndex: 1 }}
     />
   );
 }
@@ -248,45 +228,64 @@ export function RugGameScreen() {
   const [error, setError] = useState('');
   const [recentRounds, setRecentRounds] = useState<any[]>([]);
   const [cashOutDone, setCashOutDone] = useState<{ multiplier: number; payout: number } | null>(null);
+  const [showWinCard, setShowWinCard] = useState(false);
+  const [showResultOverlay, setShowResultOverlay] = useState(false);
 
-  // Track which round we cashed out of (so we keep watching)
   const cashedRoundRef = useRef<string | null>(null);
   const fetchingRef = useRef(false);
+  const lastSyncedRef = useRef<string | null>(null);
+  const prevStatusRef = useRef<string | null>(null);
 
-  // Fetch current round from server (with stacking guard)
   const fetchRound = useCallback(async () => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
       const data = await api.getRugGameRound();
-      setRound(data?.round || null);
-
-      // If we transitioned to a new round, reset cashout state
-      if (cashedRoundRef.current && data?.round?.roundId !== cashedRoundRef.current) {
+      if (!data) return;
+      const r = data.round || null;
+      setRound(r);
+      if (cashedRoundRef.current && r?.roundId !== cashedRoundRef.current) {
         cashedRoundRef.current = null;
         setCashOutDone(null);
       }
-    } catch { /* ignore polling errors */ }
+      if (r?.status === 'resolved' && r.roundId !== lastSyncedRef.current) {
+        lastSyncedRef.current = r.roundId;
+        syncProfile();
+      }
+    } catch {}
     finally { fetchingRef.current = false; }
-  }, []);
+  }, [syncProfile]);
 
   const fetchRecent = useCallback(async () => {
     try {
-      const data = await api.getRugGameRecentRounds(10);
+      const data = await api.getRugGameRecentRounds(12);
       setRecentRounds(data?.rounds || []);
-    } catch { /* ignore */ }
+    } catch {}
   }, []);
 
-  // Poll every 500ms for smooth updates
   useEffect(() => {
     fetchRound();
     fetchRecent();
-    const interval = setInterval(fetchRound, 500);
-    const recentInterval = setInterval(fetchRecent, 5000);
+    const interval = setInterval(fetchRound, isMobile ? 1500 : 1000);
+    const recentInterval = setInterval(fetchRecent, 15000);
     return () => { clearInterval(interval); clearInterval(recentInterval); };
   }, [fetchRound, fetchRecent]);
 
-  // Get my bet in the current round
+  // Show result overlay when round transitions to resolved
+  useEffect(() => {
+    if (round?.status === 'resolved' && prevStatusRef.current === 'active') {
+      setTimeout(() => setShowResultOverlay(true), 400);
+      // Settlement toast for rug loss (cashout wins are toasted immediately in handleCashOut)
+      if (hasBet && !isCashedOut && myBet) {
+        toast.info('Rugged', `${(myBet.betAmount / 1e9).toFixed(4)} SOL lost`);
+      }
+    }
+    if (round?.status === 'waiting') {
+      setShowResultOverlay(false);
+    }
+    prevStatusRef.current = round?.status || null;
+  }, [round?.status]);
+
   const myBet = round?.bets.find(b => b.userId === userId) || null;
   const hasBet = !!myBet;
   const isCashedOut = myBet?.status === 'cashed_out' || !!cashOutDone;
@@ -298,15 +297,32 @@ export function RugGameScreen() {
     setLoading(true);
     playBetPlaced();
     hapticMedium();
+    gameTrack.start('rug', betAmount);
+
+    // Optimistic UI
+    if (round) {
+      setRound({
+        ...round,
+        bets: [...round.bets, {
+          userId: userId || '',
+          username: profile.username || 'You',
+          avatarUrl: profile.avatarUrl || null,
+          betAmount,
+          cashOutMultiplier: null,
+          status: 'active' as const,
+        }],
+      });
+    }
+
     try {
       const result = await api.joinRugGameRound(betAmount);
       if (!result.success) {
+        fetchRound();
         setError(result.message || 'Failed to join');
         setTimeout(() => setError(''), 3000);
-      } else {
-        fetchRound();
       }
     } catch (err: any) {
+      fetchRound();
       setError(err.message || 'Failed to join');
       setTimeout(() => setError(''), 3000);
     } finally {
@@ -324,6 +340,11 @@ export function RugGameScreen() {
         setCashOutDone({ multiplier: result.multiplier, payout: result.payout });
         cashedRoundRef.current = round.roundId;
         playRoundEnd(true);
+        gameTrack.cashout('rug', result.multiplier);
+        const profit = result.payout - (myBet?.betAmount || 0);
+        if (profit > 0) {
+          toast.success('Cashed Out!', `+${(profit / 1e9).toFixed(4)} SOL added to balance`);
+        }
         syncProfile();
       } else {
         setError(result.message || 'Cash out failed');
@@ -337,105 +358,241 @@ export function RugGameScreen() {
     }
   };
 
-  // Countdown for waiting phase
   const waitRemaining = round?.status === 'waiting' && round.waitEndsAt
     ? Math.max(0, Math.ceil((round.waitEndsAt - Date.now()) / 1000))
     : 0;
 
-  return (
-    <div style={s.root} className="screen-enter">
-      {/* Header */}
-      <div style={s.headerSection}>
-        <button style={s.backBtn} onClick={() => go('lobby')} className="hover-bright">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
-        </button>
-        <div style={s.headerText}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ ...s.headerIcon, background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.2)' }}>
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round">
-                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-              </svg>
-            </div>
-            <h1 style={s.title}>Rug Game</h1>
-          </div>
-          <p style={s.subtitle}>Cash out before the rug pull!</p>
+  const projectedPayout = hasBet && round?.status === 'active'
+    ? Math.floor((myBet?.betAmount || 0) * round.currentMultiplier)
+    : 0;
+
+  const phase = !round ? undefined
+    : round.status === 'waiting' ? 'waiting' as const
+    : round.status === 'active' ? 'active' as const
+    : 'result' as const;
+
+  const { gap, textSize } = theme;
+  const ts = (key: keyof typeof textSize) => isMobile ? textSize[key].mobile : textSize[key].desktop;
+
+  // Result state for overlay
+  const isResolved = round?.status === 'resolved' && hasBet;
+  const resolvedProfit = isCashedOut && cashOutDone
+    ? cashOutDone.payout - (myBet?.betAmount || 0)
+    : -(myBet?.betAmount || 0);
+
+  /* ─── HEADER ─── */
+  const header = (
+    <GameHeader
+      title="Rug Game"
+      subtitle="Cash out before the rug pull"
+      icon={
+        <div style={{ width: 36, height: 36, borderRadius: theme.radius.md, background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2" strokeLinecap="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+          </svg>
         </div>
-        {round && (
-          <div style={{
-            padding: '4px 10px', borderRadius: '8px', fontSize: '11px', fontWeight: 700,
-            background: round.status === 'waiting' ? 'rgba(139,92,246,0.12)' : round.status === 'active' ? 'rgba(46,204,113,0.12)' : 'rgba(239,68,68,0.12)',
-            color: round.status === 'waiting' ? '#8b5cf6' : round.status === 'active' ? '#2ecc71' : '#ef4444',
-            border: `1px solid ${round.status === 'waiting' ? 'rgba(139,92,246,0.2)' : round.status === 'active' ? 'rgba(46,204,113,0.2)' : 'rgba(239,68,68,0.2)'}`,
-            letterSpacing: '1px',
-          }}>
-            {round.status === 'waiting' ? `PRESALE ${waitRemaining}s` : round.status === 'active' ? 'LIVE' : 'RUGGED'}
-          </div>
-        )}
-      </div>
+      }
+      rightSlot={phase && <StatusBadge phase={phase} countdown={phase === 'waiting' ? waitRemaining : undefined} label={phase === 'result' ? 'RUGGED' : undefined} />}
+      howToPlay={
+        <HowToPlayInline steps={[
+          { icon: '💰', label: 'Place your bet', desc: 'Join during the betting window' },
+          { icon: '📈', label: 'Watch the multiplier rise', desc: 'The chart climbs until the rug pull' },
+          { icon: '🏃', label: 'Cash out in time', desc: 'Take profit before it crashes to zero' },
+        ]} />
+      }
+    />
+  );
 
-      {error && <div style={s.errorMsg} className="screen-enter">{error}</div>}
+  /* ─── CONTROL RAIL ─── */
+  const railContent = (
+    <GameControlRail>
+      {/* Error */}
+      {error && <div style={errorMsg}>{error}</div>}
 
-      {/* Candlestick Chart */}
-      <RugCandleChart
-        candles={round?.candles || []}
-        currentMultiplier={round?.currentMultiplier || 1.0}
-        status={round?.status || 'waiting'}
-        rugMultiplier={round?.rugMultiplier || null}
-        isMobile={isMobile}
-      />
+      {/* Multiplier Hero (active round) */}
+      {round?.status === 'active' && (
+        <div style={{
+          textAlign: 'center',
+          padding: `${gap.md}px`,
+          background: theme.bg.secondary,
+          borderRadius: theme.radius.lg,
+          border: `1px solid ${theme.border.subtle}`,
+        }}>
+          <MultiplierPulse value={round.currentMultiplier}>
+            <div style={{
+              fontSize: isMobile ? ts('hero') : 32,
+              fontWeight: 800,
+              fontFamily: "'JetBrains Mono', monospace",
+              letterSpacing: '-0.02em',
+              color: theme.accent.neonGreen,
+              textShadow: `0 0 ${Math.min(24, round.currentMultiplier * 4)}px rgba(0, 231, 1, ${Math.min(0.5, round.currentMultiplier * 0.06)})`,
+              transition: 'text-shadow 0.3s ease',
+            }}>
+              {Number(round.currentMultiplier).toFixed(2)}x
+            </div>
+          </MultiplierPulse>
+          {hasBet && !isCashedOut && (
+            <div style={{ fontSize: ts('sm'), color: theme.text.secondary, marginTop: gap.xs, fontFamily: "'JetBrains Mono', monospace" }}>
+              Payout: {formatSol(projectedPayout)} <SolIcon size="0.9em" />
+            </div>
+          )}
+          {isCashedOut && cashOutDone && (
+            <div style={{ fontSize: ts('sm'), color: theme.accent.neonGreen, marginTop: gap.xs, fontFamily: "'JetBrains Mono', monospace" }}>
+              Cashed out at {Number(cashOutDone.multiplier).toFixed(2)}x
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* Cash Out Notification */}
+      {/* Cash Out Button */}
+      {round?.status === 'active' && hasBet && !isCashedOut && (
+        <button style={cashOutBtn} onClick={handleCashOut} disabled={loading}>
+          CASH OUT  ·  {Number(round.currentMultiplier).toFixed(2)}x  ·  {formatSol(projectedPayout)} <SolIcon size="0.9em" />
+        </button>
+      )}
+
+      {/* Disabled Cash Out Preview */}
+      {round?.status === 'waiting' && hasBet && (
+        <button style={cashOutBtnDisabled} disabled>
+          CASH OUT — Available when round starts
+        </button>
+      )}
+
+      {/* Cashout Success Banner */}
       {isCashedOut && cashOutDone && round?.status === 'active' && (
         <div style={{
-          padding: '12px 16px', borderRadius: '12px',
-          background: 'rgba(46,204,113,0.08)', border: '1px solid rgba(46,204,113,0.2)',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: `${gap.md}px`,
+          background: 'rgba(0,231,1,0.04)',
+          border: '1px solid rgba(0,231,1,0.15)',
+          borderRadius: theme.radius.lg,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
         }}>
           <div>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#2ecc71', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Cashed Out!
+            <div style={{ fontSize: ts('xs'), fontWeight: 600, color: theme.accent.neonGreen, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+              Cashed Out
             </div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: '#2ecc71' }} className="mono">
-              {cashOutDone.multiplier.toFixed(2)}x — +{formatSol(cashOutDone.payout)} SOL
+            <div style={{ fontSize: ts('lg'), fontWeight: 700, color: theme.accent.neonGreen, marginTop: 2 }} className="mono">
+              {Number(cashOutDone.multiplier).toFixed(2)}x — +{formatSol(cashOutDone.payout - (myBet?.betAmount || 0))} <SolIcon size="0.9em" />
             </div>
           </div>
-          <div style={{ fontSize: '11px', color: theme.text.muted }}>Watching round...</div>
+          <Badge variant="success" size="sm">Watching</Badge>
         </div>
+      )}
+
+      {/* Betting Panel (waiting, no bet) */}
+      {round?.status === 'waiting' && !hasBet && (
+        <BetPanel
+          presets={[
+            { label: '0.1', lamports: 100_000_000 },
+            { label: '0.5', lamports: 500_000_000 },
+            { label: '1', lamports: 1_000_000_000 },
+            { label: '5', lamports: 5_000_000_000 },
+            { label: '10', lamports: 10_000_000_000 },
+            { label: '50', lamports: 50_000_000_000 },
+            { label: '100', lamports: 100_000_000_000 },
+          ]}
+          selectedAmount={betAmount}
+          onAmountChange={setBetAmount}
+          balance={profile.balance}
+          demoBalance={profile.demoBalance}
+          submitLabel="Join Round"
+          onSubmit={handleJoin}
+          submitDisabled={betAmount <= 0}
+          submitLoading={loading}
+        />
+      )}
+
+      {/* Already Joined (waiting) */}
+      {round?.status === 'waiting' && hasBet && (
+        <Card variant="panel" style={{ textAlign: 'center', background: 'rgba(0,231,1,0.03)', borderColor: 'rgba(0,231,1,0.10)' }}>
+          <div style={{ fontSize: ts('md'), fontWeight: 700, color: theme.accent.neonGreen }}>
+            You're in! Bet: {formatSol(myBet!.betAmount)} <SolIcon size="0.9em" />
+          </div>
+          <div style={{ fontSize: ts('sm'), color: theme.text.muted, marginTop: gap.xs }}>
+            Launching in {waitRemaining}s...
+          </div>
+        </Card>
+      )}
+
+      {/* Spectator: logged in but missed betting window */}
+      {round?.status === 'active' && !hasBet && isAuthenticated && (
+        <Card variant="panel" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: ts('md'), fontWeight: 600, color: theme.text.secondary }}>
+            Round in progress
+          </div>
+          <div style={{ fontSize: ts('sm'), color: theme.text.muted, marginTop: gap.xs }}>
+            You can join the next round when betting opens
+          </div>
+        </Card>
+      )}
+
+      {/* Spectator: not logged in */}
+      {round?.status === 'active' && !hasBet && !isAuthenticated && (
+        <Card variant="panel" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: ts('md'), fontWeight: 600, color: theme.text.secondary, marginBottom: gap.sm }}>
+            Sign in to play in the next round
+          </div>
+          <Button variant="primary" size="md" onClick={() => go('auth')}>
+            Sign In
+          </Button>
+        </Card>
+      )}
+
+      {/* Post-round: resolved, waiting for next */}
+      {round?.status === 'resolved' && !hasBet && (
+        <Card variant="panel" style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: ts('sm'), color: theme.text.muted }}>
+            Next round starts automatically...
+          </div>
+        </Card>
+      )}
+
+      {/* No round available */}
+      {!round && (
+        <Card variant="panel">
+          <EmptyState
+            icon={
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.text.muted} strokeWidth="1.5" strokeLinecap="round">
+                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+            }
+            title="Waiting for next round..."
+            subtitle="A new rug game starts automatically every 30 seconds"
+          />
+        </Card>
       )}
 
       {/* Players Strip */}
       {round && round.bets.length > 0 && (
-        <div style={{
-          display: 'flex', gap: '6px', overflowX: 'auto', padding: '2px 0',
-          scrollbarWidth: 'none',
-        }}>
+        <div style={playersStrip}>
           {round.bets.map((bet) => {
             const isMe = bet.userId === userId;
-            const statusColor = bet.status === 'cashed_out' ? '#2ecc71' : bet.status === 'rugged' ? '#ef4444' : '#8b5cf6';
+            const statusColor = bet.status === 'cashed_out' ? theme.accent.neonGreen : bet.status === 'rugged' ? theme.accent.red : theme.accent.purple;
             return (
               <div key={bet.userId} style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',
-                borderRadius: '10px', flexShrink: 0,
-                background: isMe ? 'rgba(139,92,246,0.1)' : theme.bg.secondary,
-                border: `1px solid ${isMe ? 'rgba(139,92,246,0.3)' : theme.border.subtle}`,
+                ...playerChip,
+                background: isMe ? 'rgba(139,92,246,0.06)' : theme.bg.secondary,
+                borderColor: isMe ? 'rgba(139,92,246,0.20)' : theme.border.subtle,
               }}>
                 <div style={{
-                  width: 24, height: 24, borderRadius: '50%',
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
                   background: getAvatarGradient(bet.avatarUrl, bet.username),
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '9px', fontWeight: 700, color: '#fff',
+                  fontSize: '8px', fontWeight: 700, color: '#fff',
                 }}>
                   {getInitials(bet.username)}
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
-                  <span style={{ fontSize: '10px', fontWeight: 700, color: theme.text.primary }}>{bet.username}</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                    <span className="mono" style={{ fontSize: '10px', fontWeight: 700, color: '#8b5cf6' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <span style={{ fontSize: ts('xs'), fontWeight: 600, color: theme.text.primary }}>{bet.username}</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: gap.xs }}>
+                    <span className="mono" style={{ fontSize: ts('xs'), fontWeight: 700, color: theme.accent.purple }}>
                       {formatSol(bet.betAmount)}
                     </span>
                     {bet.cashOutMultiplier && (
-                      <span className="mono" style={{ fontSize: '9px', fontWeight: 700, color: statusColor }}>
-                        {bet.cashOutMultiplier.toFixed(2)}x
+                      <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: statusColor }}>
+                        {Number(bet.cashOutMultiplier).toFixed(2)}x
                       </span>
                     )}
                   </div>
@@ -448,232 +605,209 @@ export function RugGameScreen() {
 
       {/* Recent Rounds Strip */}
       {recentRounds.length > 0 && (
-        <div style={{
-          display: 'flex', gap: '6px', overflowX: 'auto', padding: '2px 0',
-          scrollbarWidth: 'none',
-        }}>
-          {recentRounds.slice(0, 12).map((r: any) => {
-            const mult = parseFloat(r.rugMultiplier || '1');
-            const color = mult >= 3 ? '#2ecc71' : mult >= 1.5 ? '#8b5cf6' : '#ef4444';
-            return (
-              <div key={r.id} style={{
-                padding: '4px 10px', borderRadius: '8px', flexShrink: 0,
-                background: `${color}10`, border: `1px solid ${color}30`,
-                display: 'flex', alignItems: 'center', gap: '2px',
-              }}>
-                <span className="mono" style={{ fontSize: '11px', fontWeight: 800, color }}>
-                  {mult.toFixed(2)}x
-                </span>
-              </div>
-            );
-          })}
+        <div>
+          <div style={{ fontSize: ts('xs'), fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: gap.sm }}>
+            Recent Rounds
+          </div>
+          <div style={recentStrip}>
+            {recentRounds.slice(0, 12).map((r: any) => {
+              const mult = parseFloat(r.rugMultiplier || '1');
+              const variant = mult >= 3 ? 'success' : mult >= 1.5 ? 'purple' : 'danger';
+              return (
+                <Badge key={r.id} variant={variant as any} size="md" style={{ flexShrink: 0 }}>
+                  <span className="mono" style={{ fontWeight: 700 }}>{mult.toFixed(2)}x</span>
+                </Badge>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </GameControlRail>
+  );
+
+  /* ─── GAME STAGE ─── */
+  const stageContent = (
+    <GameStage atmosphere={RUG_ATMOSPHERE}>
+      {/* Desktop header inside stage */}
+      {!isMobile && (
+        <div style={{ padding: `${gap.sm}px ${gap.md}px 0` }}>
+          {header}
         </div>
       )}
 
-      {/* Betting Controls */}
-      {round?.status === 'waiting' && !hasBet && (
-        <BetPanel
-          presets={[
-            { label: '0.01', lamports: 10_000_000 },
-            { label: '0.05', lamports: 50_000_000 },
-            { label: '0.1', lamports: 100_000_000 },
-            { label: '0.25', lamports: 250_000_000 },
-            { label: '0.5', lamports: 500_000_000 },
-            { label: '1', lamports: 1_000_000_000 },
-          ]}
-          selectedAmount={betAmount}
-          onAmountChange={setBetAmount}
-          balance={profile.balance}
-          submitLabel="JOIN RUG GAME"
-          onSubmit={handleJoin}
-          submitDisabled={betAmount <= 0}
-          submitLoading={loading}
+      {/* Chart fills the stage */}
+      <div style={{ position: 'relative', flex: isMobile ? undefined : 1, height: isMobile ? 240 : undefined, minHeight: isMobile ? undefined : 200 }}>
+        <RugCandleChart
+          candles={round?.candles || []}
+          currentMultiplier={round?.currentMultiplier || 1.0}
+          status={round?.status || 'waiting'}
+          rugMultiplier={round?.rugMultiplier || null}
+          isMobile={isMobile}
         />
-      )}
+      </div>
 
-      <RecentGames
-        title="Recent Rug Games"
-        fetchGames={async () => {
-          const res = await api.getRugGameRecentRounds(10);
-          return (res.rounds || []).map((r: any) => ({
-            id: r.id,
-            result: 'loss',
-            multiplier: parseFloat(r.rugMultiplier || '1'),
-            amount: 0,
-            payout: 0,
-            time: r.resolvedAt,
-          }));
-        }}
+      {/* Confetti on win result */}
+      <WinConfetti active={showResultOverlay && isCashedOut} zIndex={8} />
+
+      {/* Result Overlay */}
+      <ResultOverlay
+        visible={showResultOverlay && isResolved === true}
+        variant={isCashedOut ? 'win' : 'loss'}
+        actionsDelay={isCashedOut ? 1500 : 800}
+        actions={
+          isCashedOut && cashOutDone && resolvedProfit > 0 ? (
+            <button onClick={() => setShowWinCard(true)} style={btnGhost}>
+              Share Win
+            </button>
+          ) : undefined
+        }
+      >
+        {isCashedOut && cashOutDone ? (
+          <>
+            <div style={{ fontSize: ts('sm'), fontWeight: 600, color: theme.accent.neonGreen, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: gap.xs }}>
+              CASHED OUT
+            </div>
+            <CountUpNumber value={cashOutDone.multiplier} from={1} duration={1000} decimals={2} suffix="x" style={{ fontSize: ts('hero'), fontWeight: 800, color: theme.accent.neonGreen, fontFamily: "'JetBrains Mono', monospace", textShadow: '0 0 24px rgba(0, 231, 1, 0.4)' }} />
+            <CountUpNumber value={resolvedProfit / 1e9} from={0} duration={1200} decimals={resolvedProfit >= 1e9 ? 2 : 4} prefix={resolvedProfit >= 0 ? '+' : ''} suffix={<> <SolIcon size="0.9em" /></>} style={{ fontSize: ts('xl'), fontWeight: 700, color: theme.accent.neonGreen, fontFamily: "'JetBrains Mono', monospace", marginTop: gap.xs }} />
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: ts('sm'), fontWeight: 600, color: theme.accent.red, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: gap.xs }}>
+              RUGGED
+            </div>
+            <div style={{ fontSize: ts('hero'), fontWeight: 800, color: theme.accent.red, fontFamily: "'JetBrains Mono', monospace", opacity: 0.8 }}>
+              {round?.rugMultiplier ? `${Number(round.rugMultiplier).toFixed(2)}x` : '0.00x'}
+            </div>
+            <div style={{ fontSize: ts('xl'), fontWeight: 700, color: theme.accent.red, fontFamily: "'JetBrains Mono', monospace", marginTop: gap.xs, opacity: 0.7 }}>
+              -{formatSol(myBet?.betAmount || 0)} <SolIcon size="0.9em" />
+            </div>
+          </>
+        )}
+      </ResultOverlay>
+    </GameStage>
+  );
+
+  /* ─── FOOTER ─── */
+  const footerContent = round ? (
+    <GameFooterBar>
+      <RoundInfoFooter roundNumber={round.roundNumber} seedHash={round.seedHash} />
+      <span style={{ fontSize: ts('xs'), color: theme.text.muted }}>
+        {round.bets.length} player{round.bets.length !== 1 ? 's' : ''}
+      </span>
+    </GameFooterBar>
+  ) : undefined;
+
+  return (
+    <>
+      {/* Mobile header above layout */}
+      {isMobile && <div style={{ padding: `${gap.sm}px 12px` }}>{header}</div>}
+
+      <CasinoGameLayout
+        rail={railContent}
+        stage={stageContent}
+        footer={footerContent}
       />
 
-      {/* Already joined waiting */}
-      {round?.status === 'waiting' && hasBet && (
-        <div style={{
-          padding: '16px', textAlign: 'center', borderRadius: '12px',
-          background: 'rgba(46,204,113,0.06)', border: '1px solid rgba(46,204,113,0.15)',
-        }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: '#2ecc71' }}>
-            You're in! Bet: {formatSol(myBet!.betAmount)} SOL
-          </div>
-          <div style={{ fontSize: '12px', color: theme.text.muted, marginTop: '4px' }}>
-            Launching in {waitRemaining}s...
-          </div>
-        </div>
+      {/* Win Card Modal */}
+      {showWinCard && cashOutDone && myBet && (
+        <WinCard
+          gameType="rug-game"
+          multiplier={Number(cashOutDone.multiplier)}
+          betAmount={myBet.betAmount}
+          payout={cashOutDone.payout}
+          profit={cashOutDone.payout - myBet.betAmount}
+          timestamp={new Date()}
+          username={profile.username || 'Player'}
+          level={profile.level}
+          vipTier={profile.vipTier || 'bronze'}
+          onClose={() => setShowWinCard(false)}
+        />
       )}
-
-      {/* Cash Out Button during active */}
-      {round?.status === 'active' && hasBet && !isCashedOut && (
-        <button
-          style={s.cashOutBtn}
-          onClick={handleCashOut}
-          disabled={loading}
-          className="hover-scale"
-        >
-          <span style={{ fontSize: '20px', fontWeight: 900 }}>
-            CASH OUT
-          </span>
-          <span style={{ fontSize: '14px', fontWeight: 600, opacity: 0.8 }} className="mono">
-            {round.currentMultiplier.toFixed(2)}x — {formatSol(Math.floor((myBet?.betAmount || 0) * round.currentMultiplier))} SOL
-          </span>
-        </button>
-      )}
-
-      {/* Resolved result for user */}
-      {round?.status === 'resolved' && hasBet && (
-        <div style={{
-          padding: '16px', textAlign: 'center', borderRadius: '12px',
-          background: isCashedOut ? 'rgba(46,204,113,0.08)' : 'rgba(239,68,68,0.08)',
-          border: `1px solid ${isCashedOut ? 'rgba(46,204,113,0.2)' : 'rgba(239,68,68,0.2)'}`,
-        }}>
-          <div style={{
-            fontSize: '18px', fontWeight: 900,
-            color: isCashedOut ? '#2ecc71' : '#ef4444',
-          }}>
-            {isCashedOut ? 'YOU WON!' : 'RUGGED!'}
-          </div>
-          <div style={{
-            fontSize: '24px', fontWeight: 900, marginTop: '4px',
-            color: isCashedOut ? '#2ecc71' : '#ef4444',
-          }} className="mono">
-            {isCashedOut && cashOutDone
-              ? `+${formatSol(cashOutDone.payout - (myBet?.betAmount || 0))} SOL`
-              : `-${formatSol(myBet?.betAmount || 0)} SOL`
-            }
-          </div>
-          {round.seed && (
-            <div style={{
-              marginTop: '8px', padding: '6px 10px', borderRadius: '8px',
-              background: 'rgba(139,92,246,0.06)', fontSize: '10px', color: theme.text.muted,
-              fontFamily: "'JetBrains Mono', monospace", wordBreak: 'break-all',
-            }}>
-              Seed: {round.seed.slice(0, 16)}...
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* No active round — waiting state */}
-      {!round && (
-        <div style={{
-          padding: '24px', textAlign: 'center', borderRadius: '14px',
-          background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`,
-        }}>
-          <div style={{ fontSize: '28px', marginBottom: '8px' }}>🚀</div>
-          <div style={{ fontSize: '16px', fontWeight: 700, color: theme.text.secondary }}>
-            Waiting for next round...
-          </div>
-          <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '6px' }}>
-            A new rug game starts automatically every 30 seconds
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginTop: '14px' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#2ecc71' }}>BET</div>
-              <div style={{ fontSize: '11px', color: theme.text.muted }}>Place during presale</div>
-            </div>
-            <div style={{ width: '1px', background: theme.border.subtle }} />
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#f59e0b' }}>WATCH</div>
-              <div style={{ fontSize: '11px', color: theme.text.muted }}>Multiplier rises</div>
-            </div>
-            <div style={{ width: '1px', background: theme.border.subtle }} />
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#ef4444' }}>CASH OUT</div>
-              <div style={{ fontSize: '11px', color: theme.text.muted }}>Before the rug!</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Not authenticated + active round */}
-      {round?.status === 'active' && !hasBet && !isAuthenticated && (
-        <div style={{
-          padding: '16px', textAlign: 'center', borderRadius: '12px',
-          background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`,
-        }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: theme.text.secondary }}>
-            Sign in to play in the next round
-          </div>
-          <button style={{ ...s.buyBtn, marginTop: '8px', padding: '12px' }} onClick={() => go('auth')}>
-            Sign In
-          </button>
-        </div>
-      )}
-
-      {/* Round info */}
-      {round && (
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          padding: '8px 12px', borderRadius: '10px',
-          background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`,
-          fontSize: '11px', color: theme.text.muted,
-        }}>
-          <span>Round #{round.roundNumber}</span>
-          <span>{round.bets.length} player{round.bets.length !== 1 ? 's' : ''}</span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '10px' }}>
-            {round.seedHash.slice(0, 12)}...
-          </span>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
 
-const s: Record<string, React.CSSProperties> = {
-  root: {
-    display: 'flex', flexDirection: 'column', gap: '10px',
-    padding: '12px', minHeight: '100%', boxSizing: 'border-box',
-    maxWidth: '900px', margin: '0 auto', width: '100%',
-  },
-  headerSection: { display: 'flex', alignItems: 'center', gap: '12px' },
-  backBtn: {
-    width: 38, height: 38, borderRadius: '10px', border: `1px solid ${theme.border.subtle}`,
-    background: theme.bg.secondary, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', transition: 'all 0.15s', flexShrink: 0,
-  },
-  headerText: { flex: 1, minWidth: 0 },
-  headerIcon: {
-    width: 36, height: 36, borderRadius: '10px',
-    border: '1px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-  },
-  title: { fontSize: '22px', fontWeight: 800, color: '#fff', margin: 0 },
-  subtitle: { fontSize: '13px', color: theme.text.muted, margin: '4px 0 0' },
-  errorMsg: {
-    padding: '10px 14px', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)',
-    borderRadius: '10px', color: '#f87171', fontSize: '14px', fontWeight: 600, textAlign: 'center',
-  },
-  buyBtn: {
-    width: '100%', padding: '16px',
-    background: 'linear-gradient(135deg, #7c3aed, #8b5cf6, #a78bfa)',
-    border: 'none', borderRadius: '14px', color: '#fff',
-    fontSize: '18px', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
-    boxShadow: '0 4px 20px rgba(139, 92, 246, 0.3)', letterSpacing: '2px',
-  },
-  cashOutBtn: {
-    width: '100%', padding: '16px',
-    background: 'linear-gradient(135deg, #ef4444, #dc2626)',
-    border: 'none', borderRadius: '14px', color: '#fff',
-    cursor: 'pointer', fontFamily: 'inherit',
-    boxShadow: '0 4px 24px rgba(239, 68, 68, 0.4)',
-    display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: '4px',
-  },
+// ─── Styles ─────────────────────────────────────────────────
+
+const errorMsg: CSSProperties = {
+  padding: `${theme.gap.sm}px ${theme.gap.md}px`,
+  background: 'rgba(255,51,51,0.06)',
+  border: '1px solid rgba(255,51,51,0.12)',
+  borderRadius: theme.radius.md,
+  color: theme.accent.red,
+  fontSize: 13,
+  fontWeight: 600,
+  textAlign: 'center',
+  animation: 'screenFadeIn 0.15s ease-out',
+};
+
+const cashOutBtn: CSSProperties = {
+  width: '100%',
+  padding: '14px 16px',
+  background: 'linear-gradient(135deg, #FF3333, #dc2626)',
+  border: 'none',
+  borderRadius: theme.radius.lg,
+  color: '#fff',
+  cursor: 'pointer',
+  fontFamily: "'JetBrains Mono', monospace",
+  fontSize: 15,
+  fontWeight: 700,
+  letterSpacing: '0.01em',
+  transition: 'all 0.15s ease',
+  minHeight: 48,
+  boxShadow: '0 0 20px rgba(255, 51, 51, 0.2), 0 4px 12px rgba(255, 51, 51, 0.15)',
+};
+
+const cashOutBtnDisabled: CSSProperties = {
+  width: '100%',
+  padding: '14px 16px',
+  background: theme.bg.secondary,
+  border: `1px solid ${theme.border.medium}`,
+  borderRadius: theme.radius.lg,
+  color: theme.text.muted,
+  cursor: 'not-allowed',
+  fontFamily: "'JetBrains Mono', monospace",
+  fontSize: 14,
+  fontWeight: 600,
+  opacity: 0.5,
+  minHeight: 48,
+};
+
+const playersStrip: CSSProperties = {
+  display: 'flex',
+  gap: theme.gap.sm,
+  overflowX: 'auto',
+  padding: '2px 0',
+  scrollbarWidth: 'none' as any,
+};
+
+const playerChip: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.gap.sm,
+  padding: `${theme.gap.sm}px`,
+  borderRadius: theme.radius.md,
+  flexShrink: 0,
+  border: '1px solid',
+};
+
+const recentStrip: CSSProperties = {
+  display: 'flex',
+  gap: theme.gap.sm,
+  overflowX: 'auto',
+  padding: '2px 0',
+  scrollbarWidth: 'none' as any,
+};
+
+const btnGhost: CSSProperties = {
+  width: '100%',
+  padding: '10px 16px',
+  fontSize: 13,
+  fontWeight: 600,
+  color: theme.text.secondary,
+  background: 'rgba(255,255,255,0.06)',
+  border: `1px solid ${theme.border.medium}`,
+  borderRadius: theme.radius.md,
+  cursor: 'pointer',
+  minHeight: 40,
 };

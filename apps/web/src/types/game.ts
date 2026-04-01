@@ -100,12 +100,16 @@ export interface PlayerProfile {
   rakebackRate: number;
   avatarUrl: string | null;
   balance: number;
+  lockedBalance: number;
+  demoBalance: number;
+  demoRefillsUsed: number;
   totalWagered: number;
   totalWon: number;
   roundsPlayed: number;
   winRate: number;
   streak: number;
   bestMultiplier: number;
+  progressionLoaded: boolean;
 }
 
 // ─── Lobby ───────────────────────────────────────────────────────────────────

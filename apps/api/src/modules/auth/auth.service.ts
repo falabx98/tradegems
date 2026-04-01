@@ -33,7 +33,7 @@ const AVATAR_POOL = Array.from({ length: 20 }, (_, i) => {
     'jade', 'obsidian', 'lapis', 'rose_quartz', 'peridot',
     'tanzanite', 'amber', 'malachite', 'tiger_eye', 'alexandrite',
   ];
-  return `/avatars/pepe_${String(i + 1).padStart(2, '0')}_${names[i]}.png`;
+  return `/avatars/pepe_${String(i + 1).padStart(2, '0')}_${names[i]}.webp`;
 });
 
 function randomAvatar(): string {

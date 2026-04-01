@@ -3,15 +3,28 @@ import { useGameStore } from '../../stores/gameStore';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { api } from '../../utils/api';
 import { theme } from '../../styles/theme';
+import { gameTrack } from '../../utils/analytics';
 import { formatSol } from '../../utils/sol';
 import { getAvatarGradient, getInitials } from '../../utils/avatars';
 import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { playButtonClick, playBetPlaced, playRoundEnd, hapticLight, hapticMedium } from '../../utils/sounds';
-import { LiveDot, LiveRoundBanner, StatusBadge, WinAmountDisplay, timeAgo } from '../ui/LiveIndicators';
+import { LiveDot, LiveRoundBanner, StatusBadge as OldStatusBadge, WinAmountDisplay, timeAgo } from '../ui/LiveIndicators';
 import { BetPanel } from '../ui/BetPanel';
 import { RecentGames } from '../ui/RecentGames';
 import { toast } from '../../stores/toastStore';
+import { WinCard } from '../ui/WinCard';
+import { SolIcon } from '../ui/SolIcon';
+import { GameHeader } from '../game/GameHeader';
+import { HowToPlayInline } from '../game/HowToPlayInline';
+import { RoundInfoFooter } from '../game/RoundInfoFooter';
+import { CasinoGameLayout, GameControlRail, GameStage, GameFooterBar } from '../game/CasinoGameLayout';
+import { Button } from '../primitives/Button';
+import { Card } from '../primitives/Card';
+import { Badge } from '../primitives/Badge';
+import { EmptyState } from '../primitives/EmptyState';
+import { WinConfetti } from '../game/WinConfetti';
+import { CountUpNumber } from '../game/CountUpNumber';
 
 interface Candle { open: number; high: number; low: number; close: number; volume: number; timestamp: number; }
 interface Participant { id: string; userId: string; username?: string; startBalance: number; finalBalance?: number; finalPnl?: number; rank?: number; }
@@ -19,7 +32,7 @@ interface Room { id: string; entryFee: number; maxPlayers: number; currentPlayer
 type View = 'list' | 'game' | 'result';
 
 const ENTRY_TIERS = [
-  { fee: 100_000_000, label: '0.1', color: '#2ecc71', gradient: 'linear-gradient(135deg, #064e3b, #059669)', icon: '💹' },
+  { fee: 100_000_000, label: '0.1', color: '#00E701', gradient: 'linear-gradient(135deg, #064e3b, #059669)', icon: '💹' },
   { fee: 250_000_000, label: '0.25', color: '#60a5fa', gradient: 'linear-gradient(135deg, #172554, #1d4ed8)', icon: '📊' },
   { fee: 500_000_000, label: '0.5', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #78350f, #d97706)', icon: '🏆' },
 ];
@@ -48,15 +61,12 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
     const w = rect.width;
     const h = rect.height;
 
-    ctx.fillStyle = '#0a0c10';
-    ctx.beginPath();
-    ctx.roundRect(0, 0, w, h, 12);
-    ctx.fill();
+    ctx.clearRect(0, 0, w, h);
 
     const candles = candlesRef.current;
     if (candles.length === 0) {
       // Waiting state
-      ctx.fillStyle = '#2ecc71';
+      ctx.fillStyle = '#00E701';
       ctx.font = `900 ${isMobile ? 18 : 24}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
       ctx.shadowColor = 'rgba(46,204,113,0.4)';
@@ -107,7 +117,7 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
       const c = visible[i];
       const x = pad.left + (i + 0.5) * spacing;
       const isGreen = c.c >= c.o;
-      const color = isGreen ? '#2ecc71' : '#f87171';
+      const color = isGreen ? '#00E701' : '#FF3333';
       ctx.strokeStyle = color; ctx.lineWidth = isMobile ? 1 : 1.5;
       ctx.beginPath(); ctx.moveTo(x, toY(c.h)); ctx.lineTo(x, toY(c.l)); ctx.stroke();
       const bTop = toY(Math.max(c.o, c.c));
@@ -121,7 +131,7 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
       const lastC = candles[candles.length - 1];
       const priceY = toY(lastC.c);
       const isUp = lastC.c >= candles[0].o;
-      const lineColor = isUp ? '#2ecc71' : '#f87171';
+      const lineColor = isUp ? '#00E701' : '#FF3333';
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 3]);
@@ -132,13 +142,13 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
       ctx.fillStyle = lineColor;
       ctx.font = `700 ${isMobile ? 10 : 11}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'right';
-      ctx.fillText(`$${lastC.c.toFixed(2)}`, w - 4, priceY - 4);
+      ctx.fillText(`$${Number(lastC.c).toFixed(2)}`, w - 4, priceY - 4);
     }
 
     // Top info
     const currentPhase = phaseRef.current;
     if (currentPhase === 'trading') {
-      ctx.fillStyle = '#2ecc71';
+      ctx.fillStyle = '#00E701';
       ctx.font = "700 9px 'Inter', system-ui, sans-serif";
       ctx.textAlign = 'left';
       ctx.fillText('\u25CF LIVE ROUND', pad.left + 4, 16);
@@ -221,14 +231,16 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
     return () => window.removeEventListener('resize', handleResize);
   }, [draw]);
 
-  const chartHeight = isMobile ? 200 : 260;
+  const chartHeight = isMobile ? 200 : 360;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-      <div style={{ position: 'relative' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: theme.gap.sm }}>
+      <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', background: '#0a0c10' }}>
+        {/* Teal trading-floor atmosphere */}
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse at 50% 60%, rgba(13,148,136,0.06) 0%, transparent 70%)', pointerEvents: 'none', zIndex: 0 }} />
         <canvas
           ref={canvasRef}
-          style={{ width: '100%', height: `${chartHeight}px`, display: 'block', borderRadius: '12px' }}
+          style={{ width: '100%', height: `${chartHeight}px`, display: 'block', position: 'relative', zIndex: 1 }}
         />
         {/* Timer overlay */}
         {phase === 'trading' && (
@@ -239,7 +251,7 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
             background: 'rgba(0,0,0,0.6)', backdropFilter: '',
           }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-            <span className="mono" style={{ fontSize: '12px', fontWeight: 700, color: timeLeft <= 10 ? '#f87171' : '#fff' }}>{timeLeft}s</span>
+            <span className="mono" style={{ fontSize: '12px', fontWeight: 700, color: timeLeft <= 10 ? '#FF3333' : '#fff' }}>{timeLeft}s</span>
           </div>
         )}
         {phase === 'result' && (
@@ -249,7 +261,7 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
             background: 'rgba(0,0,0,0.7)', backdropFilter: '',
           }}>
             <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '1px' }}>Round Complete</div>
-            <div className="mono" style={{ fontSize: '22px', fontWeight: 900, color: pnl >= 0 ? '#2ecc71' : '#f87171', marginTop: '2px' }}>
+            <div className="mono" style={{ fontSize: '22px', fontWeight: 900, color: pnl >= 0 ? '#00E701' : '#FF3333', marginTop: '2px' }}>
               {pnl >= 0 ? '+' : ''}{pnl.toFixed(1)}%
             </div>
           </div>
@@ -272,7 +284,7 @@ function LiveTradingChart({ rooms, recentRooms }: { rooms: any[]; recentRooms: a
               }}>
                 <span style={{ fontSize: '12px' }}>{tier.icon}</span>
                 <span className="mono" style={{ fontSize: '11px', fontWeight: 700, color: tier.color }}>
-                  {tier.label} SOL
+                  {tier.label} <SolIcon size="0.9em" />
                 </span>
                 <span style={{ fontSize: '10px', color: theme.text.muted }}>{r.currentPlayers}/{r.maxPlayers}</span>
               </div>
@@ -297,6 +309,7 @@ export function TradingSimScreen() {
   const [loading, setLoading] = useState(false);
   const [recentRooms, setRecentRooms] = useState<any[]>([]);
   const [entryAmount, setEntryAmount] = useState(0);
+  const [showWinCard, setShowWinCard] = useState(false);
 
   // Game state
   const [position, setPosition] = useState(0);
@@ -309,7 +322,7 @@ export function TradingSimScreen() {
   const [countdown, setCountdown] = useState<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const confettiCanvasRef = useRef<HTMLCanvasElement>(null);
+  // confetti now uses shared WinConfetti component
 
   const fetchRooms = async () => {
     try {
@@ -346,6 +359,7 @@ export function TradingSimScreen() {
   };
 
   const handleJoinRoom = async () => {
+    gameTrack.start('trading_sim', entryAmount);
     // Try to join an existing room with matching entry fee first
     const matchingRoom = rooms.find(r => Number(r.entryFee) === entryAmount && r.status === 'waiting');
     if (matchingRoom) {
@@ -370,7 +384,7 @@ export function TradingSimScreen() {
   };
 
   const countdownTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const confettiRaf = useRef<number>(0);
+  // confettiRaf removed — using shared WinConfetti
 
   const startPolling = (roomId: string) => {
     // Clear any existing polling interval first
@@ -425,7 +439,6 @@ export function TradingSimScreen() {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       countdownTimers.current.forEach(t => clearTimeout(t));
-      cancelAnimationFrame(confettiRaf.current);
     };
   }, []);
 
@@ -444,9 +457,8 @@ export function TradingSimScreen() {
     const h = rect.height;
     ctx.clearRect(0, 0, w, h);
 
-    // Background
-    ctx.fillStyle = '#0c0e12';
-    ctx.fillRect(0, 0, w, h);
+    // Transparent background (atmosphere from container)
+    ctx.clearRect(0, 0, w, h);
 
     const prices = visibleCandles.flatMap(c => [c.high, c.low]);
     const minP = Math.min(...prices) * 0.998;
@@ -465,7 +477,7 @@ export function TradingSimScreen() {
       const y = pad.top + (chartH / gridLines) * i;
       ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(w - pad.right, y); ctx.stroke();
       // Y-axis labels
-      const price = maxP - (range / gridLines) * i;
+      const price = maxP - ((maxP - minP) / gridLines) * i;
       ctx.fillStyle = 'rgba(255,255,255,0.3)';
       ctx.font = `500 ${isMobile ? 9 : 10}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'right';
@@ -473,21 +485,31 @@ export function TradingSimScreen() {
     }
     ctx.setLineDash([]);
 
-    // Candles
-    const totalCandles = activeRoom?.duration ? Math.ceil(activeRoom.duration / 1) : 60;
-    const candleW = Math.max(2, (chartW / totalCandles) - 1);
-    const gap = (chartW - candleW * visibleCandles.length) / Math.max(1, visibleCandles.length);
+    // Candles — sliding window for stable readability
+    const maxVisible = isMobile ? 30 : 40;
+    const displayCandles = visibleCandles.length > maxVisible
+      ? visibleCandles.slice(-maxVisible)
+      : visibleCandles;
+    const candleW = Math.max(3, Math.min(8, (chartW / displayCandles.length) - 2));
+    const spacing = displayCandles.length > 1
+      ? (chartW - candleW * displayCandles.length) / (displayCandles.length - 1)
+      : 0;
 
-    visibleCandles.forEach((c, i) => {
-      const x = pad.left + i * (candleW + Math.max(1, gap / visibleCandles.length * i > 0 ? 1 : 0));
-      const xPos = pad.left + (chartW / totalCandles) * i;
+    // Use display window prices for Y-axis (better zoom on visible data)
+    const dpPrices = displayCandles.flatMap(c => [c.high, c.low]);
+    const dpMinP = dpPrices.length > 0 ? Math.min(...dpPrices) * 0.998 : minP;
+    const dpMaxP = dpPrices.length > 0 ? Math.max(...dpPrices) * 1.002 : maxP;
+    const dpRange = dpMaxP - dpMinP || 1;
+
+    displayCandles.forEach((c, i) => {
+      const xPos = pad.left + i * (candleW + spacing);
       const isGreen = c.close >= c.open;
-      const color = isGreen ? '#2ecc71' : '#f87171';
+      const color = isGreen ? '#00E701' : '#FF3333';
 
-      const highY = pad.top + ((maxP - c.high) / range) * chartH;
-      const lowY = pad.top + ((maxP - c.low) / range) * chartH;
-      const openY = pad.top + ((maxP - c.open) / range) * chartH;
-      const closeY = pad.top + ((maxP - c.close) / range) * chartH;
+      const highY = pad.top + ((dpMaxP - c.high) / dpRange) * chartH;
+      const lowY = pad.top + ((dpMaxP - c.low) / dpRange) * chartH;
+      const openY = pad.top + ((dpMaxP - c.open) / dpRange) * chartH;
+      const closeY = pad.top + ((dpMaxP - c.close) / dpRange) * chartH;
 
       // Wick
       ctx.strokeStyle = color;
@@ -508,9 +530,9 @@ export function TradingSimScreen() {
     // Current price line
     if (visibleCandles.length > 0) {
       const lastPrice = visibleCandles[visibleCandles.length - 1].close;
-      const priceY = pad.top + ((maxP - lastPrice) / range) * chartH;
+      const priceY = pad.top + ((dpMaxP - lastPrice) / dpRange) * chartH;
       const isUp = lastPrice >= visibleCandles[0].open;
-      const lineColor = isUp ? '#2ecc71' : '#f87171';
+      const lineColor = isUp ? '#00E701' : '#FF3333';
 
       ctx.strokeStyle = lineColor;
       ctx.lineWidth = 1;
@@ -527,52 +549,13 @@ export function TradingSimScreen() {
       ctx.fillStyle = '#000';
       ctx.font = `700 ${isMobile ? 9 : 10}px 'JetBrains Mono', monospace`;
       ctx.textAlign = 'center';
-      ctx.fillText(`$${lastPrice.toFixed(1)}`, w - pad.right / 2, priceY + 4);
+      ctx.fillText(`$${Number(lastPrice).toFixed(1)}`, w - pad.right / 2, priceY + 4);
     }
   }, [visibleCandles, isMobile, activeRoom]);
 
   useEffect(() => { drawChart(); }, [drawChart]);
 
-  // Confetti effect
-  const runConfetti = useCallback(() => {
-    const canvas = confettiCanvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    canvas.width = canvas.offsetWidth * 2;
-    canvas.height = canvas.offsetHeight * 2;
-    ctx.scale(2, 2);
-    const colors = ['#2ecc71', '#8b5cf6', '#a78bfa', '#3b82f6', '#5b8def', '#f472b6'];
-    const particles: { x: number; y: number; vx: number; vy: number; color: string; alpha: number; size: number; }[] = [];
-    for (let i = 0; i < 80; i++) {
-      particles.push({
-        x: canvas.offsetWidth / 2, y: canvas.offsetHeight / 2,
-        vx: (Math.random() - 0.5) * 12, vy: (Math.random() - 0.5) * 12 - 4,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        alpha: 1, size: Math.random() * 5 + 2,
-      });
-    }
-    let frame = 0;
-    const animate = () => {
-      ctx.clearRect(0, 0, canvas.offsetWidth, canvas.offsetHeight);
-      particles.forEach(p => {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.18; p.alpha -= 0.006;
-        if (p.alpha <= 0) return;
-        ctx.globalAlpha = p.alpha;
-        ctx.fillStyle = p.color;
-        ctx.fillRect(p.x, p.y, p.size, p.size);
-      });
-      ctx.globalAlpha = 1;
-      if (++frame < 200) confettiRaf.current = requestAnimationFrame(animate);
-    };
-    animate();
-  }, []);
-
-  useEffect(() => {
-    if (view === 'result' && activeRoom?.winnerId === userId) {
-      setTimeout(() => runConfetti(), 300);
-    }
-  }, [view, activeRoom, userId, runConfetti]);
+  // Confetti now handled by shared WinConfetti component in result view
 
   const handleBuy = async () => {
     if (!activeRoom) return;
@@ -582,27 +565,38 @@ export function TradingSimScreen() {
     setTradeFlash('buy');
     playBetPlaced(); hapticMedium();
     setTimeout(() => setTradeFlash(null), 400);
+    // Optimistic update — instant feedback
+    const costValue = qty * currentPrice;
+    setPosition(p => p + qty);
+    setCash(c => c - costValue);
     try {
       await api.executeTradingSimTrade(activeRoom.id, 'buy', qty, currentPrice, Date.now());
-      setPosition(p => p + qty);
-      setCash(c => c - qty * currentPrice);
     } catch (err: any) {
+      // Rollback optimistic update
+      setPosition(p => p - qty);
+      setCash(c => c + costValue);
       toast.error('Trade Failed', err?.message || 'Buy order could not be executed');
     }
   };
 
   const handleSell = async () => {
     if (!activeRoom || position <= 0) return;
-    const sellQty = Math.ceil(position * (buyQty / 100));
+    // Use floor to never exceed server-side position; 100% sells all
+    const sellQty = buyQty >= 100 ? position : Math.floor(position * (buyQty / 100));
     if (sellQty <= 0) return;
     setTradeFlash('sell');
     playBetPlaced(); hapticMedium();
     setTimeout(() => setTradeFlash(null), 400);
+    // Optimistic update — instant feedback
+    const saleValue = sellQty * currentPrice;
+    setCash(c => c + saleValue);
+    setPosition(p => p - sellQty);
     try {
       await api.executeTradingSimTrade(activeRoom.id, 'sell', sellQty, currentPrice, Date.now());
-      setCash(c => c + sellQty * currentPrice);
-      setPosition(p => p - sellQty);
     } catch (err: any) {
+      // Rollback optimistic update
+      setCash(c => c - saleValue);
+      setPosition(p => p + sellQty);
       toast.error('Trade Failed', err?.message || 'Sell order could not be executed');
     }
   };
@@ -612,51 +606,31 @@ export function TradingSimScreen() {
 
   // ─── LIST VIEW ───
   if (view === 'list') {
-    return (
-      <div style={s.root} className="screen-enter">
-        {/* Header */}
-        <div style={s.headerSection}>
-          <button style={s.backBtn} onClick={() => go('lobby')} className="hover-bright">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
-          </button>
-          <div style={s.headerText}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={s.headerIcon}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
-              </div>
-              <h1 style={s.title}>Trading Arena</h1>
-            </div>
-            <p style={s.subtitle}>Compete in real-time PvP trading • Most profit wins the pot</p>
+    const listHeader = (
+      <GameHeader
+        title="Trading Arena"
+        subtitle="PvP trading — most profit wins the pot"
+        backTo="lobby"
+        icon={
+          <div style={{ width: 36, height: 36, borderRadius: theme.radius.md, background: 'rgba(13,148,136,0.08)', border: '1px solid rgba(13,148,136,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
           </div>
-        </div>
+        }
+        howToPlay={
+          <HowToPlayInline steps={[
+            { icon: '🏟️', label: 'Join a trading room', desc: 'Pick an entry fee tier and wait for an opponent' },
+            { icon: '📊', label: 'Trade for 60 seconds', desc: 'Buy and sell to maximize your P&L vs the chart' },
+            { icon: '🏆', label: 'Highest profit wins the pot', desc: 'Entry fees combine into the prize pool' },
+          ]} />
+        }
+      />
+    );
 
-        {error && <div style={s.errorMsg} className="screen-enter">{error}</div>}
-
-        {/* LIVE SPECTATOR CHART */}
-        <LiveTradingChart rooms={rooms} recentRooms={recentRooms} />
-
-        {/* How it works */}
-        <div style={s.howItWorks}>
-          <div style={s.howStep}>
-            <span style={s.howIcon}>🎮</span>
-            <span style={s.howLabel}>Join Room</span>
-          </div>
-          <div style={s.howDivider} />
-          <div style={s.howStep}>
-            <span style={s.howIcon}>📈</span>
-            <span style={s.howLabel}>Trade 60s</span>
-          </div>
-          <div style={s.howDivider} />
-          <div style={s.howStep}>
-            <span style={s.howIcon}>💰</span>
-            <span style={s.howLabel}>Win Pot</span>
-          </div>
-        </div>
-
-        {/* Create Room */}
-        <div style={s.sectionLabel}>
-          <span>Create Room</span>
-          <span style={s.sectionHint}>Choose entry fee</span>
+    const listRail = (
+      <GameControlRail>
+        {error && <div style={s.errorMsg}>{error}</div>}
+        <div style={{ fontSize: '11px', fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase' as const, letterSpacing: '0.8px' }}>
+          Join Room — choose entry fee
         </div>
         <BetPanel
           presets={[
@@ -667,6 +641,7 @@ export function TradingSimScreen() {
           selectedAmount={entryAmount}
           onAmountChange={setEntryAmount}
           balance={profile.balance}
+          demoBalance={profile.demoBalance}
           allowCustom={false}
           showModifiers={false}
           submitLabel="JOIN ROOM"
@@ -675,32 +650,21 @@ export function TradingSimScreen() {
           submitLoading={loading}
         />
 
-        <RecentGames
-          title="Recent Trading Rooms"
-          fetchGames={async () => {
-            const res = await api.getTradingSimRecent(10);
-            return (res.rooms || []).map((r: any) => ({
-              id: r.id,
-              result: r.winnerId ? 'win' : 'loss',
-              multiplier: r.potSize && r.entryFee ? r.potSize / r.entryFee : 1,
-              amount: r.entryFee || 0,
-              payout: r.potSize || 0,
-              time: r.createdAt,
-            }));
-          }}
-        />
-
         {/* Available Rooms */}
         <div style={s.sectionLabel}>
           <span>Available Rooms</span>
           <span style={s.sectionHint}>{rooms.length} open</span>
         </div>
         {rooms.length === 0 ? (
-          <div style={s.emptyState}>
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(139,92,246,0.3)" strokeWidth="1.5" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><path d="M16 16s-1.5-2-4-2-4 2-4 2" /><line x1="9" y1="9" x2="9.01" y2="9" /><line x1="15" y1="9" x2="15.01" y2="9" /></svg>
-            <span style={s.emptyText}>No Active Rooms</span>
-            <span style={s.emptyHint}>Be the first! Create a room above and wait for opponents to join.</span>
-          </div>
+          <Card variant="panel">
+            <EmptyState
+              icon={
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.text.muted} strokeWidth="1.5" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+              }
+              title="No Active Rooms"
+              subtitle="Create a room above and wait for opponents to join."
+            />
+          </Card>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '8px' }}>
             {rooms.map((room) => {
@@ -712,7 +676,7 @@ export function TradingSimScreen() {
                       <span className="mono" style={{ color: tier.color, fontWeight: 700, fontSize: '14px' }}>{tier.label}</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column' as const, gap: '2px' }}>
-                      <span style={s.roomFee} className="mono">{tier.label} SOL Entry</span>
+                      <span style={s.roomFee} className="mono">{tier.label} <SolIcon size="0.9em" /> Entry</span>
                       {room.status === 'waiting' && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' }}>
                           <LiveDot size={6} color={tier.color} />
@@ -744,11 +708,15 @@ export function TradingSimScreen() {
           </div>
         )}
 
-        {/* Recent Finished Games — prominent */}
-        <div style={{
-          background: theme.bg.secondary, borderRadius: '12px',
-          border: `1px solid ${theme.border.subtle}`, overflow: 'hidden',
-        }}>
+      </GameControlRail>
+    );
+
+    const listStage = (
+      <GameStage atmosphere="radial-gradient(ellipse at 50% 40%, rgba(13,148,136,0.04) 0%, transparent 70%)" style={{ padding: isMobile ? theme.gap.md : theme.gap.lg }}>
+        {!isMobile && <div style={{ marginBottom: theme.gap.md }}>{listHeader}</div>}
+        <LiveTradingChart rooms={rooms} recentRooms={recentRooms} />
+        {/* Recent Finished Games */}
+        <div style={{ background: theme.bg.secondary, borderRadius: '12px', border: `1px solid ${theme.border.subtle}`, overflow: 'hidden', marginTop: theme.gap.md }}>
           <LiveRoundBanner title="Recent Games" accentColor="#0d9488" count={recentRooms.length} />
           {recentRooms.length === 0 ? (
             <div style={{ padding: '24px', textAlign: 'center' as const }}>
@@ -764,41 +732,27 @@ export function TradingSimScreen() {
                     padding: '10px 14px', borderBottom: `1px solid ${theme.border.subtle}`,
                     borderLeft: '3px solid #0d9488',
                   }}>
-                    <div style={{
-                      width: 40, height: 40, borderRadius: '8px', flexShrink: 0,
-                      background: tier.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '16px',
-                    }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '8px', flexShrink: 0, background: tier.gradient, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>
                       {tier.icon}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {room.winnerUsername ? (
                           <>
-                            <div style={{
-                              width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                              background: getAvatarGradient(null, room.winnerUsername),
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: '7px', fontWeight: 700, color: '#fff',
-                            }}>{getInitials(room.winnerUsername)}</div>
-                            <span style={{ fontSize: '13px', fontWeight: 700, color: theme.text.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>
-                              {room.winnerUsername}
-                            </span>
-                            <StatusBadge status="winner" />
+                            <div style={{ width: 20, height: 20, borderRadius: '50%', flexShrink: 0, background: getAvatarGradient(null, room.winnerUsername), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '7px', fontWeight: 700, color: '#fff' }}>{getInitials(room.winnerUsername)}</div>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: theme.text.primary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{room.winnerUsername}</span>
+                            <OldStatusBadge status="winner" />
                           </>
                         ) : (
                           <span style={{ fontSize: '13px', fontWeight: 700, color: theme.text.muted }}>No winner</span>
                         )}
                       </div>
                       <div style={{ fontSize: '11px', color: theme.text.muted, marginTop: '2px' }}>
-                        {room.currentPlayers} players
-                        {room.endedAt ? ` · ${timeAgo(room.endedAt)}` : ''}
+                        {room.currentPlayers} players{room.endedAt ? ` · ${timeAgo(room.endedAt)}` : ''}
                       </div>
                     </div>
                     <div style={{ textAlign: 'right' as const, flexShrink: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: 800, color: '#00dc82' }} className="mono">
-                        {formatSol(room.prizePool)}
-                      </div>
+                      <div style={{ fontSize: '14px', fontWeight: 800, color: '#00dc82' }} className="mono">{formatSol(room.prizePool)}</div>
                       <div style={{ fontSize: '10px', color: theme.text.muted }}>SOL pot</div>
                     </div>
                   </div>
@@ -807,7 +761,20 @@ export function TradingSimScreen() {
             </div>
           )}
         </div>
-      </div>
+      </GameStage>
+    );
+
+    const listFooter = (
+      <GameFooterBar>
+        <span>Trading Sim · PvP</span>
+      </GameFooterBar>
+    );
+
+    return (
+      <>
+        {isMobile && <div style={{ padding: `${theme.gap.sm}px 12px` }}>{listHeader}</div>}
+        <CasinoGameLayout rail={listRail} stage={listStage} footer={listFooter} />
+      </>
     );
   }
 
@@ -847,13 +814,13 @@ export function TradingSimScreen() {
             ) : (
               <div style={s.timerPill}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
-                <span className="mono" style={{ color: timeLeft <= 10 ? '#f87171' : '#fff', fontWeight: 700, fontSize: '15px' }}>{timeLeft}s</span>
+                <span className="mono" style={{ color: timeLeft <= 10 ? '#FF3333' : '#fff', fontWeight: 700, fontSize: '15px' }}>{timeLeft}s</span>
               </div>
             )}
           </div>
 
           <div style={s.hudCenter}>
-            <span style={{ ...s.pnlHero, color: pnl >= 0 ? '#2ecc71' : '#f87171', textShadow: `0 0 20px ${pnl >= 0 ? 'rgba(46,204,113,0.4)' : 'rgba(248,113,113,0.4)'}` }} className="mono">
+            <span style={{ ...s.pnlHero, color: pnl >= 0 ? '#00E701' : '#FF3333', textShadow: `0 0 20px ${pnl >= 0 ? 'rgba(46,204,113,0.4)' : 'rgba(248,113,113,0.4)'}` }} className="mono">
               {pnl >= 0 ? '+' : ''}{pnl.toFixed(0)}
             </span>
             <span style={{ fontSize: '11px', fontWeight: 600, color: pnl >= 0 ? 'rgba(46,204,113,0.7)' : 'rgba(248,113,113,0.7)' }} className="mono">
@@ -872,12 +839,13 @@ export function TradingSimScreen() {
         {/* Timer progress bar */}
         {!isWaiting && (
           <div style={s.timerBar}>
-            <div style={{ ...s.timerBarFill, width: `${Math.min(100, timeProgress)}%`, background: timeLeft <= 10 ? '#f87171' : '#8b5cf6' }} />
+            <div style={{ ...s.timerBarFill, width: `${Math.min(100, timeProgress)}%`, background: timeLeft <= 10 ? '#FF3333' : '#8b5cf6' }} />
           </div>
         )}
 
         {/* Chart */}
         <div style={s.chartContainer}>
+          <div style={s.chartAtmosphere} />
           <canvas ref={canvasRef} style={s.canvas} />
           {isWaiting && (
             <div style={s.chartWaitingOverlay}>
@@ -916,21 +884,26 @@ export function TradingSimScreen() {
           </div>
           <div style={s.infoItem}>
             <span style={s.infoLabel}>Value</span>
-            <span style={{ ...s.infoValue, color: pnl >= 0 ? '#2ecc71' : '#f87171' }} className="mono">${(cash + position * currentPrice).toFixed(0)}</span>
+            <span style={{ ...s.infoValue, color: pnl >= 0 ? '#00E701' : '#FF3333' }} className="mono">${(cash + position * currentPrice).toFixed(0)}</span>
           </div>
         </div>
 
         {/* Quantity selector */}
-        <div style={s.qtyRow}>
-          {[25, 50, 75, 100].map(pct => (
-            <button
-              key={pct}
-              style={{ ...s.qtyBtn, ...(buyQty === pct ? s.qtyBtnActive : {}) }}
-              onClick={() => { setBuyQty(pct); playButtonClick(); }}
-            >
-              <span className="mono" style={{ fontSize: '13px', fontWeight: 700 }}>{pct}%</span>
-            </button>
-          ))}
+        <div>
+          <div style={{ fontSize: '10px', fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase' as const, letterSpacing: '0.8px', marginBottom: '4px' }}>
+            Trade Size — % of available cash
+          </div>
+          <div style={s.qtyRow}>
+            {[25, 50, 75, 100].map(pct => (
+              <button
+                key={pct}
+                style={{ ...s.qtyBtn, ...(buyQty === pct ? s.qtyBtnActive : {}) }}
+                onClick={() => { setBuyQty(pct); playButtonClick(); }}
+              >
+                <span className="mono" style={{ fontSize: '13px', fontWeight: 700 }}>{pct}%</span>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Trade buttons */}
@@ -984,27 +957,50 @@ export function TradingSimScreen() {
     const sorted = [...(activeRoom.participants || [])].sort((a, b) => (b.finalPnl || 0) - (a.finalPnl || 0));
     const isWinner = activeRoom.winnerId === userId;
 
-    return (
-      <div style={s.root} className="screen-enter">
-        <canvas ref={confettiCanvasRef} style={s.confettiCanvas} />
+    const resultHeader = (
+      <GameHeader title="Trading Arena" subtitle="Round Complete" backTo="lobby"
+        icon={<div style={{ width: 36, height: 36, borderRadius: theme.radius.md, background: 'rgba(13,148,136,0.08)', border: '1px solid rgba(13,148,136,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0D9488" strokeWidth="2" strokeLinecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
+        </div>}
+      />
+    );
 
-        {/* Result header */}
-        <div style={{ textAlign: 'center' as const, padding: '12px 0' }}>
-          <span style={{ fontSize: '14px', fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase' as const, letterSpacing: '2px' }}>
-            {isWinner ? '🏆 VICTORY' : 'GAME OVER'}
-          </span>
-          <div style={{ fontSize: '28px', fontWeight: 800, color: isWinner ? '#00dc82' : theme.text.primary, marginTop: '4px' }}>
-            {isWinner ? 'You Won!' : 'Results'}
-          </div>
-        </div>
-
-        {/* Prize pool */}
+    const resultRail = (
+      <GameControlRail>
+        <Button variant="primary" size="lg" fullWidth onClick={() => { setView('list'); setActiveRoom(null); setPosition(0); setCash(10000); setElapsed(0); setVisibleCandles([]); fetchRooms(); }}>
+          Play Again
+        </Button>
+        <Button variant="ghost" size="md" fullWidth onClick={() => go('lobby')}>
+          Back to Lobby
+        </Button>
+        {isWinner && (
+          <Button variant="ghost-accent" size="sm" fullWidth onClick={() => setShowWinCard(true)}>
+            Share Win
+          </Button>
+        )}
+        {/* Prize Pool summary */}
         <div style={s.prizeCard}>
-          <span style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>Prize Pool</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <img src="/sol-coin.png" alt="SOL" style={{ width: 24, height: 24 }} />
-            <span className="mono" style={{ fontSize: '32px', fontWeight: 800, color: '#00dc82' }}>{formatSol(activeRoom.prizePool)}</span>
-            <span style={{ fontSize: '16px', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>SOL</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' as const }}>Prize Pool</span>
+          <CountUpNumber value={activeRoom.prizePool / 1e9} from={0} duration={1200}
+            decimals={activeRoom.prizePool >= 1e9 ? 2 : 4} suffix={<> <SolIcon size="0.9em" /></>}
+            style={{ fontSize: theme.textSize.xl.mobile, fontWeight: 800, color: '#00dc82', fontFamily: "'JetBrains Mono', monospace" }}
+          />
+        </div>
+      </GameControlRail>
+    );
+
+    const resultStage = (
+      <GameStage atmosphere="radial-gradient(ellipse at 50% 40%, rgba(13,148,136,0.04) 0%, transparent 70%)" style={{ padding: isMobile ? theme.gap.md : theme.gap.lg }}>
+        {!isMobile && <div style={{ marginBottom: theme.gap.md }}>{resultHeader}</div>}
+        <WinConfetti active={isWinner} zIndex={10} />
+
+        {/* Result badge */}
+        <div style={{ textAlign: 'center' as const, padding: `${theme.gap.md}px 0`, position: 'relative', zIndex: 3 }}>
+          <Badge variant={isWinner ? 'success' : 'default'} size="md" glow={isWinner}>
+            {isWinner ? 'VICTORY' : 'GAME OVER'}
+          </Badge>
+          <div style={{ fontSize: isMobile ? theme.textSize.xl.mobile : theme.textSize.xl.desktop, fontWeight: 700, color: isWinner ? theme.accent.green : theme.text.primary, marginTop: theme.gap.sm }}>
+            {isWinner ? 'You Won!' : 'Results'}
           </div>
         </div>
 
@@ -1022,22 +1018,13 @@ export function TradingSimScreen() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <span style={{ fontSize: i < 3 ? '20px' : '14px' }}>{i < 3 ? rankLabels[i] : `#${i + 1}`}</span>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    background: getAvatarGradient(null, p.username || '?'),
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '11px', fontWeight: 700, color: '#fff',
-                    border: `2px solid ${rankColors[i] || theme.border.subtle}`,
-                  }}>{getInitials(p.username || '?')}</div>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: getAvatarGradient(null, p.username || '?'), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: '#fff', border: `2px solid ${rankColors[i] || theme.border.subtle}` }}>{getInitials(p.username || '?')}</div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '14px', fontWeight: 700, color: isMe ? '#fff' : theme.text.primary }}>
                       {isMe ? 'You' : (p.username || 'Player')}
                     </div>
                   </div>
-                  <span style={{
-                    fontSize: '16px', fontWeight: 800, fontFamily: "'JetBrains Mono', monospace",
-                    color: (p.finalPnl || 0) >= 0 ? '#2ecc71' : '#f87171',
-                  }}>
+                  <span style={{ fontSize: '16px', fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: (p.finalPnl || 0) >= 0 ? '#00E701' : '#FF3333' }}>
                     {(p.finalPnl || 0) >= 0 ? '+' : ''}{(p.finalPnl || 0).toFixed(0)}
                   </span>
                 </div>
@@ -1045,21 +1032,25 @@ export function TradingSimScreen() {
             );
           })}
         </div>
+      </GameStage>
+    );
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
-          <button
-            style={s.playAgainBtn}
-            onClick={() => { setView('list'); setActiveRoom(null); setPosition(0); setCash(10000); setElapsed(0); setVisibleCandles([]); fetchRooms(); }}
-            className="hover-scale"
-          >
-            Play Again
-          </button>
-          <button style={s.backLobbyBtn} onClick={() => go('lobby')} className="hover-bright">
-            Lobby
-          </button>
-        </div>
-      </div>
+    return (
+      <>
+        {isMobile && <div style={{ padding: `${theme.gap.sm}px 12px` }}>{resultHeader}</div>}
+        <CasinoGameLayout rail={resultRail} stage={resultStage} footer={<GameFooterBar><span>Trading Sim · PvP</span></GameFooterBar>} />
+        {showWinCard && isWinner && (
+          <WinCard gameType="trading-sim"
+            multiplier={activeRoom.entryFee > 0 ? activeRoom.prizePool / activeRoom.entryFee : 1}
+            betAmount={activeRoom.entryFee} payout={activeRoom.prizePool}
+            profit={activeRoom.prizePool - activeRoom.entryFee}
+            timestamp={new Date()} username={profile.username || 'Player'}
+            level={profile.level} vipTier={profile.vipTier || 'bronze'}
+            rank={1} participants={sorted.length} prizePool={activeRoom.prizePool}
+            onClose={() => setShowWinCard(false)}
+          />
+        )}
+      </>
     );
   }
 
@@ -1074,9 +1065,9 @@ const s: Record<string, React.CSSProperties> = {
     position: 'relative',
   },
   gameRoot: {
-    display: 'flex', flexDirection: 'column', gap: '8px',
-    padding: '12px', minHeight: '100%', boxSizing: 'border-box',
-    maxWidth: '900px', margin: '0 auto', width: '100%',
+    display: 'flex', flexDirection: 'column', gap: theme.gap.sm,
+    padding: `${theme.gap.md}px`, minHeight: '100%', boxSizing: 'border-box',
+    maxWidth: '960px', margin: '0 auto', width: '100%',
     position: 'relative',
   },
   // Header
@@ -1091,11 +1082,11 @@ const s: Record<string, React.CSSProperties> = {
     width: 36, height: 36, borderRadius: '10px', background: 'rgba(46,204,113,0.1)',
     border: '1px solid rgba(46,204,113,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  title: { fontSize: '22px', fontWeight: 800, color: '#fff', margin: 0 },
+  title: { fontSize: '20px', fontWeight: 700, color: '#fff', margin: 0 },
   subtitle: { fontSize: '13px', color: theme.text.muted, margin: '4px 0 0' },
   errorMsg: {
     padding: '10px 14px', background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.2)',
-    borderRadius: '10px', color: '#f87171', fontSize: '14px', fontWeight: 600, textAlign: 'center' as const,
+    borderRadius: '10px', color: '#FF3333', fontSize: '14px', fontWeight: 600, textAlign: 'center' as const,
   },
   // How it works
   howItWorks: {
@@ -1136,9 +1127,9 @@ const s: Record<string, React.CSSProperties> = {
   roomPlayersRow: { display: 'flex', alignItems: 'center', gap: '4px', marginTop: '2px' },
   roomPlayerCount: { fontSize: '11px', fontWeight: 600, color: theme.text.muted, marginLeft: '4px' },
   joinBtn: {
-    padding: '10px 24px', background: 'linear-gradient(135deg, #7c3aed, #8b5cf6, #a78bfa)', border: 'none', borderRadius: '10px',
-    color: '#fff', fontSize: '14px', fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-    transition: 'all 0.15s', letterSpacing: '1px',
+    padding: '10px 24px', background: theme.gradient.primary, border: 'none', borderRadius: theme.radius.md,
+    color: '#fff', fontSize: '14px', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+    transition: 'all 0.15s', letterSpacing: '0.5px', minHeight: '40px',
   },
   // Game HUD
   hud: {
@@ -1177,9 +1168,15 @@ const s: Record<string, React.CSSProperties> = {
   // Chart
   chartContainer: {
     flex: 1, minHeight: '200px', position: 'relative' as const, borderRadius: '12px',
-    overflow: 'hidden', border: `1px solid rgba(139,92,246,0.12)`,
+    overflow: 'hidden', border: `1px solid rgba(13,148,136,0.15)`,
+    background: '#0c0e12',
   },
-  canvas: { width: '100%', height: '100%', display: 'block' },
+  chartAtmosphere: {
+    position: 'absolute' as const, inset: 0,
+    background: 'radial-gradient(ellipse at 50% 60%, rgba(13,148,136,0.06) 0%, transparent 70%)',
+    pointerEvents: 'none' as const, zIndex: 0,
+  },
+  canvas: { width: '100%', height: '100%', display: 'block', position: 'relative' as const, zIndex: 1 },
   chartWaitingOverlay: {
     position: 'absolute' as const, inset: 0, display: 'flex', flexDirection: 'column' as const,
     alignItems: 'center', justifyContent: 'center', gap: '12px',
@@ -1215,16 +1212,18 @@ const s: Record<string, React.CSSProperties> = {
   // Trade buttons
   tradeButtons: { display: 'flex', gap: '10px' },
   buyBtn: {
-    flex: 1, padding: '14px', background: 'rgba(46,204,113,0.12)', border: '1px solid rgba(46,204,113,0.3)',
-    borderRadius: '12px', color: '#2ecc71', fontSize: '16px', fontWeight: 800,
+    flex: 1, padding: '14px', background: 'rgba(0,231,1,0.08)', border: `1px solid rgba(0,231,1,0.20)`,
+    borderRadius: theme.radius.lg, color: theme.accent.neonGreen, fontSize: '16px', fontWeight: 700,
     cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', gap: '8px', transition: 'all 0.15s', letterSpacing: '1px',
+    justifyContent: 'center', gap: '8px', transition: 'all 0.15s', letterSpacing: '0.5px',
+    minHeight: '48px',
   },
   sellBtn: {
-    flex: 1, padding: '14px', background: 'rgba(248,113,113,0.12)', border: '1px solid rgba(248,113,113,0.3)',
-    borderRadius: '12px', color: '#f87171', fontSize: '16px', fontWeight: 800,
+    flex: 1, padding: '14px', background: 'rgba(255,51,51,0.08)', border: `1px solid rgba(255,51,51,0.20)`,
+    borderRadius: theme.radius.lg, color: theme.accent.red, fontSize: '16px', fontWeight: 700,
     cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center',
-    justifyContent: 'center', gap: '8px', transition: 'all 0.15s', letterSpacing: '1px',
+    justifyContent: 'center', gap: '8px', transition: 'all 0.15s', letterSpacing: '0.5px',
+    minHeight: '48px',
   },
   // Leaderboard
   leaderboard: { display: 'flex', flexDirection: 'column' as const, gap: '4px' },
@@ -1256,10 +1255,7 @@ const s: Record<string, React.CSSProperties> = {
     transition: 'opacity 0.3s',
   },
   // Result
-  confettiCanvas: {
-    position: 'absolute' as const, inset: 0, width: '100%', height: '100%',
-    pointerEvents: 'none' as const, zIndex: 10,
-  },
+  // confettiCanvas removed — using shared WinConfetti
   prizeCard: {
     display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: '8px',
     padding: '24px', borderRadius: '16px',

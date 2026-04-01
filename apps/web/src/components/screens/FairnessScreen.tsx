@@ -160,7 +160,7 @@ export function FairnessScreen() {
               <span style={styles.panelTitle}>Verification Result</span>
               {verified && (
                 <div style={styles.verifiedBadge}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00E701" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="20 6 9 17 4 12" />
                   </svg>
                   <span>VERIFIED</span>
@@ -468,7 +468,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: '20px',
     fontSize: '11px',
     fontWeight: 700,
-    color: '#2ecc71',
+    color: '#00E701',
     fontFamily: "inherit",
     letterSpacing: '1px',
   },

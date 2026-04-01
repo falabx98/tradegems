@@ -34,7 +34,11 @@ export const users = pgTable('users', {
   xpCurrent: bigint('xp_current', { mode: 'number' }).notNull().default(0),
   xpToNext: bigint('xp_to_next', { mode: 'number' }).notNull().default(100),
   bonusClaimed: boolean('bonus_claimed').notNull().default(false),
+  demoBalance: bigint('demo_balance', { mode: 'number' }).notNull().default(100_000_000_000), // 100 DEMO tokens in lamports
+  demoRefillsUsed: integer('demo_refills_used').notNull().default(0),
+  lastDemoRefill: timestamp('last_demo_refill', { withTimezone: true }),
   avatarUrl: text('avatar_url'),
+  isBot: boolean('is_bot').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -55,6 +59,10 @@ export const userProfiles = pgTable('user_profiles', {
   winRate: numeric('win_rate', { precision: 5, scale: 4 }).notNull().default('0.0'),
   currentStreak: integer('current_streak').notNull().default(0),
   bestStreak: integer('best_streak').notNull().default(0),
+  // Daily play streak (consecutive days)
+  dailyStreak: integer('daily_streak').notNull().default(0),
+  longestDailyStreak: integer('longest_daily_streak').notNull().default(0),
+  lastPlayedDate: text('last_played_date'), // 'YYYY-MM-DD' format for easy comparison
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -311,6 +319,7 @@ export const userMissionProgress = pgTable('user_mission_progress', {
   missionId: uuid('mission_id').notNull().references(() => missions.id),
   progress: integer('progress').notNull().default(0),
   target: integer('target').notNull(),
+  metadata: jsonb('metadata').default({}),
   completedAt: timestamp('completed_at', { withTimezone: true }),
   claimedAt: timestamp('claimed_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -581,6 +590,11 @@ export const predictionRounds = pgTable('prediction_rounds', {
   multiplier: numeric('multiplier', { precision: 10, scale: 4 }).notNull().default('0'),
   pattern: text('pattern'),
   metadata: jsonb('metadata'),
+  isDemo: boolean('is_demo').notNull().default(false),
+  serverSeed: text('server_seed'),
+  seedHash: text('seed_hash'),
+  clientSeed: text('client_seed'),
+  nonce: integer('nonce'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index('idx_prediction_user').on(table.userId, table.createdAt),
@@ -594,19 +608,52 @@ export const bonusCodes = pgTable('bonus_codes', {
   id: uuid('id').primaryKey().defaultRandom(),
   code: text('code').unique().notNull(),
   description: text('description'),
-  type: text('type').notNull().default('fixed'),
+  type: text('type').notNull().default('free_credit'), // free_credit, deposit_match
   amountLamports: bigint('amount_lamports', { mode: 'number' }).notNull(),
+  matchPercentage: integer('match_percentage').notNull().default(0), // for deposit_match (100 = 100%)
+  maxMatchLamports: bigint('max_match_lamports', { mode: 'number' }).notNull().default(0),
+  wagerMultiplier: integer('wager_multiplier').notNull().default(0), // 0 = no requirement, 20 = 20x
   maxUses: integer('max_uses').notNull().default(1),
   usedCount: integer('used_count').notNull().default(0),
   maxPerUser: integer('max_per_user').notNull().default(1),
   minLevel: integer('min_level').notNull().default(1),
+  minDeposits: integer('min_deposits').notNull().default(0),
+  firstDepositOnly: boolean('first_deposit_only').notNull().default(false),
   active: boolean('active').notNull().default(true),
+  startsAt: timestamp('starts_at', { withTimezone: true }),
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   createdBy: uuid('created_by').notNull().references(() => users.id),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   uniqueIndex('idx_bonus_codes_code').on(table.code),
   index('idx_bonus_codes_active').on(table.active),
+]);
+
+export const bonusWagerProgress = pgTable('bonus_wager_progress', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  bonusCodeId: uuid('bonus_code_id').notNull().references(() => bonusCodes.id),
+  bonusAmountLamports: bigint('bonus_amount_lamports', { mode: 'number' }).notNull(),
+  wagerRequiredLamports: bigint('wager_required_lamports', { mode: 'number' }).notNull(),
+  wagerCompletedLamports: bigint('wager_completed_lamports', { mode: 'number' }).notNull().default(0),
+  fulfilled: boolean('fulfilled').notNull().default(false),
+  fulfilledAt: timestamp('fulfilled_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_bonus_wager_user').on(table.userId),
+]);
+
+export const pendingDepositMatches = pgTable('pending_deposit_matches', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  bonusCodeId: uuid('bonus_code_id').notNull().references(() => bonusCodes.id),
+  matchPercentage: integer('match_percentage').notNull(),
+  maxMatchLamports: bigint('max_match_lamports', { mode: 'number' }).notNull(),
+  used: boolean('used').notNull().default(false),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_pending_match_user').on(table.userId),
 ]);
 
 export const bonusCodeRedemptions = pgTable('bonus_code_redemptions', {
@@ -638,6 +685,7 @@ export const lotteryDraws = pgTable('lottery_draws', {
   winningGemBall: integer('winning_gem_ball'), // 1-9
   drawSeed: text('draw_seed'),
   seedCommitment: text('seed_commitment'),
+  clientSeedCombined: text('client_seed_combined'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   drawnAt: timestamp('drawn_at', { withTimezone: true }),
 }, (table) => [
@@ -672,6 +720,7 @@ export const lotteryWinners = pgTable('lottery_winners', {
   prizeAmount: bigint('prize_amount', { mode: 'number' }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex('idx_lottery_winners_unique').on(table.drawId, table.ticketId),
   index('idx_lottery_winners_draw').on(table.drawId),
   index('idx_lottery_winners_user').on(table.userId),
   index('idx_lottery_winners_tier').on(table.drawId, table.tier),
@@ -708,6 +757,7 @@ export const tradingSimParticipants = pgTable('trading_sim_participants', {
   rank: integer('rank'),
   joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
+  uniqueIndex('idx_trading_sim_participants_unique').on(table.roomId, table.userId),
   index('idx_trading_sim_participants_room').on(table.roomId),
   index('idx_trading_sim_participants_user').on(table.userId),
 ]);
@@ -794,11 +844,34 @@ export const rugRoundBets = pgTable('rug_round_bets', {
   cashOutMultiplier: numeric('cash_out_multiplier', { precision: 8, scale: 4 }),
   payout: bigint('payout', { mode: 'number' }).notNull().default(0),
   status: text('status').notNull().default('active'), // active | cashed_out | rugged
+  isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   settledAt: timestamp('settled_at', { withTimezone: true }),
 }, (table) => [
   uniqueIndex('idx_rug_round_bets_unique').on(table.roundId, table.userId),
   index('idx_rug_round_bets_round').on(table.roundId),
+]);
+
+// ── Failed Settlements (recovery tracking) ─────────────────────────────────
+
+export const failedSettlements = pgTable('failed_settlements', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  game: text('game').notNull(),
+  gameRefType: text('game_ref_type').notNull(),
+  gameRefId: text('game_ref_id').notNull(),
+  betAmount: bigint('bet_amount', { mode: 'number' }).notNull(),
+  fee: bigint('fee', { mode: 'number' }).notNull().default(0),
+  payoutAmount: bigint('payout_amount', { mode: 'number' }).notNull(),
+  errorMessage: text('error_message').notNull(),
+  status: text('status').notNull().default('pending'), // pending | retried | resolved | abandoned
+  resolvedBy: uuid('resolved_by').references(() => users.id),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  metadata: jsonb('metadata').default({}),
+}, (table) => [
+  index('idx_failed_settlements_status').on(table.status),
+  index('idx_failed_settlements_user').on(table.userId),
 ]);
 
 // ── Public Candleflip Rounds ─────────────────────────────────────────────────
@@ -830,6 +903,7 @@ export const candleflipRoundBets = pgTable('candleflip_round_bets', {
   betAmount: bigint('bet_amount', { mode: 'number' }).notNull(),
   payout: bigint('payout', { mode: 'number' }).notNull().default(0),
   status: text('status').notNull().default('pending'), // pending | won | lost
+  isDemo: boolean('is_demo').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   settledAt: timestamp('settled_at', { withTimezone: true }),
 }, (table) => [
@@ -837,3 +911,147 @@ export const candleflipRoundBets = pgTable('candleflip_round_bets', {
   index('idx_candleflip_round_bets_round').on(table.roundId),
 ]);
 
+// ─── Mines ──────────────────────────────────────────────────
+
+export const minesGames = pgTable('mines_games', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  betAmount: bigint('bet_amount', { mode: 'number' }).notNull(),
+  mineCount: integer('mine_count').notNull(),
+  revealedCells: jsonb('revealed_cells').notNull().default([]),
+  revealCount: integer('reveal_count').notNull().default(0),
+  currentMultiplier: numeric('current_multiplier', { precision: 12, scale: 4 }).notNull().default('1.0000'),
+  finalMultiplier: numeric('final_multiplier', { precision: 12, scale: 4 }),
+  payout: bigint('payout', { mode: 'number' }),
+  status: text('status').notNull().default('active'), // active | cashed_out | lost
+  seed: text('seed').notNull(),
+  seedHash: text('seed_hash').notNull(),
+  clientSeed: text('client_seed').notNull(),
+  board: text('board').notNull(), // JSON-serialized mine positions (encrypted at rest)
+  isDemo: boolean('is_demo').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+}, (table) => [
+  index('idx_mines_games_user').on(table.userId),
+  index('idx_mines_games_status').on(table.status),
+  index('idx_mines_games_created').on(table.createdAt),
+  uniqueIndex('idx_mines_games_active_user').on(table.userId).where(sql`status = 'active'`),
+]);
+
+// ─── Responsible Gambling ───────────────────────────────────
+
+export const userLimits = pgTable('user_limits', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  limitType: text('limit_type').notNull(), // daily_deposit, weekly_deposit, monthly_deposit, daily_loss
+  amount: bigint('amount', { mode: 'number' }).notNull(),
+  pendingAmount: bigint('pending_amount', { mode: 'number' }),
+  pendingEffectiveAt: timestamp('pending_effective_at', { withTimezone: true }),
+  effectiveFrom: timestamp('effective_from', { withTimezone: true }).notNull().defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_user_limits_user').on(table.userId),
+]);
+
+export const selfExclusions = pgTable('self_exclusions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  exclusionType: text('exclusion_type').notNull(), // 24h, 7d, 30d, permanent
+  startsAt: timestamp('starts_at', { withTimezone: true }).notNull().defaultNow(),
+  endsAt: timestamp('ends_at', { withTimezone: true }), // null = permanent
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_self_exclusions_active').on(table.userId, table.active),
+]);
+
+
+
+// ─── Weekly Races ───────────────────────────────────────────
+
+export const weeklyRaces = pgTable('weekly_races', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  weekStart: timestamp('week_start', { withTimezone: true }).notNull(),
+  weekEnd: timestamp('week_end', { withTimezone: true }).notNull(),
+  status: text('status').notNull().default('active'), // active, paying, completed
+  prizePoolLamports: bigint('prize_pool_lamports', { mode: 'number' }).notNull().default(10_000_000_000), // 10 SOL
+  prizeSource: text('prize_source').notNull().default('fixed'), // fixed, percentage_of_volume
+  fixedPrizeLamports: bigint('fixed_prize_lamports', { mode: 'number' }).notNull().default(10_000_000_000),
+  volumePercentage: numeric('volume_percentage').default('0.01'),
+  totalVolumeLamports: bigint('total_volume_lamports', { mode: 'number' }).notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_weekly_races_status').on(table.status),
+  index('idx_weekly_races_week_start').on(table.weekStart),
+]);
+
+export const weeklyRaceEntries = pgTable('weekly_race_entries', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  raceId: uuid('race_id').notNull().references(() => weeklyRaces.id),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  totalWageredLamports: bigint('total_wagered_lamports', { mode: 'number' }).notNull().default(0),
+  betCount: integer('bet_count').notNull().default(0),
+  lastBetAt: timestamp('last_bet_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('idx_weekly_race_entries_unique').on(table.raceId, table.userId),
+  index('idx_weekly_race_entries_wagered').on(table.raceId, table.totalWageredLamports),
+]);
+
+export const weeklyRacePrizes = pgTable('weekly_race_prizes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  raceId: uuid('race_id').notNull().references(() => weeklyRaces.id),
+  rank: integer('rank').notNull(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  prizeLamports: bigint('prize_lamports', { mode: 'number' }).notNull(),
+  claimed: boolean('claimed').notNull().default(true), // auto-credited
+  claimedAt: timestamp('claimed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_weekly_race_prizes_race').on(table.raceId),
+  index('idx_weekly_race_prizes_user').on(table.userId),
+]);
+
+// ─── Sponsored Balances (Streamer Accounts) ─────────────────
+
+export const sponsoredBalances = pgTable('sponsored_balances', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id).unique(),
+  grantedAmountLamports: bigint('granted_amount_lamports', { mode: 'number' }).notNull(),
+  profitSharePercentage: integer('profit_share_percentage').notNull().default(20),
+  ownDepositsLamports: bigint('own_deposits_lamports', { mode: 'number' }).notNull().default(0),
+  totalWithdrawnLamports: bigint('total_withdrawn_lamports', { mode: 'number' }).notNull().default(0),
+  status: text('status').notNull().default('active'), // active, expired, settled
+  grantedBy: uuid('granted_by').notNull().references(() => users.id),
+  notes: text('notes'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+}, (table) => [
+  index('idx_sponsored_status').on(table.status),
+]);
+
+// ─── User Seed State (Provably Fair) ────────────────────────
+
+export const userSeedState = pgTable('user_seed_state', {
+  userId: uuid('user_id').primaryKey().references(() => users.id),
+  clientSeed: text('client_seed').notNull(),
+  nonce: integer('nonce').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ─── Analytics Events ────────────────────────────────────────
+
+export const analyticsEvents = pgTable('analytics_events', {
+  id: serial('id').primaryKey(),
+  userId: uuid('user_id'),
+  sessionId: text('session_id'),
+  event: text('event').notNull(),
+  properties: jsonb('properties').default({}),
+  device: text('device'),
+  page: text('page'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_analytics_user').on(table.userId),
+  index('idx_analytics_event').on(table.event),
+  index('idx_analytics_created').on(table.createdAt),
+]);

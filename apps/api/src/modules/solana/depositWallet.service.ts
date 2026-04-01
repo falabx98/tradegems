@@ -5,6 +5,7 @@ import { userDepositWallets } from '@tradingarena/db';
 import { getDb } from '../../config/database.js';
 import { getSolanaConnection, getTreasuryKeypair } from './treasury.js';
 import { encryptPrivateKey, decryptPrivateKey } from './encryption.js';
+import { getSolanaCircuitBreaker } from '../../utils/circuitBreaker.js';
 
 export class DepositWalletService {
   private db = getDb();
@@ -65,8 +66,9 @@ export class DepositWalletService {
     );
     const depositKeypair = Keypair.fromSecretKey(bs58.decode(secretKeyBase58));
 
-    // Check balance
-    const balance = await connection.getBalance(depositKeypair.publicKey);
+    // Check balance (through circuit breaker)
+    const cb = getSolanaCircuitBreaker();
+    const balance = await cb.execute(() => connection.getBalance(depositKeypair.publicKey));
 
     // Need enough to cover rent + tx fee (5000 lamports fee minimum)
     const fee = 5000;
@@ -83,12 +85,12 @@ export class DepositWalletService {
       }),
     );
 
-    const txHash = await sendAndConfirmTransaction(
+    const txHash = await cb.execute(() => sendAndConfirmTransaction(
       connection,
       transaction,
       [depositKeypair],
       { commitment: 'confirmed' },
-    );
+    ));
 
     // Update last swept timestamp
     await this.db.update(userDepositWallets).set({
@@ -113,6 +115,7 @@ export class DepositWalletService {
    */
   async getWalletBalance(address: string): Promise<number> {
     const connection = getSolanaConnection();
-    return connection.getBalance(new PublicKey(address));
+    const cb = getSolanaCircuitBreaker();
+    return cb.execute(() => connection.getBalance(new PublicKey(address)));
   }
 }

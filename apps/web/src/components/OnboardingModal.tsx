@@ -23,11 +23,11 @@ const STEPS: TutorialStep[] = [
     accent: theme.accent.purple,
   },
   {
-    icon: <GemIcon size={26} color="#2ecc71" />,
+    icon: <GemIcon size={26} color="#00E701" />,
     title: 'Collect Gems',
     desc: 'Green emerald gems boost your multiplier. Avoid red bombs that divide your gains. Shields protect you once.',
     visual: 'gems',
-    accent: '#2ecc71',
+    accent: '#00E701',
   },
   {
     icon: <ChartBarIcon size={26} color="#8b5cf6" />,
@@ -119,7 +119,7 @@ function drawGemsVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: 
     const halfW = r * 0.65;
 
     ctx.save();
-    ctx.shadowColor = '#2ecc71';
+    ctx.shadowColor = '#00E701';
     ctx.shadowBlur = 14;
 
     ctx.beginPath();
@@ -133,7 +133,7 @@ function drawGemsVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: 
 
     const grad = ctx.createLinearGradient(gem.x - halfW, cy - r, gem.x + halfW, cy + r);
     grad.addColorStop(0, '#6ff5b0');
-    grad.addColorStop(0.4, '#2ecc71');
+    grad.addColorStop(0.4, '#00E701');
     grad.addColorStop(1, '#14654a');
     ctx.fillStyle = grad;
     ctx.fill();
@@ -151,7 +151,7 @@ function drawGemsVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: 
     ctx.fill();
     ctx.restore();
 
-    ctx.fillStyle = '#2ecc71';
+    ctx.fillStyle = '#00E701';
     ctx.font = 'bold 11px monospace';
     ctx.textAlign = 'center';
     ctx.fillText(`x${(1.5 + gem.size * 0.05).toFixed(1)}`, gem.x, cy + r + 16);
@@ -229,7 +229,7 @@ function drawBetVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: n
   ctx.clearRect(0, 0, w, h);
 
   const tiers = [
-    { label: 'SAFE', color: '#2ecc71', x: w * 0.18, gain: '0.80x', loss: '0.85x' },
+    { label: 'SAFE', color: '#00E701', x: w * 0.18, gain: '0.80x', loss: '0.85x' },
     { label: 'STANDARD', color: '#8b5cf6', x: w * 0.5, gain: '1.00x', loss: '1.00x' },
     { label: 'DEGEN', color: '#f87171', x: w * 0.82, gain: '1.25x', loss: '1.40x' },
   ];
@@ -272,7 +272,7 @@ function drawBetVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t: n
     ctx.fillText(tier.label, cx, cy - cardH * 0.1);
 
     ctx.font = '10px monospace';
-    ctx.fillStyle = '#2ecc71';
+    ctx.fillStyle = '#00E701';
     ctx.fillText(`gain ${tier.gain}`, cx, cy + cardH * 0.1);
     ctx.fillStyle = '#f87171';
     ctx.fillText(`loss ${tier.loss}`, cx, cy + cardH * 0.25);
@@ -443,7 +443,7 @@ function drawWalletVisual(ctx: CanvasRenderingContext2D, w: number, h: number, t
   ctx.fillText('WITHDRAW', cardX + cardW - btnW / 2, btnY + 20);
 
   const txY = btnY + btnH + 24;
-  ctx.fillStyle = '#2ecc71';
+  ctx.fillStyle = '#00E701';
   ctx.font = '10px monospace';
   ctx.textAlign = 'left';
   ctx.fillText('+0.2500 SOL', cardX + 8, txY);
@@ -554,7 +554,7 @@ export function OnboardingModal({ onClose }: { onClose: () => void }) {
 
         {/* Step counter */}
         <div style={s.stepCounter}>
-          <span style={{ color: current.accent, fontWeight: 700 }}>{step + 1}</span>
+          <span className="mono" style={{ color: current.accent, fontWeight: 700 }}>{step + 1}</span>
           <span style={{ color: theme.text.muted }}> / {STEPS.length}</span>
         </div>
 
@@ -582,7 +582,7 @@ export function OnboardingModal({ onClose }: { onClose: () => void }) {
               onClick={() => setStep(i)}
               style={{
                 ...s.dot,
-                background: i === step ? current.accent : 'rgba(255, 255, 255, 0.1)',
+                background: i === step ? current.accent : 'rgba(255, 255, 255, 0.08)',
                 width: i === step ? '24px' : '8px',
               }}
             />
@@ -631,24 +631,28 @@ const s: Record<string, React.CSSProperties> = {
     position: 'fixed',
     inset: 0,
     zIndex: 9999,
-    background: 'rgba(0, 0, 0, 0.8)',
+    background: theme.bg.overlay,
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     padding: '16px',
+    animation: 'fadeIn 0.15s ease',
   },
   modal: {
-    background: theme.bg.card,
+    background: theme.bg.tertiary,
     border: `1px solid ${theme.border.medium}`,
-    borderRadius: '12px',
+    borderRadius: theme.radius.xl,
     padding: '20px 24px 24px',
-    maxWidth: '400px',
+    maxWidth: '420px',
     width: '100%',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '14px',
-    boxShadow: '0 16px 48px rgba(0, 0, 0, 0.7)',
+    gap: '12px',
+    boxShadow: theme.shadow.lg,
+    animation: 'authSlideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
   },
   progressBar: {
     width: '100%',
@@ -722,24 +726,26 @@ const s: Record<string, React.CSSProperties> = {
   backBtn: {
     background: 'none',
     border: `1px solid ${theme.border.medium}`,
-    borderRadius: '6px',
+    borderRadius: theme.radius.md,
     color: theme.text.secondary,
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
     fontFamily: 'inherit',
-    padding: '12px 18px',
+    padding: '12px 16px',
+    minHeight: '44px',
   },
   nextBtn: {
     flex: 1,
-    padding: '13px',
+    padding: '12px',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: theme.radius.md,
     color: '#fff',
     fontSize: '15px',
-    fontWeight: 600,
+    fontWeight: 700,
     cursor: 'pointer',
     fontFamily: 'inherit',
     transition: 'all 0.15s ease',
+    minHeight: '44px',
   },
 };

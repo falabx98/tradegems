@@ -1,8 +1,11 @@
+import { useState, useEffect } from 'react';
 import { TopBar } from './TopBar';
 import { SideNav } from './SideNav';
 import { BottomNav } from './BottomNav';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
+
+const SIDEBAR_KEY = 'tradesol_sidebar_collapsed';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -11,6 +14,20 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, hideChrome = false }: AppLayoutProps) {
   const isMobile = useIsMobile();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SIDEBAR_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  // Persist sidebar collapse state
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_KEY, sidebarCollapsed ? '1' : '0');
+    } catch { /* ignore */ }
+  }, [sidebarCollapsed]);
 
   if (hideChrome) {
     return (
@@ -22,12 +39,12 @@ export function AppLayout({ children, hideChrome = false }: AppLayoutProps) {
 
   return (
     <div style={styles.root}>
-      <TopBar />
+      <TopBar onToggleSidebar={() => setSidebarCollapsed(v => !v)} />
       <div style={styles.body}>
-        {!isMobile && <SideNav />}
+        {!isMobile && <SideNav collapsed={sidebarCollapsed} />}
         <main style={{
           ...styles.main,
-          ...(isMobile ? { paddingBottom: '68px' } : {}),
+          ...(isMobile ? { paddingBottom: '64px' } : {}),
         }}>
           {children}
         </main>
@@ -54,6 +71,11 @@ const styles: Record<string, React.CSSProperties> = {
     flex: 1,
     overflow: 'auto',
     background: theme.bg.primary,
+  },
+  contentWrap: {
+    maxWidth: theme.layout.maxWidth,
+    margin: '0 auto',
+    width: '100%',
   },
   fullscreen: {
     height: '100vh',

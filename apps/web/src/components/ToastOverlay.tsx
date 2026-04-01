@@ -1,5 +1,6 @@
 import { useToastStore, type ToastType } from '../stores/toastStore';
 import { CheckIcon, XIcon, InfoIcon, WarningIcon } from './ui/GameIcons';
+import { theme } from '../styles/theme';
 
 const ICON_COMPONENTS: Record<ToastType, (color: string) => React.ReactNode> = {
   success: (c) => <CheckIcon size={14} color={c} />,
@@ -10,28 +11,28 @@ const ICON_COMPONENTS: Record<ToastType, (color: string) => React.ReactNode> = {
 
 const COLORS: Record<ToastType, { bg: string; border: string; text: string; icon: string }> = {
   success: {
-    bg: 'rgba(46, 204, 113, 0.08)',
-    border: 'rgba(46, 204, 113, 0.25)',
-    text: '#2ecc71',
-    icon: '#2ecc71',
+    bg: 'rgba(0, 231, 1, 0.06)',
+    border: 'rgba(0, 231, 1, 0.20)',
+    text: theme.accent.neonGreen,
+    icon: theme.accent.neonGreen,
   },
   error: {
-    bg: 'rgba(248, 113, 113, 0.08)',
-    border: 'rgba(248, 113, 113, 0.25)',
-    text: '#f87171',
-    icon: '#f87171',
+    bg: 'rgba(255, 51, 51, 0.06)',
+    border: 'rgba(255, 51, 51, 0.20)',
+    text: theme.accent.red,
+    icon: theme.accent.red,
   },
   info: {
-    bg: 'rgba(139, 92, 246, 0.08)',
-    border: 'rgba(139, 92, 246, 0.25)',
-    text: '#3b82f6',
-    icon: '#8b5cf6',
+    bg: 'rgba(139, 92, 246, 0.06)',
+    border: 'rgba(139, 92, 246, 0.20)',
+    text: theme.accent.blue,
+    icon: theme.accent.purple,
   },
   warning: {
-    bg: 'rgba(251, 191, 36, 0.08)',
-    border: 'rgba(251, 191, 36, 0.25)',
-    text: '#8b5cf6',
-    icon: '#8b5cf6',
+    bg: 'rgba(255, 170, 0, 0.06)',
+    border: 'rgba(255, 170, 0, 0.20)',
+    text: theme.accent.amber,
+    icon: theme.accent.amber,
   },
 };
 
@@ -52,16 +53,15 @@ export function ToastOverlay() {
               ...styles.toast,
               background: c.bg,
               borderColor: c.border,
-              opacity: 1 - i * 0.08,
+              opacity: 1 - i * 0.06,
               animation: 'toastSlideIn 0.3s ease',
             }}
-            onClick={() => removeToast(t.id)}
           >
             <div style={{
               ...styles.iconCircle,
-              background: `${c.icon}18`,
+              background: `${c.icon}12`,
               color: c.icon,
-              border: `1px solid ${c.icon}30`,
+              border: `1px solid ${c.icon}25`,
             }}>
               {ICON_COMPONENTS[t.type](c.icon)}
             </div>
@@ -69,7 +69,10 @@ export function ToastOverlay() {
               <span style={{ ...styles.title, color: c.text }}>{t.title}</span>
               {t.message && <span style={styles.message}>{t.message}</span>}
             </div>
-            <button style={styles.close} onClick={(e) => { e.stopPropagation(); removeToast(t.id); }}>
+            <button
+              style={styles.close}
+              onClick={(e) => { e.stopPropagation(); removeToast(t.id); }}
+            >
               <XIcon size={12} color="currentColor" />
             </button>
           </div>
@@ -95,14 +98,16 @@ const styles: Record<string, React.CSSProperties> = {
   toast: {
     display: 'flex',
     alignItems: 'flex-start',
-    gap: '10px',
-    padding: '12px 14px',
-    borderRadius: '12px',
+    gap: '8px',
+    padding: '12px',
+    borderRadius: theme.radius.lg,
     border: '1px solid',
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+    boxShadow: theme.shadow.lg,
     cursor: 'pointer',
     pointerEvents: 'auto',
     transition: 'opacity 0.2s ease',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
   },
   iconCircle: {
     width: '28px',
@@ -111,8 +116,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '14px',
-    fontWeight: 700,
     flexShrink: 0,
   },
   textWrap: {
@@ -125,22 +128,27 @@ const styles: Record<string, React.CSSProperties> = {
   title: {
     fontSize: '14px',
     fontWeight: 700,
-    fontFamily: "inherit",
-    letterSpacing: '0.3px',
+    fontFamily: 'inherit',
+    letterSpacing: '0.2px',
   },
   message: {
     fontSize: '13px',
-    color: 'rgba(255, 255, 255, 0.5)',
+    color: theme.text.secondary,
     lineHeight: 1.4,
   },
   close: {
-    background: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '24px',
+    height: '24px',
+    background: 'rgba(255,255,255,0.04)',
     border: 'none',
-    color: 'rgba(255, 255, 255, 0.25)',
-    fontSize: '12px',
+    borderRadius: theme.radius.sm,
+    color: theme.text.muted,
     cursor: 'pointer',
-    padding: '2px',
-    lineHeight: 1,
+    padding: 0,
     flexShrink: 0,
+    transition: 'background 0.15s ease',
   },
 };

@@ -2,6 +2,7 @@ import { getDb } from '../config/database.js';
 import { lotteryDraws } from '@tradingarena/db';
 import { eq, and, lte, sql } from 'drizzle-orm';
 import { LotteryService } from '../modules/lottery/lottery.service.js';
+import { createWorkerReporter, withWorkerRecovery } from '../utils/workerHealth.js';
 
 const POLL_INTERVAL_MS = 60_000; // 60 seconds
 
@@ -47,20 +48,18 @@ export async function startLotteryDrawWorker(): Promise<void> {
     console.error('[LotteryWorker] Failed to ensure current draw on startup:', err);
   }
 
-  // Run an initial tick immediately to catch any expired draws
-  await tick();
+  const wrappedTick = withWorkerRecovery('lottery-draw', tick, reporter);
+  await wrappedTick();
 
-  // Poll every 60 seconds
-  workerTimer = setInterval(() => {
-    tick().catch((err) => {
-      console.error('[LotteryWorker] Tick error:', err);
-    });
-  }, POLL_INTERVAL_MS);
+  workerTimer = setInterval(wrappedTick, POLL_INTERVAL_MS);
 
   console.log('[LotteryWorker] Lottery draw worker started successfully');
 }
 
+const reporter = createWorkerReporter('lottery-draw');
+
 export function stopLotteryDrawWorker(): void {
+  reporter.stop();
   if (workerTimer) {
     clearInterval(workerTimer);
     workerTimer = null;

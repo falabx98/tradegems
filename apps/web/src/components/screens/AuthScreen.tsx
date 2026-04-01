@@ -52,7 +52,7 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
           <img src="/logo.png" alt="TradeGems" style={{ height: '52px', width: 'auto', objectFit: 'contain' }} />
           <span style={{
-            fontSize: '18px', fontWeight: 800, fontFamily: "inherit",
+            fontSize: '18px', fontWeight: 700, fontFamily: "inherit",
             color: '#ffffff',
             letterSpacing: '1px',
           }}>

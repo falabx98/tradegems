@@ -14,7 +14,7 @@ interface Props {
 const CANDLE_REVEAL_DURATION = 1.5; // seconds per candle
 
 const BULL_COLOR = '#34d399';
-const BEAR_COLOR = '#f87171';
+const BEAR_COLOR = '#FF3333';
 const GRID_COLOR = 'rgba(119, 23, 255, 0.06)';
 const GRID_TEXT = 'rgba(255,255,255,0.35)';
 const ENTRY_COLOR = '#c084fc';

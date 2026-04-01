@@ -5,6 +5,7 @@ import { getRedis } from '../config/redis.js';
 import { WalletService } from '../modules/wallet/wallet.service.js';
 import { DepositWalletService } from '../modules/solana/depositWallet.service.js';
 import { SolanaService } from '../modules/solana/solana.service.js';
+import { createWorkerReporter, withWorkerRecovery } from '../utils/workerHealth.js';
 
 const POLL_INTERVAL_MS = 30_000; // 30 seconds
 const STALE_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
@@ -12,25 +13,21 @@ const WORKER_LOCK_KEY = 'lock:deposit-confirmation-worker';
 const WORKER_LOCK_TTL = 25; // seconds — shorter than poll interval to avoid stale locks
 
 let pollInterval: ReturnType<typeof setInterval> | null = null;
+const reporter = createWorkerReporter('deposit-confirmation');
 
 export function startDepositWorker(intervalMs: number = POLL_INTERVAL_MS) {
   console.log(`[DepositWorker] Starting deposit confirmation worker (interval: ${intervalMs}ms)`);
 
-  // Run once immediately, then on interval
-  processConfirmingDeposits().catch((err) => {
-    console.error('[DepositWorker] Initial cycle error:', err.message);
-  });
+  const wrappedProcess = withWorkerRecovery('deposit-confirmation', processConfirmingDeposits, reporter);
 
-  pollInterval = setInterval(async () => {
-    try {
-      await processConfirmingDeposits();
-    } catch (err: any) {
-      console.error('[DepositWorker] Cycle error:', err.message);
-    }
-  }, intervalMs);
+  // Run once immediately, then on interval
+  wrappedProcess();
+
+  pollInterval = setInterval(wrappedProcess, intervalMs);
 }
 
 export function stopDepositWorker() {
+  reporter.stop();
   if (pollInterval) {
     clearInterval(pollInterval);
     pollInterval = null;

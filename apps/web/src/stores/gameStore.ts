@@ -20,7 +20,7 @@ import { toast } from './toastStore';
 
 interface GameState {
   // Current view
-  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'prediction' | 'fairness' | 'season' | 'admin' | 'profile' | 'trading-sim' | 'lottery' | 'candleflip' | 'rug-game';
+  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'prediction' | 'fairness' | 'season' | 'admin' | 'profile' | 'trading-sim' | 'lottery' | 'candleflip' | 'rug-game' | 'mines' | 'my-bets' | 'about' | 'responsible-gambling' | 'privacy' | 'terms';
   mode: GameMode;
 
   // Round state
@@ -91,13 +91,17 @@ const DEFAULT_PROFILE: PlayerProfile = {
   vipTier: 'bronze',
   rakebackRate: 0.01,
   avatarUrl: null,
-  balance: 0, // lamports
+  balance: 0, // lamports (available)
+  lockedBalance: 0, // lamports (in play)
+  demoBalance: 0,
+  demoRefillsUsed: 0,
   totalWagered: 0,
   totalWon: 0,
   roundsPlayed: 0,
   winRate: 0,
   streak: 0,
   bestMultiplier: 1.0,
+  progressionLoaded: false,
 };
 
 export const useGameStore = create<GameState>((set, get) => ({
@@ -263,6 +267,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       ? profile.totalWon / profile.totalWagered
       : 0;
 
+    // Settlement toast
+    const profit = result.payout - state.betAmount;
+    if (profit > 0) {
+      toast.success('You Won!', `+${(profit / 1e9).toFixed(4)} SOL added to balance`);
+    } else {
+      toast.info('Round Settled', `${(state.betAmount / 1e9).toFixed(4)} SOL deducted`);
+    }
+
     set({
       phase: 'frozen',
       isRunning: false,
@@ -358,7 +370,10 @@ export const useGameStore = create<GameState>((set, get) => ({
       ]);
 
       const solBalance = balances.balances?.find((b: any) => b.asset === 'SOL');
-      const availableLamports = solBalance ? parseInt(solBalance.available) : 0;
+      const parsed = solBalance ? parseInt(solBalance.available) : NaN;
+      const parsedLocked = solBalance ? parseInt(solBalance.locked || '0') : 0;
+      // Only update balance if we got a valid number; otherwise keep old balance
+      const validBalance = !isNaN(parsed) && parsed >= 0;
 
       let stats: any = {};
       try {
@@ -367,15 +382,32 @@ export const useGameStore = create<GameState>((set, get) => ({
         // Stats endpoint might not return data for new users
       }
 
+      // Fetch real progression data (XP, level, tier, rakeback)
+      let progression: any = {};
+      try {
+        progression = await api.getMyProgression();
+      } catch {
+        // Progression might not be available yet for new users
+      }
+
       set((state) => ({
         profile: {
           ...state.profile,
           id: me.id,
-          username: me.username ?? state.profile.username,
-          level: me.level ?? state.profile.level,
-          vipTier: (me.vipTier as any) ?? state.profile.vipTier,
+          username: me.username || state.profile.username,
+          level: progression.level ?? me.level ?? state.profile.level,
+          vipTier: (progression.vipTier ?? me.vipTier ?? state.profile.vipTier) as any,
           avatarUrl: me.avatarUrl ?? state.profile.avatarUrl,
-          balance: availableLamports, // stored as lamports
+          balance: validBalance ? parsed : state.profile.balance,
+          lockedBalance: !isNaN(parsedLocked) ? parsedLocked : state.profile.lockedBalance,
+          demoBalance: (me as any).demoBalance ?? state.profile.demoBalance,
+          demoRefillsUsed: (me as any).demoRefillsUsed ?? state.profile.demoRefillsUsed,
+          // Real progression data from backend
+          xp: progression.xpCurrent ?? state.profile.xp,
+          xpToNext: progression.xpToNext ?? state.profile.xpToNext,
+          rakebackRate: progression.rakebackRate ?? state.profile.rakebackRate,
+          progressionLoaded: true,
+          // Stats
           totalWagered: stats.totalWagered ?? state.profile.totalWagered,
           totalWon: stats.totalWon ?? state.profile.totalWon,
           roundsPlayed: stats.roundsPlayed ?? state.profile.roundsPlayed,
@@ -385,6 +417,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }));
     } catch (err) {
       console.warn('Profile sync failed:', err);
+      // On total failure, do NOT reset profile — keep existing data
     }
   },
 }));

@@ -3,6 +3,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { api } from '../../utils/api';
 import { theme } from '../../styles/theme';
+import { gameTrack } from '../../utils/analytics';
 import { formatSol } from '../../utils/sol';
 import { getAvatarGradient, getInitials } from '../../utils/avatars';
 import { useAuthStore } from '../../stores/authStore';
@@ -10,6 +11,16 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import { playButtonClick, playBetPlaced, playRoundEnd, hapticLight, hapticMedium } from '../../utils/sounds';
 import { PageHeader } from '../ui/PageHeader';
 import { StatCard } from '../ui/StatCard';
+import { GameHeader } from '../game/GameHeader';
+import { HowToPlayInline } from '../game/HowToPlayInline';
+import { CasinoGameLayout, GameControlRail, GameStage, GameFooterBar } from '../game/CasinoGameLayout';
+import { SolIcon } from '../ui/SolIcon';
+import { Button } from '../primitives/Button';
+import { Card } from '../primitives/Card';
+import { Badge } from '../primitives/Badge';
+import { EmptyState } from '../primitives/EmptyState';
+import { Skeleton } from '../primitives/Skeleton';
+import { CountUpNumber } from '../game/CountUpNumber';
 
 /* ─── Types ─── */
 interface LotteryDraw {
@@ -221,6 +232,7 @@ export function LotteryScreen() {
 
   const handleBuy = async () => {
     if (!draw || buying) return;
+    gameTrack.start('lottery', totalCost);
     const incomplete = tickets.some((t) => t.numbers.includes(null) || t.gemBall === null);
     if (incomplete) {
       setError('Fill all numbers on every ticket (or use Auto-fill)');
@@ -270,29 +282,93 @@ export function LotteryScreen() {
   const estimatedJackpot = draw ? Math.floor((draw.prizePool + draw.rolloverPool) * 0.95 * 0.4) : 0;
 
   /* ─── Render ─── */
+  const LOTTERY_ATMOSPHERE = 'radial-gradient(ellipse at 50% 40%, rgba(234,179,8,0.04) 0%, transparent 70%)';
+
+  const lotteryHeader = (
+    <GameHeader title="Lottery" subtitle="Jackpot Draws" icon={
+      <div style={{ width: 36, height: 36, borderRadius: theme.radius.md, background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EAB308" strokeWidth="2" strokeLinecap="round"><path d="M6 3h12l4 6-10 13L2 9z" /></svg>
+      </div>
+    }
+    howToPlay={
+      <HowToPlayInline steps={[
+        { icon: '🎯', label: 'Pick 5 numbers + 1 Gem Ball', desc: 'Choose from 1-36 for main numbers and 1-9 for the Gem Ball' },
+        { icon: '🎫', label: 'Buy Standard or Power entry', desc: 'Power entry costs more but doubles your winnings' },
+        { icon: '💎', label: 'Match numbers to win', desc: 'More matches = bigger prizes. Match all 5 + Gem Ball for the Jackpot!' },
+      ]} />
+    }
+    />
+  );
+
   if (loading) {
     return (
-      <div style={s.container}>
-        <PageHeader title="Lottery" subtitle="Jackpot Draws" />
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '300px', color: theme.text.muted }}>
-          Loading lottery...
-        </div>
-      </div>
+      <CasinoGameLayout
+        rail={<GameControlRail><Skeleton variant="rect" height="200px" /><Skeleton variant="rect" height="40px" /></GameControlRail>}
+        stage={
+          <GameStage atmosphere={LOTTERY_ATMOSPHERE} style={{ minHeight: isMobile ? 200 : 300, padding: theme.gap.lg }}>
+            {!isMobile && <div style={{ marginBottom: theme.gap.md }}>{lotteryHeader}</div>}
+            <Skeleton variant="rect" height="160px" />
+          </GameStage>
+        }
+      />
     );
   }
 
-  return (
-    <div style={s.container}>
-      {/* Page Header */}
-      <PageHeader
-        title="Lottery"
-        subtitle="Jackpot Draws"
-        icon={
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M6 3h12l4 6-10 13L2 9z" />
-          </svg>
-        }
-      />
+  /* ─── CONTROL RAIL ─── */
+  const railContent = (
+    <GameControlRail>
+      {/* Tabs */}
+      <div style={s.tabBar}>
+        {(['play', 'tickets', 'howtoplay'] as const).map((t) => (
+          <button
+            key={t}
+            onClick={() => { setTab(t); playButtonClick(); }}
+            style={tab === t ? { ...s.tab, ...s.tabActive } : s.tab}
+          >
+            {t === 'play' ? 'Play Lottery' : t === 'tickets' ? 'Tickets & Prizes' : 'How To Play'}
+          </button>
+        ))}
+      </div>
+
+      {/* Messages */}
+      {error && <div style={s.errorMsg}>{error}</div>}
+      {success && <div style={s.successMsg}>{success}</div>}
+
+      {/* Tab Content */}
+      {tab === 'play' && !draw && (
+        <Card variant="panel">
+          <EmptyState
+            icon={<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={theme.text.muted} strokeWidth="1.5" strokeLinecap="round"><path d="M6 3h12l4 6-10 13L2 9z" /></svg>}
+            title="Next Draw Coming Soon"
+          />
+        </Card>
+      )}
+      {tab === 'play' && draw && <PlayTab
+        draw={draw} entryType={entryType} setEntryType={setEntryType}
+        tickets={tickets} setTicketCount={setTicketCount} autoFillAll={autoFillAll}
+        clearAll={clearAll} autoFillOne={autoFillOne} removeTicket={removeTicket}
+        pickerOpen={pickerOpen} setPickerOpen={setPickerOpen}
+        selectNumber={selectNumber} selectGemBall={selectGemBall}
+        ticketPrice={ticketPrice} totalCost={totalCost}
+        buying={buying} handleBuy={handleBuy}
+        isAuthenticated={isAuthenticated} balance={balance} isMobile={isMobile}
+      />}
+      {tab === 'tickets' && <TicketsTab
+        viewDraw={viewDraw} viewDrawNumber={viewDrawNumber}
+        setViewDrawNumber={setViewDrawNumber} draw={draw}
+        myTickets={myTickets} prizeTiers={prizeTiers}
+        ticketsSubTab={ticketsSubTab} setTicketsSubTab={setTicketsSubTab}
+        drawHistory={drawHistory} isMobile={isMobile}
+      />}
+      {tab === 'howtoplay' && <HowToPlayTab isMobile={isMobile} />}
+    </GameControlRail>
+  );
+
+  /* ─── GAME STAGE ─── */
+  const stageContent = (
+    <GameStage atmosphere={LOTTERY_ATMOSPHERE} style={{ minHeight: isMobile ? 200 : 340, padding: theme.gap.lg }}>
+      {/* Desktop header inside stage */}
+      {!isMobile && <div style={{ marginBottom: theme.gap.md }}>{lotteryHeader}</div>}
 
       {/* Jackpot Banner */}
       <div style={s.jackpotBanner}>
@@ -311,8 +387,15 @@ export function LotteryScreen() {
         <div style={s.jackpotBannerContent}>
           {draw ? (
             <>
-              <div style={s.jackpotDrawLabel}>DRAW #{draw.drawNumber} &bull; {formatDate(draw.drawDate)} at {formatTime(draw.drawDate)}</div>
-              <div style={s.jackpotAmount}>{formatSol(estimatedJackpot)} SOL</div>
+              <div style={s.jackpotDrawLabel}>DRAW #{draw.drawNumber} &bull; <DrawCountdown drawDate={draw.drawDate} /></div>
+              <CountUpNumber
+                value={estimatedJackpot / 1e9}
+                from={0}
+                duration={1500}
+                decimals={estimatedJackpot >= 1e9 ? 2 : 4}
+                suffix={<> <SolIcon size="0.9em" /></>}
+                style={s.jackpotAmount}
+              />
               <div style={s.jackpotSubLabel}>Estimated Jackpot</div>
             </>
           ) : (
@@ -323,7 +406,7 @@ export function LotteryScreen() {
 
       {/* Stats Row */}
       {draw && (
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ display: 'flex', gap: theme.gap.sm, flexWrap: 'wrap' }}>
           <StatCard
             label="Prize Pool"
             value={`${formatSol(draw.prizePool + draw.rolloverPool)} SOL`}
@@ -350,74 +433,48 @@ export function LotteryScreen() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div style={s.tabBar}>
-        {(['play', 'tickets', 'howtoplay'] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => { setTab(t); playButtonClick(); }}
-            style={tab === t ? { ...s.tab, ...s.tabActive } : s.tab}
-          >
-            {t === 'play' ? 'Play Lottery' : t === 'tickets' ? 'Tickets & Prizes' : 'How To Play'}
-          </button>
-        ))}
-      </div>
+    </GameStage>
+  );
 
-      {/* Messages */}
-      {error && <div style={s.errorMsg}>{error}</div>}
-      {success && <div style={s.successMsg}>{success}</div>}
+  /* ─── FOOTER ─── */
+  const footerContent = draw ? (
+    <GameFooterBar>
+      <span>Draw #{draw.drawNumber}</span>
+      <span>Provably Fair · {draw.totalTickets} tickets</span>
+    </GameFooterBar>
+  ) : undefined;
 
-      {/* Tab Content */}
-      {tab === 'play' && !draw && (
-        <div style={{
-          padding: '32px 20px', textAlign: 'center', borderRadius: '14px',
-          background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`,
-        }}>
-          <div style={{ fontSize: '36px', marginBottom: '12px' }}>🎰</div>
-          <div style={{ fontSize: '18px', fontWeight: 700, color: theme.text.secondary }}>
-            Next Draw Coming Soon
-          </div>
-          <div style={{ fontSize: '13px', color: theme.text.muted, marginTop: '8px', maxWidth: '400px', margin: '8px auto 0' }}>
-            Draws happen regularly. Pick 5 numbers + 1 GemBall for a chance to win the jackpot!
-          </div>
-          <div style={{
-            display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px',
-            marginTop: '20px', maxWidth: '360px', margin: '20px auto 0',
-          }}>
-            <div style={{ padding: '12px 8px', borderRadius: '10px', background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.12)' }}>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: '#8b5cf6' }}>5+1</div>
-              <div style={{ fontSize: '10px', color: theme.text.muted, marginTop: '2px' }}>Numbers to pick</div>
-            </div>
-            <div style={{ padding: '12px 8px', borderRadius: '10px', background: 'rgba(46,204,113,0.06)', border: '1px solid rgba(46,204,113,0.12)' }}>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: '#2ecc71' }}>5</div>
-              <div style={{ fontSize: '10px', color: theme.text.muted, marginTop: '2px' }}>Prize tiers</div>
-            </div>
-            <div style={{ padding: '12px 8px', borderRadius: '10px', background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)' }}>
-              <div style={{ fontSize: '20px', fontWeight: 900, color: '#f59e0b' }}>100x</div>
-              <div style={{ fontSize: '10px', color: theme.text.muted, marginTop: '2px' }}>Top payout</div>
-            </div>
-          </div>
-        </div>
-      )}
-      {tab === 'play' && draw && <PlayTab
-        draw={draw} entryType={entryType} setEntryType={setEntryType}
-        tickets={tickets} setTicketCount={setTicketCount} autoFillAll={autoFillAll}
-        clearAll={clearAll} autoFillOne={autoFillOne} removeTicket={removeTicket}
-        pickerOpen={pickerOpen} setPickerOpen={setPickerOpen}
-        selectNumber={selectNumber} selectGemBall={selectGemBall}
-        ticketPrice={ticketPrice} totalCost={totalCost}
-        buying={buying} handleBuy={handleBuy}
-        isAuthenticated={isAuthenticated} balance={balance} isMobile={isMobile}
-      />}
-      {tab === 'tickets' && <TicketsTab
-        viewDraw={viewDraw} viewDrawNumber={viewDrawNumber}
-        setViewDrawNumber={setViewDrawNumber} draw={draw}
-        myTickets={myTickets} prizeTiers={prizeTiers}
-        ticketsSubTab={ticketsSubTab} setTicketsSubTab={setTicketsSubTab}
-        drawHistory={drawHistory} isMobile={isMobile}
-      />}
-      {tab === 'howtoplay' && <HowToPlayTab isMobile={isMobile} />}
-    </div>
+  return (
+    <>
+      {isMobile && <div style={{ padding: `${theme.gap.sm}px 12px` }}>{lotteryHeader}</div>}
+      <CasinoGameLayout
+        rail={railContent}
+        stage={stageContent}
+        footer={footerContent}
+      />
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DRAW COUNTDOWN
+   ══════════════════════════════════════════════════════════════ */
+function DrawCountdown({ drawDate }: { drawDate: string }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const iv = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(iv);
+  }, []);
+  const diff = new Date(drawDate).getTime() - now;
+  if (diff <= 0) return <span style={{ color: theme.accent.amber }}>Drawing now...</span>;
+  const hours = Math.floor(diff / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  const isUrgent = diff < 30 * 60 * 1000; // last 30 minutes
+  return (
+    <span style={{ color: isUrgent ? theme.accent.red : theme.accent.amber, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+      {isUrgent ? '⏰ ' : ''}{hours}h {String(mins).padStart(2, '0')}m {String(secs).padStart(2, '0')}s
+    </span>
   );
 }
 
@@ -428,7 +485,7 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
       {/* Step 1 + Step 2 row */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {/* Step 1: Entry Type */}
         <div style={s.stepCard}>
           <div style={s.stepHeader}>1. Select Entry Type</div>
@@ -443,7 +500,7 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
               </div>
               <span style={s.entryPrice}>
                 <img src="/sol-coin.png" alt="" style={{ width: 14, height: 14 }} />
-                {formatSol(draw.standardPrice)} SOL
+                {formatSol(draw.standardPrice)} <SolIcon size="0.9em" />
               </span>
             </button>
             <button
@@ -459,7 +516,7 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
               </div>
               <span style={s.entryPrice}>
                 <img src="/sol-coin.png" alt="" style={{ width: 14, height: 14 }} />
-                {formatSol(draw.powerPrice)} SOL
+                {formatSol(draw.powerPrice)} <SolIcon size="0.9em" />
               </span>
             </button>
           </div>
@@ -486,7 +543,7 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: theme.bg.tertiary, borderRadius: theme.radius.sm }}>
               <span style={{ color: theme.text.muted, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total cost</span>
               <span style={{ color: theme.text.primary, fontSize: '16px', fontWeight: 700, fontFamily: 'monospace' }}>
-                {formatSol(totalCost)} SOL
+                {formatSol(totalCost)} <SolIcon size="0.9em" />
               </span>
             </div>
           </div>
@@ -513,8 +570,17 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
             <span style={{ color: theme.accent.lavender, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>GemBall</span>
           </div>
 
-          {tickets.map((ticket: TicketEntry, tIdx: number) => (
-            <div key={ticket.id} style={s.ticketRow}>
+          {tickets.map((ticket: TicketEntry, tIdx: number) => {
+            const missingNums = ticket.numbers.filter((n: number | null) => n === null).length;
+            const missingGem = ticket.gemBall === null;
+            const isComplete = missingNums === 0 && !missingGem;
+            const missingCount = missingNums + (missingGem ? 1 : 0);
+            return (
+            <div key={ticket.id} style={{
+              ...s.ticketRow,
+              borderColor: isComplete ? 'rgba(0,231,1,0.15)' : theme.border.subtle,
+              background: isComplete ? 'rgba(0,231,1,0.02)' : theme.bg.secondary,
+            }}>
               <span style={s.ticketNum}>{tIdx + 1}</span>
               {/* Main numbers */}
               <div style={{ display: 'flex', gap: '5px' }}>
@@ -535,6 +601,12 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
               >
                 {ticket.gemBall !== null ? ticket.gemBall : 'GB'}
               </button>
+              {/* Completion indicator */}
+              {isComplete ? (
+                <span style={{ color: theme.accent.neonGreen, fontSize: '11px', fontWeight: 600, whiteSpace: 'nowrap' }}>✓</span>
+              ) : (
+                <span style={{ color: theme.text.muted, fontSize: '10px', whiteSpace: 'nowrap' }}>{missingCount} left</span>
+              )}
               {/* Actions */}
               <div style={{ display: 'flex', gap: '4px', marginLeft: 'auto' }}>
                 <button onClick={() => autoFillOne(tIdx)} style={s.iconBtn} title="Auto-fill">
@@ -547,7 +619,8 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Number Picker Popover */}
@@ -570,7 +643,7 @@ function PlayTab({ draw, entryType, setEntryType, tickets, setTicketCount, autoF
           <div>
             <div style={{ color: theme.text.muted, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Total cost</div>
             <div style={{ color: theme.text.primary, fontWeight: 700, fontFamily: 'monospace', fontSize: '17px' }}>
-              {formatSol(totalCost)} SOL
+              {formatSol(totalCost)} <SolIcon size="0.9em" />
             </div>
           </div>
           <div style={{ width: '1px', height: '32px', background: theme.border.medium }} />
@@ -617,7 +690,7 @@ function NumberPicker({ slot, ticketIdx, slotIdx, currentTicket, onSelectNumber,
           <span style={{ color: theme.text.primary, fontWeight: 700, fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
             {slot === 'main' ? `Pick Number — Slot ${(slotIdx ?? 0) + 1}` : 'Pick GemBall (1–9)'}
           </span>
-          <button onClick={onClose} style={{ background: theme.bg.tertiary, border: `1px solid ${theme.border.medium}`, borderRadius: theme.radius.sm, color: theme.text.secondary, cursor: 'pointer', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', lineHeight: 1 }}>×</button>
+          <button onClick={onClose} style={{ background: theme.bg.tertiary, border: `1px solid ${theme.border.medium}`, borderRadius: theme.radius.md, color: theme.text.secondary, cursor: 'pointer', width: '36px', height: '36px', minWidth: '40px', minHeight: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', lineHeight: 1 }}>×</button>
         </div>
         {slot === 'main' ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '6px' }}>
@@ -807,7 +880,7 @@ function TicketsTab({ viewDraw, viewDrawNumber, setViewDrawNumber, draw, myTicke
                       <MatchPattern desc={pt.desc} />
                     </span>
                     <span style={{ flex: 1, textAlign: 'right', fontFamily: 'monospace', color: pt.tier === 1 ? theme.accent.lavender : theme.text.primary, fontWeight: pt.tier === 1 ? 700 : 400 }}>
-                      {data ? `${formatSol(data.prizeAmount)} SOL` : '--'}
+                      {data ? <>{formatSol(data.prizeAmount)} <SolIcon size="0.9em" /></> : '--'}
                     </span>
                     <span style={{ width: '60px', textAlign: 'right', color: theme.text.muted }}>
                       {data?.winners ?? 0}
@@ -881,7 +954,7 @@ function HowToPlayTab({ isMobile }: { isMobile: boolean }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Steps */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '10px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
         {steps.map((step) => (
           <div key={step.num} style={s.howCard}>
             <div style={{ fontSize: '26px', lineHeight: 1 }}>{step.icon}</div>
@@ -894,7 +967,7 @@ function HowToPlayTab({ isMobile }: { isMobile: boolean }) {
       </div>
 
       {/* Info cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)', gap: '10px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {info.map((item) => (
           <div key={item.title} style={s.infoCard}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
@@ -950,14 +1023,15 @@ const s: Record<string, React.CSSProperties> = {
     position: 'relative',
     borderRadius: theme.radius.lg,
     overflow: 'hidden',
-    background: `linear-gradient(135deg, ${theme.accent.violet} 0%, ${theme.accent.purple} 50%, ${theme.accent.lavender} 100%)`,
+    background: `linear-gradient(135deg, rgba(234,179,8,0.12) 0%, rgba(139,92,246,0.10) 50%, rgba(234,179,8,0.08) 100%)`,
+    border: '1px solid rgba(234,179,8,0.15)',
     padding: '28px 24px',
     textAlign: 'center',
   },
   jackpotBannerDecor: { position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' },
   jackpotBannerContent: { position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' },
   jackpotDrawLabel: { color: 'rgba(255,255,255,0.7)', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase' as const, letterSpacing: '1px', marginBottom: '6px' },
-  jackpotAmount: { color: '#fff', fontSize: '46px', fontWeight: 900, fontFamily: 'monospace', lineHeight: 1, textShadow: '0 2px 24px rgba(0,0,0,0.3)' },
+  jackpotAmount: { color: '#EAB308', fontSize: '46px', fontWeight: 900, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1, textShadow: '0 0 24px rgba(234,179,8,0.3), 0 2px 12px rgba(0,0,0,0.3)' },
   jackpotSubLabel: { color: 'rgba(255,255,255,0.65)', fontSize: '12px', textTransform: 'uppercase' as const, letterSpacing: '1px', marginTop: '4px' },
 
   // Tabs

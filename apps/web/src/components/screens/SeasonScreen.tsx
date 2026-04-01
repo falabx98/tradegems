@@ -362,7 +362,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   seasonTitle: {
     fontSize: '22px',
-    fontWeight: 800,
+    fontWeight: 700,
     color: theme.text.primary,
     fontFamily: "inherit",
     textTransform: 'uppercase' as const,
@@ -683,7 +683,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(46, 204, 113, 0.15)',
     border: '1px solid rgba(46, 204, 113, 0.35)',
     borderRadius: '6px',
-    color: '#2ecc71',
+    color: '#00E701',
     fontSize: '12px',
     fontWeight: 700,
     cursor: 'pointer',

@@ -2,8 +2,11 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { requireNotExcluded } from '../middleware/selfExclusion.js';
 import { CandleflipService } from '../modules/candleflip/candleflip.service.js';
 import { getCandleflipCurrentRound, betOnRound, getRecentCandleflipRounds } from '../modules/round-manager/candleflipRoundManager.js';
+import { requireGameEnabled } from '../utils/gameGates.js';
+import { validateBetLimits } from '../utils/betLimits.js';
 
 export async function candleflipRoutes(server: FastifyInstance) {
   const service = new CandleflipService();
@@ -22,14 +25,19 @@ export async function candleflipRoutes(server: FastifyInstance) {
     return { rounds };
   });
 
-  server.post('/bet', { preHandler: requireAuth }, async (request) => {
+  server.post('/bet', { preHandler: [requireAuth, requireNotExcluded] }, async (request) => {
+    await requireGameEnabled('candleflip');
     const userId = getAuthUser(request).userId;
     const body = z.object({
       pick: z.enum(['bullish', 'bearish']),
       betAmount: z.number().int().positive().min(1_000_000),
+      isDemoBet: z.boolean().optional().default(false),
     }).parse(request.body);
 
-    const result = await betOnRound(userId, body.pick, body.betAmount);
+    const { detectDemoBet } = await import('../utils/demoDetect.js');
+    const isDemoBet = await detectDemoBet(userId, body.isDemoBet);
+    if (!isDemoBet) await validateBetLimits(userId, body.betAmount);
+    const result = await betOnRound(userId, body.pick, body.betAmount, isDemoBet);
     if (!result.success) {
       throw new AppError(400, 'BET_FAILED', result.message || 'Cannot place bet');
     }

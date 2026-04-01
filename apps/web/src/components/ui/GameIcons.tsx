@@ -16,7 +16,7 @@ const defaults = (size: number, style?: React.CSSProperties): React.CSSPropertie
 
 // ─── Game Node Icons ─────────────────────────────────────────────────────────
 
-export function GemIcon({ size = 20, color = '#2ecc71', className, style }: IconProps) {
+export function GemIcon({ size = 20, color = '#00E701', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M6 3h12l4 7-10 12L2 10l4-7z" fill={color} opacity="0.2" />
@@ -81,7 +81,7 @@ export function SwordsIcon({ size = 20, color = '#f87171', className, style }: I
 
 // ─── Direction / Prediction Icons ────────────────────────────────────────────
 
-export function ArrowUpIcon({ size = 24, color = '#2ecc71', className, style }: IconProps) {
+export function ArrowUpIcon({ size = 24, color = '#00E701', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M12 20V4" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
@@ -197,14 +197,14 @@ export function PartyIcon({ size = 20, color = '#8b5cf6', className, style }: Ic
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M4 20l3.5-14L21.5 9.5 4 20z" fill={color} opacity="0.15" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
       <circle cx="14" cy="4" r="1.5" fill="#f87171" />
-      <circle cx="19" cy="6" r="1" fill="#2ecc71" />
+      <circle cx="19" cy="6" r="1" fill="#00E701" />
       <circle cx="17" cy="2" r="1" fill="#5b8def" />
       <path d="M8.5 7l1 2" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
 
-export function CheckIcon({ size = 16, color = '#2ecc71', className, style }: IconProps) {
+export function CheckIcon({ size = 16, color = '#00E701', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className} style={defaults(size, style)}>
       <path d="M5 12l5 5L20 7" stroke={color} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
@@ -238,7 +238,7 @@ export function WarningIcon({ size = 16, color = '#8b5cf6', className, style }: 
   );
 }
 
-export function MoneyIcon({ size = 20, color = '#2ecc71', className, style }: IconProps) {
+export function MoneyIcon({ size = 20, color = '#00E701', className, style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className} style={defaults(size, style)}>
       <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />

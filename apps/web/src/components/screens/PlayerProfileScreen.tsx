@@ -226,7 +226,7 @@ export function PlayerProfileScreen() {
                 <span style={{
                   fontSize: '14px',
                   fontWeight: 600,
-                  color: tipResult.success ? '#2ecc71' : '#ff453a',
+                  color: tipResult.success ? '#00E701' : '#ff453a',
                 }}>{tipResult.message}</span>
               </div>
             ) : (
@@ -418,7 +418,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   avatarInitial: {
     fontSize: '32px',
-    fontWeight: 800,
+    fontWeight: 700,
     color: '#fff',
     fontFamily: "inherit",
   },
@@ -438,7 +438,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   levelBadgeText: {
     fontSize: '12px',
-    fontWeight: 800,
+    fontWeight: 700,
     color: '#fff',
     fontFamily: '"JetBrains Mono", monospace',
   },
@@ -451,7 +451,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   displayName: {
     fontSize: '22px',
-    fontWeight: 800,
+    fontWeight: 700,
     color: theme.text.primary,
     fontFamily: "inherit",
     letterSpacing: '1px',
@@ -549,7 +549,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   modalTitle: {
     fontSize: '18px',
-    fontWeight: 800,
+    fontWeight: 700,
     color: theme.text.primary,
     fontFamily: "inherit",
     textTransform: 'uppercase' as const,

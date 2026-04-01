@@ -1,54 +1,48 @@
 import { useState, useEffect } from 'react';
 import { theme } from '../../styles/theme';
 
-interface RecentGame {
+export interface RecentGame {
   id: string;
   result: 'win' | 'loss' | 'pending';
   multiplier: number;
-  amount: number;      // bet amount in lamports
-  payout: number;      // payout in lamports
-  time: string;        // createdAt ISO
+  amount: number;
+  payout: number;
+  time: string;
 }
 
-interface RecentGamesProps {
+export interface RecentGamesProps {
   title?: string;
   fetchGames: () => Promise<RecentGame[]>;
   pollInterval?: number;
 }
 
-function timeAgo(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return 'now';
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}d`;
 }
 
 export function RecentGames({ title = 'Recent Games', fetchGames, pollInterval = 15000 }: RecentGamesProps) {
   const [games, setGames] = useState<RecentGame[]>([]);
 
   useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      try {
-        const data = await fetchGames();
-        if (mounted) setGames(data);
-      } catch { /* ignore */ }
-    };
+    const load = () => fetchGames().then(setGames).catch(() => {});
     load();
     const interval = setInterval(load, pollInterval);
-    return () => { mounted = false; clearInterval(interval); };
+    return () => clearInterval(interval);
   }, [fetchGames, pollInterval]);
 
   if (games.length === 0) return null;
 
   return (
-    <div style={s.container}>
+    <div style={s.root}>
       <div style={s.header}>
         <span style={s.title}>{title}</span>
-        <span style={s.count}>{games.length} games</span>
+        <span style={s.count}>{games.length}</span>
       </div>
       <div style={s.list}>
         {games.map((g) => {
@@ -56,17 +50,17 @@ export function RecentGames({ title = 'Recent Games', fetchGames, pollInterval =
           const profit = (g.payout - g.amount) / 1e9;
           return (
             <div key={g.id} style={s.row}>
-              <div style={{ ...s.dot, background: isWin ? theme.success : theme.danger }} />
-              <span style={{ ...s.result, color: isWin ? theme.success : theme.danger }}>
+              <div style={{ ...s.dot, background: isWin ? theme.accent.neonGreen : theme.accent.red }} />
+              <span style={{ ...s.result, color: isWin ? theme.accent.neonGreen : theme.accent.red }}>
                 {isWin ? 'WIN' : 'LOSS'}
               </span>
-              <span style={s.mult} className="mono">{g.multiplier.toFixed(2)}x</span>
+              <span style={s.mult} className="mono">{Number(g.multiplier).toFixed(2)}x</span>
               <div style={s.amounts}>
                 <span style={s.bet} className="mono">
                   <img src="/sol-coin.png" alt="SOL" style={s.solIcon} />
                   {(g.amount / 1e9).toFixed(4)}
                 </span>
-                <span style={{ ...s.profit, color: isWin ? theme.success : theme.danger }} className="mono">
+                <span style={{ ...s.profit, color: isWin ? theme.accent.neonGreen : theme.accent.red }} className="mono">
                   {isWin ? '+' : ''}{profit.toFixed(4)}
                 </span>
               </div>
@@ -80,85 +74,94 @@ export function RecentGames({ title = 'Recent Games', fetchGames, pollInterval =
 }
 
 const s: Record<string, React.CSSProperties> = {
-  container: {
-    background: theme.bg.card,
-    border: `1px solid ${theme.border.subtle}`,
-    borderRadius: theme.radius.lg,
-    overflow: 'hidden',
+  root: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '12px 16px',
-    borderBottom: `1px solid ${theme.border.subtle}`,
   },
   title: {
-    fontSize: '12px',
-    fontWeight: 700,
-    color: theme.text.primary,
-    textTransform: 'uppercase' as const,
+    fontSize: '11px',
+    fontWeight: 600,
+    color: theme.text.muted,
+    textTransform: 'uppercase',
     letterSpacing: '0.8px',
   },
   count: {
     fontSize: '11px',
+    fontWeight: 600,
     color: theme.text.muted,
   },
   list: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '2px',
     maxHeight: '280px',
-    overflowY: 'auto' as const,
+    overflowY: 'auto',
+    borderRadius: theme.radius.md,
+    background: theme.bg.secondary,
+    border: `1px solid ${theme.border.subtle}`,
   },
   row: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
-    padding: '8px 16px',
-    borderBottom: `1px solid ${theme.border.subtle}`,
+    gap: '8px',
+    padding: '8px 12px',
+    transition: 'background 0.15s ease',
   },
   dot: {
-    width: 6,
-    height: 6,
+    width: '6px',
+    height: '6px',
     borderRadius: '50%',
     flexShrink: 0,
   },
   result: {
-    fontSize: '10px',
+    fontSize: '11px',
     fontWeight: 700,
     width: '32px',
-    letterSpacing: '0.5px',
+    flexShrink: 0,
   },
   mult: {
-    fontSize: '12px',
+    fontSize: '13px',
     fontWeight: 700,
     color: theme.text.primary,
-    width: '50px',
+    width: '52px',
+    flexShrink: 0,
   },
   amounts: {
     display: 'flex',
-    flexDirection: 'column' as const,
-    gap: '1px',
     flex: 1,
-    alignItems: 'flex-end' as const,
+    justifyContent: 'flex-end',
+    gap: '12px',
+    minWidth: 0,
   },
   bet: {
-    fontSize: '11px',
+    fontSize: '12px',
+    fontWeight: 600,
     color: theme.text.secondary,
     display: 'flex',
     alignItems: 'center',
-    gap: '3px',
-  },
-  profit: {
-    fontSize: '11px',
-    fontWeight: 600,
+    gap: '4px',
   },
   solIcon: {
-    width: 12,
-    height: 12,
+    width: '12px',
+    height: '12px',
+  },
+  profit: {
+    fontSize: '12px',
+    fontWeight: 600,
+    width: '72px',
+    textAlign: 'right' as const,
   },
   time: {
-    fontSize: '10px',
+    fontSize: '11px',
     color: theme.text.muted,
-    width: '50px',
+    width: '28px',
     textAlign: 'right' as const,
+    flexShrink: 0,
   },
 };

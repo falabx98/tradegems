@@ -10,6 +10,8 @@ import { setProfileTarget } from './PlayerProfileScreen';
 import { isPhotoAvatar, getAvatarGradient, getInitials as getAvatarInitials } from '../../utils/avatars';
 import { PageHeader } from '../ui/PageHeader';
 import { TabBar } from '../ui/TabBar';
+import { ContentNarrow } from '../primitives/ContentContainer';
+import { SolIcon } from '../ui/SolIcon';
 
 interface LeaderboardEntry {
   rank: number;
@@ -75,11 +77,11 @@ export function LeaderboardScreen() {
     }
   }
 
-  function formatScore(score: string, tab: string) {
+  function formatScore(score: string, tab: string): React.ReactNode {
     const val = parseFloat(score || '0');
     if (tab === 'multiplier') return `${val.toFixed(2)}x`;
     if (tab === 'volume') return `${Math.round(val)} rounds`;
-    return `${formatSol(val)} SOL`;
+    return <>{formatSol(val)} <SolIcon size="0.9em" /></>;
   }
 
   const top3 = entries.slice(0, 3);
@@ -155,7 +157,7 @@ export function LeaderboardScreen() {
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontSize: actualRank === 1 ? '20px' : '16px',
-                      fontWeight: 800,
+                      fontWeight: 700,
                       color: '#fff',
                       fontFamily: "inherit",
                     }}>
@@ -216,7 +218,7 @@ export function LeaderboardScreen() {
                 }}>
                   <span style={{
                     fontSize: actualRank === 1 ? '28px' : '22px',
-                    fontWeight: 800,
+                    fontWeight: 700,
                     fontFamily: "inherit",
                     color: `${meta.color}60`,
                   }}>
@@ -267,7 +269,7 @@ export function LeaderboardScreen() {
                     fontSize: '11px', color: theme.text.muted, textAlign: 'center',
                   }}>
                     <div style={{ fontSize: '14px', fontWeight: 700, color: '#8b5cf6' }}>
-                      {t === 'profit' ? '💰' : t === 'multiplier' ? '🎯' : '📊'}
+                      {t === 'profit' ? '—' : t === 'multiplier' ? '—' : '—'}
                     </div>
                     <div style={{ marginTop: '2px', textTransform: 'capitalize' }}>{t}</div>
                   </div>

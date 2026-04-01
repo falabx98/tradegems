@@ -3,6 +3,7 @@ import { getRedis } from '../config/redis.js';
 import { bets, candleflipGames, balances, balanceLedgerEntries, predictionRounds } from '@tradingarena/db';
 import { eq, and, sql, lt } from 'drizzle-orm';
 import { WalletService } from '../modules/wallet/wallet.service.js';
+import { createWorkerReporter, withWorkerRecovery } from '../utils/workerHealth.js';
 
 let cleanupInterval: ReturnType<typeof setInterval> | null = null;
 const TICK_MS = 60_000; // Run every 60 seconds
@@ -294,18 +295,19 @@ async function tick(): Promise<void> {
 
 // ─── Public API ─────────────────────────────────────────────
 
+const reporter = createWorkerReporter('orphan-cleanup');
+
 export function startOrphanCleanupWorker(): void {
   console.log(`[OrphanCleanup] Starting orphan cleanup worker (interval: ${TICK_MS}ms)`);
 
-  // Run initial cleanup on startup
-  tick().catch((err) => console.error('[OrphanCleanup] Initial tick error:', err));
+  const wrappedTick = withWorkerRecovery('orphan-cleanup', tick, reporter);
+  wrappedTick();
 
-  cleanupInterval = setInterval(() => {
-    tick().catch((err) => console.error('[OrphanCleanup] Tick error:', err));
-  }, TICK_MS);
+  cleanupInterval = setInterval(wrappedTick, TICK_MS);
 }
 
 export function stopOrphanCleanupWorker(): void {
+  reporter.stop();
   if (cleanupInterval) {
     clearInterval(cleanupInterval);
     cleanupInterval = null;

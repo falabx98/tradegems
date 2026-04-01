@@ -364,7 +364,7 @@ function drawPhaseZones(ctx: CanvasRenderingContext2D, area: Area, duration: num
   const phases = [
     { start: 0, end: 2, color: '#4ade8008' },
     { start: 2, end: 6, color: '#facc1506' },
-    { start: 6, end: 11, color: '#ef444408' },
+    { start: 6, end: 11, color: '#FF333308' },
     { start: 11, end: 15, color: '#8b5cf606' },
   ];
 
@@ -490,8 +490,8 @@ function drawNodes(
 
 function getNodeColor(node: GameNode): string {
   switch (node.type) {
-    case 'multiplier': return '#2ecc71';
-    case 'divider': return '#f87171';
+    case 'multiplier': return '#00E701';
+    case 'divider': return '#FF3333';
     case 'shield': return '#5b8def';
     case 'fake_breakout': return '#8b5cf6';
     case 'volatility_spike': return '#8b8bf5';
@@ -531,7 +531,7 @@ function drawGemShape(
 
   // Outer glow aura
   if (glowStrength > 0) {
-    ctx.shadowColor = '#2ecc71';
+    ctx.shadowColor = '#00E701';
     ctx.shadowBlur = glowStrength;
   }
 
@@ -555,7 +555,7 @@ function drawGemShape(
   // Gradient fill
   const grad = ctx.createLinearGradient(x - halfW, topY, x + halfW, botY);
   grad.addColorStop(0, '#6ff5b0');
-  grad.addColorStop(0.35, '#2ecc71');
+  grad.addColorStop(0.35, '#00E701');
   grad.addColorStop(0.7, '#1fa87a');
   grad.addColorStop(1, '#14654a');
   ctx.fillStyle = grad;
@@ -616,7 +616,7 @@ function drawBombShape(
 
   // Outer red danger glow
   if (glowStrength > 0) {
-    ctx.shadowColor = '#f87171';
+    ctx.shadowColor = '#FF3333';
     ctx.shadowBlur = glowStrength;
   }
 
@@ -820,7 +820,7 @@ function drawActivatedNode(ctx: CanvasRenderingContext2D, x: number, y: number, 
       ctx.moveTo(x, y);
       ctx.lineTo(ex, ey);
       const ra = Math.floor(rayFade * 60).toString(16).padStart(2, '0');
-      ctx.strokeStyle = `#2ecc71${ra}`;
+      ctx.strokeStyle = `#00E701${ra}`;
       ctx.lineWidth = 2;
       ctx.stroke();
 
@@ -833,12 +833,12 @@ function drawActivatedNode(ctx: CanvasRenderingContext2D, x: number, y: number, 
 
     // Core green flash
     ctx.save();
-    ctx.shadowColor = '#2ecc71';
+    ctx.shadowColor = '#00E701';
     ctx.shadowBlur = 15 * fade;
     ctx.beginPath();
     ctx.arc(x, y, 12 * fade, 0, Math.PI * 2);
     const fa = Math.floor(fade * 100).toString(16).padStart(2, '0');
-    ctx.fillStyle = `#2ecc71${fa}`;
+    ctx.fillStyle = `#00E701${fa}`;
     ctx.fill();
     ctx.restore();
 
@@ -853,7 +853,7 @@ function drawActivatedNode(ctx: CanvasRenderingContext2D, x: number, y: number, 
       ctx.beginPath();
       ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
       const ra = Math.floor(ringFade * 50).toString(16).padStart(2, '0');
-      ctx.strokeStyle = r === 0 ? `#8b5cf6${ra}` : `#f87171${ra}`;
+      ctx.strokeStyle = r === 0 ? `#8b5cf6${ra}` : `#FF3333${ra}`;
       ctx.lineWidth = r === 0 ? 2.5 : 1.5;
       ctx.stroke();
     }

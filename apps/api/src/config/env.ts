@@ -25,6 +25,10 @@ const envSchema = z.object({
   DEPOSIT_MIN_SWEEP_LAMPORTS: z.coerce.number().default(5000), // min balance to trigger sweep
   CORS_ORIGINS: z.string().optional(),
   ADMIN_SETUP_KEY: z.string().optional(),
+
+  // Bet caps (in lamports). Defaults are conservative.
+  MAX_BET_LAMPORTS: z.coerce.number().default(100_000_000_000),        // 100 SOL max per single bet
+  MAX_USER_LOCKED_LAMPORTS: z.coerce.number().default(500_000_000_000), // 500 SOL max total locked per user
 });
 
 const parsed = envSchema.safeParse(process.env);

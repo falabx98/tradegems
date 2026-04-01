@@ -3,6 +3,10 @@ import { tradingSimRooms, tradingSimParticipants, tradingSimTrades, users } from
 import { WalletService } from '../wallet/wallet.service.js';
 import { generateSimulatedChart } from '../../utils/chartGenerator.js';
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { auditLog } from '../../utils/auditLog.js';
+import { recordFailedSettlement } from '../../utils/settlementRecovery.js';
+import { UserService } from '../user/user.service.js';
+import { MissionsService } from '../missions/missions.service.js';
 
 const PLATFORM_FEE_RATE = 0.05; // 5% rake
 const SIM_START_BALANCE = 10_000; // virtual units each player starts with
@@ -10,6 +14,8 @@ const SIM_START_BALANCE = 10_000; // virtual units each player starts with
 export class TradingSimService {
   private db = getDb();
   private walletService = new WalletService();
+  private userService = new UserService();
+  private missionsService = new MissionsService();
 
   // ─── List Available Rooms ───────────────────────────────────
 
@@ -53,6 +59,7 @@ export class TradingSimService {
       type: 'trading_sim',
       id: roomId,
     });
+    auditLog({ action: 'trading_sim_join', userId, game: 'trading-sim', gameId: roomId, betAmount: entryFee, status: 'success' });
 
     // Insert room
     const [room] = await this.db
@@ -80,7 +87,7 @@ export class TradingSimService {
 
   // ─── Join Room ──────────────────────────────────────────────
 
-  async joinRoom(userId: string, roomId: string) {
+  async joinRoom(userId: string, roomId: string, isDemoBet = false) {
     const room = await this.db.query.tradingSimRooms.findFirst({
       where: eq(tradingSimRooms.id, roomId),
     });
@@ -102,7 +109,8 @@ export class TradingSimService {
     await this.walletService.lockFunds(userId, room.entryFee, 'SOL', {
       type: 'trading_sim',
       id: roomId,
-    });
+    }, isDemoBet);
+    auditLog({ action: 'trading_sim_join', userId, game: 'trading-sim', gameId: roomId, betAmount: room.entryFee, status: 'success' });
 
     // Add participant
     await this.db.insert(tradingSimParticipants).values({
@@ -367,14 +375,24 @@ export class TradingSimService {
     if (winner && participantRoles.get(winner.userId) !== 'bot') {
       // fee=0: lockFunds only locked entryFee; platform fee taken from pool difference
       // Critical: winner payout failure must prevent room from being marked as finished
-      await this.walletService.settlePayout(
-        winner.userId,
-        room.entryFee,
-        0,
-        payoutAmount,
-        'SOL',
-        { type: 'trading_sim', id: roomId },
-      );
+      try {
+        await this.walletService.settlePayout(
+          winner.userId,
+          room.entryFee,
+          0,
+          payoutAmount,
+          'SOL',
+          { type: 'trading_sim', id: roomId },
+        );
+        auditLog({ action: 'trading_sim_winner_settle', userId: winner.userId, game: 'trading-sim', gameId: roomId, betAmount: room.entryFee, payoutAmount, status: 'success' });
+      } catch (settleErr: any) {
+        await recordFailedSettlement({
+          userId: winner.userId, game: 'trading-sim', gameRefType: 'trading_sim', gameRefId: roomId,
+          betAmount: room.entryFee, fee: 0, payoutAmount,
+          errorMessage: settleErr.message || 'Winner settlement failed',
+        });
+        throw settleErr;
+      }
     }
 
     // Settle losers: unlock with zero payout
@@ -389,9 +407,24 @@ export class TradingSimService {
           'SOL',
           { type: 'trading_sim', id: roomId },
         );
-      } catch (err) {
+        auditLog({ action: 'trading_sim_loser_settle', userId: r.userId, game: 'trading-sim', gameId: roomId, betAmount: room.entryFee, payoutAmount: 0, status: 'success' });
+      } catch (err: any) {
         console.error('[TradingSim] non-critical loser settlement failed:', err, { userId: r.userId, roomId });
+        await recordFailedSettlement({
+          userId: r.userId, game: 'trading-sim', gameRefType: 'trading_sim', gameRefId: roomId,
+          betAmount: room.entryFee, fee: 0, payoutAmount: 0,
+          errorMessage: err.message || 'Loser settlement failed',
+        });
       }
+    }
+
+    // Award XP to all participants (winner gets more)
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      if (participantRoles.get(r.userId) === 'bot') continue;
+      const xp = i === 0 ? 30 : 15; // winner: 30 XP, others: 15 XP
+      this.userService.addXP(r.userId, xp, 'trading_sim').catch(() => {});
+      this.missionsService.trackProgress(r.userId, 'trading_sim_result', i === 0).catch(() => {});
     }
 
     // Mark room as finished

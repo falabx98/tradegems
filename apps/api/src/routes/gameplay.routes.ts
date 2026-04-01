@@ -6,12 +6,17 @@ import { getDb } from '../config/database.js';
 import { BetService } from '../modules/bet/bet.service.js';
 import { RoundService } from '../modules/round/round.service.js';
 import { requireAuth, requireAdmin, getAuthUser } from '../middleware/auth.js';
+import { requireNotExcluded } from '../middleware/selfExclusion.js';
 import { AppError } from '../middleware/errorHandler.js';
+import { requireGameEnabled } from '../utils/gameGates.js';
+import { validateBetLimits } from '../utils/betLimits.js';
+import { env } from '../config/env.js';
 
 const placeBetSchema = z.object({
-  amount: z.number().int().positive().min(1_000_000).max(100_000_000_000), // min 0.001 SOL, max 100 SOL in lamports
+  amount: z.number().int().positive().min(1_000_000).max(100_000_000_000),
   riskTier: z.enum(['conservative', 'balanced', 'aggressive']),
   idempotencyKey: z.string().min(1).max(128),
+  isDemoBet: z.boolean().optional().default(false),
 });
 
 export async function gameplayRoutes(server: FastifyInstance) {
@@ -81,16 +86,21 @@ export async function gameplayRoutes(server: FastifyInstance) {
     return roundService.getRoundResult(id, getAuthUser(request).userId);
   });
 
-  server.post('/:id/bet', { preHandler: [requireAuth] }, async (request, reply) => {
+  server.post('/:id/bet', { preHandler: [requireAuth, requireNotExcluded] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = placeBetSchema.parse(request.body);
 
+    const userId = getAuthUser(request).userId;
+    const { detectDemoBet } = await import('../utils/demoDetect.js');
+    const isDemoBet = await detectDemoBet(userId, body.isDemoBet);
+    if (!isDemoBet) await validateBetLimits(userId, body.amount, Math.floor(body.amount * env.PLATFORM_FEE_RATE));
     const result = await betService.placeBet({
-      userId: getAuthUser(request).userId,
+      userId,
       roundId: id,
       amount: body.amount,
       riskTier: body.riskTier,
       idempotencyKey: body.idempotencyKey,
+      isDemoBet,
     });
 
     return reply.status(201).send(result);
@@ -103,7 +113,8 @@ export async function gameplayRoutes(server: FastifyInstance) {
   });
 
   // ─── Solo round lifecycle (any authenticated user) ──────
-  server.post('/solo/start', { preHandler: [requireAuth], config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request) => {
+  server.post('/solo/start', { preHandler: [requireAuth, requireNotExcluded], config: { rateLimit: { max: 20, timeWindow: '1 minute' } } }, async (request) => {
+    await requireGameEnabled('solo');
     const userId = getAuthUser(request).userId;
     const round = await roundService.scheduleRound('solo', 10000);
     await roundService.openEntry(round.id);

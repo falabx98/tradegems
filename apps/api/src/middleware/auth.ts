@@ -120,10 +120,30 @@ export async function optionalAuth(request: FastifyRequest, _reply: FastifyReply
   }
 }
 
+// Admin roles hierarchy: viewer < support < operator < superadmin
+// Legacy 'admin' role maps to 'operator' for backward compatibility
+const ADMIN_ROLES = ['viewer', 'support', 'operator', 'admin', 'superadmin'] as const;
+export type AdminRole = typeof ADMIN_ROLES[number];
+
 export async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
   await requireAuth(request, reply);
   const user = getAuthUser(request);
-  if (user.role !== 'admin' && user.role !== 'superadmin') {
+  if (!ADMIN_ROLES.includes(user.role as AdminRole)) {
     throw new AppError(403, 'FORBIDDEN', 'Admin access required');
   }
+}
+
+/**
+ * Granular role guard. Usage: { preHandler: [requireAdmin, requireRole('operator', 'superadmin')] }
+ * Legacy 'admin' role is treated as 'operator'.
+ */
+export function requireRole(...allowedRoles: AdminRole[]) {
+  return async (request: FastifyRequest, _reply: FastifyReply) => {
+    const user = getAuthUser(request);
+    // Map legacy 'admin' to 'operator'
+    const effectiveRole = user.role === 'admin' ? 'operator' : user.role;
+    if (!allowedRoles.includes(effectiveRole as AdminRole)) {
+      throw new AppError(403, 'FORBIDDEN', `Requires role: ${allowedRoles.join(' or ')}`);
+    }
+  };
 }

@@ -71,7 +71,7 @@ export function ActivityFeed() {
     fetchFeed();
     intervalRef.current = setInterval(() => {
       fetchFeed(lastIdRef.current);
-    }, 5000);
+    }, 15000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };

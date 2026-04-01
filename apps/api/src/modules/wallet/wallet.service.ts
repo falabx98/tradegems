@@ -3,6 +3,8 @@ import { balances, balanceLedgerEntries, deposits, withdrawals, linkedWallets, u
 import { getDb } from '../../config/database.js';
 import { getRedis } from '../../config/redis.js';
 import { AppError } from '../../middleware/errorHandler.js';
+import { auditLog } from '../../utils/auditLog.js';
+import { withSettlementGuard } from '../../utils/idempotency.js';
 
 const BONUS_PROFIT_THRESHOLD = 1_000_000_000; // Must profit 1 SOL to unlock withdrawal
 
@@ -31,104 +33,146 @@ export class WalletService {
         pendingAmount: 0,
       }).onConflictDoNothing();
 
-      return {
-        balances: [{
-          asset: 'SOL' as const,
-          available: '0',
-          locked: '0',
-          pending: '0',
-        }],
-      };
+      return [{ asset: 'SOL', available: 0, locked: 0, pending: 0, total: 0 }];
     }
 
-    return {
-      balances: rows.map(r => ({
-        asset: r.asset,
-        available: String(r.availableAmount),
-        locked: String(r.lockedAmount),
-        pending: String(r.pendingAmount),
-        bonus: String(r.bonusAmount ?? 0),
-      })),
-    };
+    return rows.map(r => ({
+      asset: r.asset,
+      available: r.availableAmount,
+      locked: r.lockedAmount,
+      pending: r.pendingAmount ?? 0,
+      total: r.availableAmount + r.lockedAmount,
+    }));
+  }
+
+  async getBalance(userId: string, asset: string = 'SOL') {
+    const row = await this.db.query.balances.findFirst({
+      where: and(eq(balances.userId, userId), eq(balances.asset, asset)),
+    });
+    return row?.availableAmount ?? 0;
   }
 
   // ─── Lock Funds (for bet placement) ──────────────────────
+  // ATOMIC: Redis lock + DB transaction (balance update + ledger) in one commit
 
-  async lockFunds(userId: string, amount: number, asset: string, ref: LedgerRef) {
+  async lockFunds(userId: string, amount: number, asset: string, ref: LedgerRef, isDemoBet = false) {
+    // Demo bets: deduct from users.demo_balance instead of balances.available_amount
+    if (isDemoBet) {
+      const result = await this.db.execute(sql`
+        UPDATE users
+        SET demo_balance = demo_balance - ${amount}
+        WHERE id = ${userId} AND demo_balance >= ${amount}
+        RETURNING demo_balance
+      `) as unknown as { demo_balance: number }[];
+      if (!result || result.length === 0) {
+        throw new AppError(400, 'INSUFFICIENT_DEMO_BALANCE', 'Insufficient demo balance');
+      }
+      return { available: 0, locked: 0, isDemoBet: true, demoBalance: result[0].demo_balance };
+    }
+    // Real money flow below
+    // Enforce loss limits (fire-and-forget on error, never block for non-limit failures)
+    try {
+      const { checkLossLimit } = await import('../../utils/limitEnforcement.js');
+      await checkLossLimit(userId, amount);
+    } catch (err) {
+      if (err instanceof AppError && err.code === 'LOSS_LIMIT_EXCEEDED') throw err;
+      // Non-limit errors: log but don't block
+      console.error('[LossLimit] Check failed:', err);
+    }
     const redis = getRedis();
     const lockKey = `lock:balance:${userId}:${asset}`;
     const acquired = await redis.set(lockKey, '1', 'EX', 5, 'NX');
-    if (!acquired) throw new AppError(409, 'BALANCE_LOCKED', 'Balance operation in progress');
+    if (!acquired) {
+      auditLog({ action: 'lock_funds', userId, betAmount: amount, status: 'failed', error: 'BALANCE_LOCKED', meta: { ref: `${ref.type}:${ref.id}` } });
+      throw new AppError(409, 'BALANCE_LOCKED', 'Balance operation in progress');
+    }
 
     try {
-      // Use raw SQL for atomic update with check
-      const result = await this.db.execute(sql`
-        UPDATE balances
-        SET available_amount = available_amount - ${amount},
-            locked_amount = locked_amount + ${amount},
-            updated_at = now()
-        WHERE user_id = ${userId}
-          AND asset = ${asset}
-          AND available_amount >= ${amount}
-        RETURNING available_amount, locked_amount
-      `) as unknown as { available_amount: number; locked_amount: number }[];
+      return await this.db.transaction(async (tx) => {
+        // 1. Atomically update balance with guard
+        const result = await tx.execute(sql`
+          UPDATE balances
+          SET available_amount = available_amount - ${amount},
+              locked_amount = locked_amount + ${amount},
+              updated_at = now()
+          WHERE user_id = ${userId}
+            AND asset = ${asset}
+            AND available_amount >= ${amount}
+          RETURNING available_amount, locked_amount
+        `) as unknown as { available_amount: number; locked_amount: number }[];
 
-      if (!result || result.length === 0) {
-        throw new AppError(400, 'INSUFFICIENT_BALANCE', 'Insufficient available balance');
-      }
+        if (!result || result.length === 0) {
+          auditLog({ action: 'lock_funds', userId, betAmount: amount, status: 'failed', error: 'INSUFFICIENT_BALANCE', meta: { ref: `${ref.type}:${ref.id}` } });
+          throw new AppError(400, 'INSUFFICIENT_BALANCE', 'Insufficient available balance');
+        }
 
-      const row = result[0];
+        const row = result[0];
 
-      // Record ledger entry
-      await this.db.insert(balanceLedgerEntries).values({
-        userId,
-        asset,
-        entryType: 'bet_lock',
-        amount: -amount,
-        balanceAfter: row.available_amount,
-        referenceType: ref.type,
-        referenceId: ref.id,
+        // 2. Ledger entry in same transaction
+        await tx.insert(balanceLedgerEntries).values({
+          userId,
+          asset,
+          entryType: 'bet_lock',
+          amount: -amount,
+          balanceAfter: row.available_amount,
+          referenceType: ref.type,
+          referenceId: ref.id,
+        });
+
+        auditLog({ action: 'lock_funds', userId, betAmount: amount, status: 'success', meta: { ref: `${ref.type}:${ref.id}` } });
+
+        return {
+          available: row.available_amount,
+          locked: row.locked_amount,
+        };
       });
-
-      return {
-        available: row.available_amount,
-        locked: row.locked_amount,
-      };
     } finally {
       await redis.del(lockKey);
     }
   }
 
   // ─── Release Funds (bet cancel / refund) ─────────────────
+  // ATOMIC: balance update + ledger in one transaction
 
-  async releaseFunds(userId: string, amount: number, asset: string, ref: LedgerRef) {
-    const result = await this.db.execute(sql`
-      UPDATE balances
-      SET available_amount = available_amount + ${amount},
-          locked_amount = locked_amount - ${amount},
-          updated_at = now()
-      WHERE user_id = ${userId}
-        AND asset = ${asset}
-        AND locked_amount >= ${amount}
-      RETURNING available_amount
-    `) as unknown as { available_amount: number }[];
-
-    if (!result || result.length === 0) {
-      throw new AppError(409, 'RELEASE_FAILED', `Release failed — insufficient locked funds for user ${userId}, ref ${ref.type}:${ref.id}`);
+  async releaseFunds(userId: string, amount: number, asset: string, ref: LedgerRef, isDemoBet = false) {
+    if (isDemoBet) {
+      // Demo: just return the amount to demo_balance
+      await this.db.execute(sql`
+        UPDATE users SET demo_balance = demo_balance + ${amount} WHERE id = ${userId}
+      `);
+      return;
     }
+    await this.db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        UPDATE balances
+        SET available_amount = available_amount + ${amount},
+            locked_amount = locked_amount - ${amount},
+            updated_at = now()
+        WHERE user_id = ${userId}
+          AND asset = ${asset}
+          AND locked_amount >= ${amount}
+        RETURNING available_amount
+      `) as unknown as { available_amount: number }[];
 
-    await this.db.insert(balanceLedgerEntries).values({
-      userId,
-      asset,
-      entryType: 'bet_unlock',
-      amount: amount,
-      balanceAfter: result[0].available_amount,
-      referenceType: ref.type,
-      referenceId: ref.id,
+      if (!result || result.length === 0) {
+        throw new AppError(409, 'RELEASE_FAILED', `Release failed — insufficient locked funds for user ${userId}, ref ${ref.type}:${ref.id}`);
+      }
+
+      await tx.insert(balanceLedgerEntries).values({
+        userId,
+        asset,
+        entryType: 'bet_unlock',
+        amount: amount,
+        balanceAfter: result[0].available_amount,
+        referenceType: ref.type,
+        referenceId: ref.id,
+      });
     });
   }
 
   // ─── Settle Payout ───────────────────────────────────────
+  // ATOMIC: balance update + all ledger entries in one transaction
+  // Guard: WHERE locked_amount >= totalLocked prevents double-settlement
 
   async settlePayout(
     userId: string,
@@ -137,135 +181,265 @@ export class WalletService {
     payoutAmount: number,
     asset: string,
     ref: LedgerRef,
+    isDemoBet = false,
   ) {
-    const totalLocked = betAmount + fee;
-
-    // Unlock bet + credit payout in one go
-    // Guard: only update if locked_amount is sufficient (prevents double-settlement)
-    const result = await this.db.execute(sql`
-      UPDATE balances
-      SET locked_amount = locked_amount - ${totalLocked},
-          available_amount = available_amount + ${payoutAmount},
-          updated_at = now()
-      WHERE user_id = ${userId}
-        AND asset = ${asset}
-        AND locked_amount >= ${totalLocked}
-      RETURNING available_amount, locked_amount
-    `) as unknown as { available_amount: number; locked_amount: number }[];
-
-    // If no row was returned, the settlement failed (already processed or insufficient locked funds)
-    if (!result || result.length === 0) {
-      throw new AppError(409, 'SETTLEMENT_FAILED', `Settlement skipped — insufficient locked funds for user ${userId}, ref ${ref.type}:${ref.id}`);
+    // Demo bets: credit payout to demo_balance (bet was already deducted in lockFunds)
+    if (isDemoBet) {
+      if (payoutAmount > 0) {
+        await this.db.execute(sql`
+          UPDATE users SET demo_balance = demo_balance + ${payoutAmount} WHERE id = ${userId}
+        `);
+      }
+      // No ledger entries, no idempotency guard needed for demo
+      return;
     }
 
-    const bal = await this.db.query.balances.findFirst({
-      where: and(eq(balances.userId, userId), eq(balances.asset, asset)),
-    });
+    const totalLocked = betAmount + fee;
 
-    // Ledger: unlock
-    await this.db.insert(balanceLedgerEntries).values({
-      userId,
-      asset,
-      entryType: 'bet_settle',
-      amount: -totalLocked,
-      balanceAfter: bal?.availableAmount ?? 0,
-      referenceType: ref.type,
-      referenceId: ref.id,
-    });
+    // Idempotency guard: same user + game + round + amount = same key
+    const { duplicate } = await withSettlementGuard(
+      {
+        userId,
+        gameType: ref.type,
+        gameId: ref.id,
+        action: 'settle',
+        amount: payoutAmount,
+      },
+      async () => {
+    await this.db.transaction(async (tx) => {
+      // 1. Unlock bet + credit payout atomically with guard
+      const result = await tx.execute(sql`
+        UPDATE balances
+        SET locked_amount = locked_amount - ${totalLocked},
+            available_amount = available_amount + ${payoutAmount},
+            updated_at = now()
+        WHERE user_id = ${userId}
+          AND asset = ${asset}
+          AND locked_amount >= ${totalLocked}
+        RETURNING available_amount, locked_amount
+      `) as unknown as { available_amount: number; locked_amount: number }[];
 
-    // Ledger: payout credit
-    if (payoutAmount > 0) {
-      await this.db.insert(balanceLedgerEntries).values({
+      if (!result || result.length === 0) {
+        auditLog({ action: 'settle_payout', userId, betAmount, fee, payoutAmount, status: 'failed', error: 'INSUFFICIENT_LOCKED', meta: { ref: `${ref.type}:${ref.id}` } });
+        throw new AppError(409, 'SETTLEMENT_FAILED', `Settlement skipped — insufficient locked funds for user ${userId}, ref ${ref.type}:${ref.id}`);
+      }
+
+      const bal = result[0];
+
+      // 2. Ledger: unlock entry
+      await tx.insert(balanceLedgerEntries).values({
         userId,
         asset,
-        entryType: 'payout_credit',
-        amount: payoutAmount,
-        balanceAfter: bal?.availableAmount ?? 0,
+        entryType: 'bet_settle',
+        amount: -totalLocked,
+        balanceAfter: bal.available_amount,
         referenceType: ref.type,
         referenceId: ref.id,
       });
+
+      // 3. Ledger: payout credit entry
+      if (payoutAmount > 0) {
+        await tx.insert(balanceLedgerEntries).values({
+          userId,
+          asset,
+          entryType: 'payout_credit',
+          amount: payoutAmount,
+          balanceAfter: bal.available_amount,
+          referenceType: ref.type,
+          referenceId: ref.id,
+        });
+      }
+
+      auditLog({ action: 'settle_payout', userId, betAmount, fee, payoutAmount, status: 'success', meta: { ref: `${ref.type}:${ref.id}` } });
+    });
+    return { settled: true };
+      }, // end withSettlementGuard fn
+    ); // end withSettlementGuard
+
+    if (duplicate) {
+      auditLog({ action: 'settle_payout', userId, betAmount, fee, payoutAmount, status: 'skipped', meta: { ref: `${ref.type}:${ref.id}`, reason: 'idempotency_duplicate' } });
+    } else {
+      // Track bet for weekly race (fire-and-forget, never block settlement)
+      try {
+        const { WeeklyRaceService } = await import('../weekly-race/weeklyRace.service.js');
+        await WeeklyRaceService.trackBet(userId, betAmount);
+      } catch { /* weekly race tracking should never break settlement */ }
+
+      // Track wager progress for bonus requirements (fire-and-forget)
+      try {
+        const { bonusWagerProgress } = await import('@tradingarena/db');
+        const { eq, and, sql: sqlTag } = await import('drizzle-orm');
+        const unfulfilled = await this.db.select({ id: bonusWagerProgress.id })
+          .from(bonusWagerProgress)
+          .where(and(eq(bonusWagerProgress.userId, userId), eq(bonusWagerProgress.fulfilled, false)));
+        for (const entry of unfulfilled) {
+          await this.db.execute(sqlTag`
+            UPDATE bonus_wager_progress
+            SET wager_completed_lamports = wager_completed_lamports + ${betAmount},
+                fulfilled = CASE WHEN wager_completed_lamports + ${betAmount} >= wager_required_lamports THEN true ELSE false END,
+                fulfilled_at = CASE WHEN wager_completed_lamports + ${betAmount} >= wager_required_lamports THEN now() ELSE NULL END
+            WHERE id = ${entry.id}
+          `);
+        }
+      } catch { /* wager tracking should never break settlement */ }
     }
   }
 
   // ─── Credit Deposit ──────────────────────────────────────
+  // ATOMIC: upsert balance + ledger + optional bonus in one transaction
 
   async creditDeposit(userId: string, amount: number, asset: string, depositId: string) {
-    // L3 fix: Upsert balance row to handle missing balance rows
-    const result = await this.db.execute(sql`
-      INSERT INTO balances (user_id, asset, available_amount, locked_amount, pending_amount)
-      VALUES (${userId}, ${asset}, ${amount}, 0, 0)
-      ON CONFLICT (user_id, asset)
-      DO UPDATE SET available_amount = balances.available_amount + ${amount},
-                    updated_at = now()
-      RETURNING available_amount
-    `) as unknown as { available_amount: number }[];
-
-    const balanceAfter = result?.[0]?.available_amount ?? amount;
-
-    await this.db.insert(balanceLedgerEntries).values({
-      userId,
-      asset,
-      entryType: 'deposit_confirmed',
-      amount,
-      balanceAfter,
-      referenceType: 'deposit',
-      referenceId: depositId,
-    });
-
-    // ── 100% First Deposit Bonus ──
-    // If user hasn't received deposit bonus yet, match 100% of this deposit
+    // Enforce deposit limits (before crediting)
     try {
-      // M14 fix: Atomically claim bonus — only update if bonus_claimed=false (prevents double bonus)
-      const bonusClaim = await this.db.execute(sql`
-        UPDATE users SET bonus_claimed = true, updated_at = now()
-        WHERE id = ${userId} AND bonus_claimed = false
-        RETURNING id
-      `) as unknown as { id: string }[];
-
-      if (bonusClaim && bonusClaim.length > 0) {
-        // We won the atomic flag — apply 100% bonus
-        const bonusAmount = amount;
-
-        await this.db.execute(sql`
-          UPDATE balances
-          SET available_amount = available_amount + ${bonusAmount},
-              bonus_amount = COALESCE(bonus_amount, 0) + ${bonusAmount},
-              updated_at = now()
-          WHERE user_id = ${userId} AND asset = ${asset}
-        `);
-
-        // Get updated balance for ledger
-        const updatedBal = await this.db.query.balances.findFirst({
-          where: and(eq(balances.userId, userId), eq(balances.asset, asset)),
-        });
-
-        // Record bonus ledger entry
-        await this.db.insert(balanceLedgerEntries).values({
-          userId,
-          asset,
-          entryType: 'signup_bonus',
-          amount: bonusAmount,
-          balanceAfter: updatedBal?.availableAmount ?? balanceAfter + bonusAmount,
-          referenceType: 'bonus',
-          referenceId: `deposit-bonus-${depositId}`,
-          metadata: { bonusType: 'first_deposit_100pct', depositAmount: amount, bonusAmount },
-        });
-
-        console.log(`[DepositBonus] Applied 100% bonus of ${bonusAmount} lamports to user ${userId}`);
-      }
-      // else: bonus already claimed (concurrent deposit lost the race) — no-op
+      const { checkDepositLimits } = await import('../../utils/limitEnforcement.js');
+      await checkDepositLimits(userId, amount);
     } catch (err) {
-      // Don't fail the deposit if bonus fails
-      console.error(`[DepositBonus] Failed to apply bonus for user ${userId}:`, err);
+      if (err instanceof AppError && err.code === 'DEPOSIT_LIMIT_EXCEEDED') {
+        console.warn(`[DepositLimit] User ${userId} exceeded deposit limit: ${err.message}`);
+        throw err; // Propagate to caller — deposit will not be credited
+      }
+      // Non-limit errors: log but don't block deposit
+      console.error('[DepositLimit] Check failed:', err);
     }
+
+    await this.db.transaction(async (tx) => {
+      // 1. Upsert balance
+      const result = await tx.execute(sql`
+        INSERT INTO balances (user_id, asset, available_amount, locked_amount, pending_amount)
+        VALUES (${userId}, ${asset}, ${amount}, 0, 0)
+        ON CONFLICT (user_id, asset)
+        DO UPDATE SET available_amount = balances.available_amount + ${amount},
+                      updated_at = now()
+        RETURNING available_amount
+      `) as unknown as { available_amount: number }[];
+
+      const balanceAfter = result?.[0]?.available_amount ?? amount;
+
+      // 2. Ledger entry
+      await tx.insert(balanceLedgerEntries).values({
+        userId,
+        asset,
+        entryType: 'deposit_confirmed',
+        amount,
+        balanceAfter,
+        referenceType: 'deposit',
+        referenceId: depositId,
+      });
+
+      // 3. First deposit bonus (atomic CAS within same transaction)
+      try {
+        const bonusClaim = await tx.execute(sql`
+          UPDATE users SET bonus_claimed = true, updated_at = now()
+          WHERE id = ${userId} AND bonus_claimed = false
+          RETURNING id
+        `) as unknown as { id: string }[];
+
+        if (bonusClaim && bonusClaim.length > 0) {
+          const bonusAmount = amount;
+
+          // Bonus balance update in same transaction
+          const bonusResult = await tx.execute(sql`
+            UPDATE balances
+            SET available_amount = available_amount + ${bonusAmount},
+                bonus_amount = COALESCE(bonus_amount, 0) + ${bonusAmount},
+                updated_at = now()
+            WHERE user_id = ${userId} AND asset = ${asset}
+            RETURNING available_amount
+          `) as unknown as { available_amount: number }[];
+
+          const bonusBalanceAfter = bonusResult?.[0]?.available_amount ?? balanceAfter + bonusAmount;
+
+          // Bonus ledger entry in same transaction
+          await tx.insert(balanceLedgerEntries).values({
+            userId,
+            asset,
+            entryType: 'signup_bonus',
+            amount: bonusAmount,
+            balanceAfter: bonusBalanceAfter,
+            referenceType: 'bonus',
+            referenceId: `deposit-bonus-${depositId}`,
+            metadata: { bonusType: 'first_deposit_100pct', depositAmount: amount, bonusAmount },
+          });
+
+          console.log(`[DepositBonus] Applied 100% bonus of ${bonusAmount} lamports to user ${userId}`);
+        }
+      } catch (err) {
+        // Don't fail the deposit if bonus fails — but since we're in a transaction,
+        // we need to handle this carefully. Log but don't re-throw.
+        console.error(`[DepositBonus] Failed to apply bonus for user ${userId}:`, err);
+      }
+
+      // ─── Process pending deposit matches (from bonus codes) ───
+      try {
+        const { pendingDepositMatches, bonusWagerProgress, bonusCodes: bonusCodesTable } = await import('@tradingarena/db');
+        const pendingMatches = await tx.select()
+          .from(pendingDepositMatches)
+          .where(and(eq(pendingDepositMatches.userId, userId), eq(pendingDepositMatches.used, false)));
+
+        for (const match of pendingMatches) {
+          const matchAmount = Math.min(
+            Math.floor(amount * match.matchPercentage / 100),
+            match.maxMatchLamports > 0 ? match.maxMatchLamports : Infinity,
+          );
+          if (matchAmount <= 0) continue;
+
+          // Credit match to balance
+          const matchResult = await tx.execute(sql`
+            UPDATE balances
+            SET available_amount = available_amount + ${matchAmount},
+                bonus_amount = COALESCE(bonus_amount, 0) + ${matchAmount},
+                updated_at = now()
+            WHERE user_id = ${userId} AND asset = ${asset}
+            RETURNING available_amount
+          `) as unknown as { available_amount: number }[];
+
+          const matchBalanceAfter = matchResult?.[0]?.available_amount ?? matchAmount;
+
+          // Ledger entry
+          await tx.insert(balanceLedgerEntries).values({
+            userId,
+            asset,
+            entryType: 'deposit_match_bonus',
+            amount: matchAmount,
+            balanceAfter: matchBalanceAfter,
+            referenceType: 'deposit_match',
+            referenceId: match.bonusCodeId,
+            metadata: { matchPercentage: match.matchPercentage, depositAmount: amount, matchAmount },
+          });
+
+          // Mark match as used
+          await tx.update(pendingDepositMatches).set({ used: true, usedAt: new Date() }).where(eq(pendingDepositMatches.id, match.id));
+
+          // Create wager requirement if the bonus code has one
+          const [bonusCode] = await tx.select({ wagerMultiplier: bonusCodesTable.wagerMultiplier }).from(bonusCodesTable).where(eq(bonusCodesTable.id, match.bonusCodeId));
+          if (bonusCode?.wagerMultiplier && bonusCode.wagerMultiplier > 0) {
+            await tx.insert(bonusWagerProgress).values({
+              userId,
+              bonusCodeId: match.bonusCodeId,
+              bonusAmountLamports: matchAmount,
+              wagerRequiredLamports: matchAmount * bonusCode.wagerMultiplier,
+            });
+          }
+
+          console.log(`[DepositMatch] Applied ${match.matchPercentage}% match: ${matchAmount} lamports to user ${userId}`);
+        }
+      } catch (err) {
+        console.error(`[DepositMatch] Failed for user ${userId}:`, err);
+      }
+
+      // Track own deposits for sponsored accounts (fire-and-forget within transaction)
+      try {
+        const { SponsoredService } = await import('../sponsored/sponsored.service.js');
+        await SponsoredService.recordOwnDeposit(userId, amount);
+      } catch { /* not sponsored or tracking failed — ok */ }
+    });
   }
 
-  // ─── Transactions ────────────────────────────────────────
+  // ─── Transactions (Ledger Query) ──────────────────────────
 
   async getTransactions(userId: string, limit: number = 20, cursor?: string) {
     const conditions = [eq(balanceLedgerEntries.userId, userId)];
     if (cursor) {
-      // cursor is the id of the last item from previous page — fetch older entries
       const cursorId = parseInt(cursor, 10);
       if (!isNaN(cursorId) && cursorId > 0) {
         conditions.push(sql`${balanceLedgerEntries.id} < ${cursorId}`);
@@ -305,30 +479,33 @@ export class WalletService {
   }
 
   // ─── Settle Withdrawal ──────────────────────────────────
+  // ATOMIC: balance update + ledger in one transaction
 
   async settleWithdrawal(userId: string, totalAmount: number, asset: string, withdrawalId: string) {
-    const result = await this.db.execute(sql`
-      UPDATE balances
-      SET locked_amount = locked_amount - ${totalAmount},
-          updated_at = now()
-      WHERE user_id = ${userId}
-        AND asset = ${asset}
-        AND locked_amount >= ${totalAmount}
-      RETURNING available_amount
-    `) as unknown as { available_amount: number }[];
+    await this.db.transaction(async (tx) => {
+      const result = await tx.execute(sql`
+        UPDATE balances
+        SET locked_amount = locked_amount - ${totalAmount},
+            updated_at = now()
+        WHERE user_id = ${userId}
+          AND asset = ${asset}
+          AND locked_amount >= ${totalAmount}
+        RETURNING available_amount
+      `) as unknown as { available_amount: number }[];
 
-    if (!result || result.length === 0) {
-      throw new AppError(409, 'WITHDRAWAL_SETTLE_FAILED', `Withdrawal settlement failed — insufficient locked funds for user ${userId}`);
-    }
+      if (!result || result.length === 0) {
+        throw new AppError(409, 'WITHDRAWAL_SETTLE_FAILED', `Withdrawal settlement failed — insufficient locked funds for user ${userId}`);
+      }
 
-    await this.db.insert(balanceLedgerEntries).values({
-      userId,
-      asset,
-      entryType: 'withdraw_complete',
-      amount: -totalAmount,
-      balanceAfter: result[0].available_amount,
-      referenceType: 'withdrawal',
-      referenceId: withdrawalId,
+      await tx.insert(balanceLedgerEntries).values({
+        userId,
+        asset,
+        entryType: 'withdraw_complete',
+        amount: -totalAmount,
+        balanceAfter: result[0].available_amount,
+        referenceType: 'withdrawal',
+        referenceId: withdrawalId,
+      });
     });
   }
 
@@ -337,9 +514,8 @@ export class WalletService {
   async getBonusStatus(userId: string): Promise<{
     claimed: boolean;
     bonusAmount: number;
-    profitRequired: number;
-    currentProfit: number;
-    withdrawalUnlocked: boolean;
+    withdrawalEligible: boolean;
+    profitNeeded: number;
   }> {
     const user = await this.db.query.users.findFirst({
       where: eq(users.id, userId),
@@ -349,77 +525,46 @@ export class WalletService {
       where: and(eq(balances.userId, userId), eq(balances.asset, 'SOL')),
     });
 
-    const profile = await this.db.query.userProfiles.findFirst({
-      where: eq(userProfiles.userId, userId),
-    });
+    const claimed = user?.bonusClaimed ?? false;
+    const bonusAmount = (bal as any)?.bonusAmount ?? 0;
+    const totalBalance = (bal?.availableAmount ?? 0) + (bal?.lockedAmount ?? 0);
 
-    const totalWagered = profile?.totalWagered ?? 0;
-    const totalWon = profile?.totalWon ?? 0;
-    const currentProfit = totalWon - totalWagered;
-    const bonusAmount = bal?.bonusAmount ?? 0;
-    const withdrawalUnlocked = bonusAmount === 0 || currentProfit >= BONUS_PROFIT_THRESHOLD;
+    // User needs to profit enough above their bonus to withdraw
+    const profitNeeded = Math.max(0, BONUS_PROFIT_THRESHOLD - (totalBalance - bonusAmount));
+    const withdrawalEligible = profitNeeded <= 0 || !claimed;
 
     return {
-      claimed: user?.bonusClaimed ?? false,
+      claimed,
       bonusAmount,
-      profitRequired: BONUS_PROFIT_THRESHOLD,
-      currentProfit,
-      withdrawalUnlocked,
+      withdrawalEligible,
+      profitNeeded,
     };
   }
 
-  // ─── Bonus: Check withdrawal eligibility ────────────────
+  // ─── Withdrawal Eligibility ───────────────────────────────
 
-  async checkWithdrawalEligibility(userId: string, requestedAmount: number): Promise<{
+  async checkWithdrawalEligibility(userId: string, asset: string = 'SOL'): Promise<{
     eligible: boolean;
-    maxWithdrawable: number;
     reason?: string;
+    availableToWithdraw: number;
   }> {
     const bal = await this.db.query.balances.findFirst({
-      where: and(eq(balances.userId, userId), eq(balances.asset, 'SOL')),
+      where: and(eq(balances.userId, userId), eq(balances.asset, asset)),
     });
 
-    if (!bal) {
-      return { eligible: false, maxWithdrawable: 0, reason: 'No balance found' };
+    if (!bal || bal.availableAmount <= 0) {
+      return { eligible: false, reason: 'NO_BALANCE', availableToWithdraw: 0 };
     }
 
-    const bonusAmount = bal.bonusAmount ?? 0;
-    const availableAmount = bal.availableAmount;
-
-    // If no bonus, full balance is withdrawable
-    if (bonusAmount === 0) {
-      return { eligible: requestedAmount <= availableAmount, maxWithdrawable: availableAmount };
-    }
-
-    // Check profit threshold
-    const profile = await this.db.query.userProfiles.findFirst({
-      where: eq(userProfiles.userId, userId),
-    });
-
-    const totalWagered = profile?.totalWagered ?? 0;
-    const totalWon = profile?.totalWon ?? 0;
-    const currentProfit = totalWon - totalWagered;
-
-    if (currentProfit >= BONUS_PROFIT_THRESHOLD) {
-      // Profit threshold met! Unlock bonus — clear it from balance tracking
-      await this.db.execute(sql`
-        UPDATE balances SET bonus_amount = 0, updated_at = now()
-        WHERE user_id = ${userId} AND asset = 'SOL'
-      `);
-      return { eligible: requestedAmount <= availableAmount, maxWithdrawable: availableAmount };
-    }
-
-    // Profit threshold not met — only allow withdrawal of non-bonus funds
-    const withdrawable = Math.max(0, availableAmount - bonusAmount);
-    if (requestedAmount > withdrawable) {
+    const bonusStatus = await this.getBonusStatus(userId);
+    if (bonusStatus.claimed && !bonusStatus.withdrawalEligible) {
       return {
         eligible: false,
-        maxWithdrawable: withdrawable,
-        reason: `Your deposit bonus is locked until you earn 1 SOL in profit. Current profit: ${(currentProfit / 1_000_000_000).toFixed(4)} SOL`,
+        reason: 'BONUS_LOCK',
+        availableToWithdraw: 0,
       };
     }
 
-    return { eligible: true, maxWithdrawable: withdrawable };
+    return { eligible: true, availableToWithdraw: bal.availableAmount };
   }
-
 }

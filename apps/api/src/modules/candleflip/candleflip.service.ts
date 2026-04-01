@@ -3,12 +3,18 @@ import { getDb } from '../../config/database.js';
 import { candleflipGames, users } from '@tradingarena/db';
 import { WalletService } from '../wallet/wallet.service.js';
 import { eq, and, desc, sql, ne } from 'drizzle-orm';
+import { auditLog } from '../../utils/auditLog.js';
+import { recordFailedSettlement } from '../../utils/settlementRecovery.js';
+import { UserService } from '../user/user.service.js';
+import { MissionsService } from '../missions/missions.service.js';
 
 const HOUSE_FEE_RATE = 0.05; // 5% rake
 
 export class CandleflipService {
   private db = getDb();
   private wallet = new WalletService();
+  private userService = new UserService();
+  private missionsService = new MissionsService();
 
   // ─── Create Game (open lobby) ──────────────────────────────
 
@@ -119,14 +125,24 @@ export class CandleflipService {
     // Settle winner: unlock their bet + add winnings
     // fee=0: lockFunds only locked betAmount; house fee is taken from pool difference
     if (!winnerIsBot) {
-      await this.wallet.settlePayout(
-        winnerId,
-        game.betAmount,
-        0,
-        prizeAmount,
-        'SOL',
-        { type: 'candleflip', id: gameId },
-      );
+      try {
+        await this.wallet.settlePayout(
+          winnerId,
+          game.betAmount,
+          0,
+          prizeAmount,
+          'SOL',
+          { type: 'candleflip', id: gameId },
+        );
+        auditLog({ action: 'candleflip_winner_settle', userId: winnerId, game: 'candleflip', gameId, betAmount: game.betAmount, payoutAmount: prizeAmount, status: 'success' });
+      } catch (settleErr: any) {
+        await recordFailedSettlement({
+          userId: winnerId, game: 'candleflip', gameRefType: 'candleflip', gameRefId: gameId,
+          betAmount: game.betAmount, fee: 0, payoutAmount: prizeAmount,
+          errorMessage: settleErr.message || 'Winner settlement failed',
+        });
+        throw settleErr;
+      }
     }
 
     // Settle loser: unlock with zero payout (fee=0, betAmount is total locked)
@@ -140,8 +156,13 @@ export class CandleflipService {
           'SOL',
           { type: 'candleflip', id: gameId },
         );
-      } catch (err) {
+      } catch (err: any) {
         console.error('[Candleflip] non-critical loser settlement failed:', err, { userId: loserId, gameId });
+        await recordFailedSettlement({
+          userId: loserId, game: 'candleflip', gameRefType: 'candleflip', gameRefId: gameId,
+          betAmount: game.betAmount, fee: 0, payoutAmount: 0,
+          errorMessage: err.message || 'Loser settlement failed',
+        });
       }
     }
 
@@ -158,6 +179,16 @@ export class CandleflipService {
       })
       .where(eq(candleflipGames.id, gameId))
       .returning();
+
+    // Award XP + track missions for both players
+    if (!winnerIsBot) {
+      this.userService.addXP(winnerId, 25, 'candleflip').catch(() => {});
+      this.missionsService.trackProgress(winnerId, 'candleflip_result', true).catch(() => {});
+    }
+    if (!loserIsBot) {
+      this.userService.addXP(loserId, 15, 'candleflip').catch(() => {});
+      this.missionsService.trackProgress(loserId, 'candleflip_result', false).catch(() => {});
+    }
 
     return resolved;
   }

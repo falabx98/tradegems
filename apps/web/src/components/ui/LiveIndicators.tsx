@@ -2,7 +2,7 @@ import { theme } from '../../styles/theme';
 
 // ─── LiveDot ────────────────────────────────────────────────────────────────
 // Pulsing dot with expanding ring, replaces inline pulsing dots everywhere
-export function LiveDot({ color = '#2ecc71', size = 8 }: { color?: string; size?: number }) {
+export function LiveDot({ color = '#00E701', size = 8 }: { color?: string; size?: number }) {
   return (
     <span style={{
       position: 'relative',
@@ -46,7 +46,7 @@ export function MultiplierBadge({
   suffix?: string;
 }) {
   const isPositive = value >= 1.0;
-  const color = isPositive ? '#2ecc71' : '#ef4444';
+  const color = isPositive ? '#00E701' : '#FF3333';
   const glowClass = isPositive ? 'glow-green' : 'glow-red';
 
   if (variant === 'hero') {
@@ -60,7 +60,7 @@ export function MultiplierBadge({
           letterSpacing: '-0.5px',
         }}
       >
-        {value.toFixed(2)}{suffix}
+        {Number(value).toFixed(2)}{suffix}
       </span>
     );
   }
@@ -75,7 +75,7 @@ export function MultiplierBadge({
         textShadow: `0 0 6px ${color}44`,
       }}
     >
-      {value.toFixed(2)}{suffix}
+      {Number(value).toFixed(2)}{suffix}
     </span>
   );
 }
@@ -94,7 +94,7 @@ export function WinAmountDisplay({
   showSign?: boolean;
 }) {
   const sizeMap = { sm: '12px', md: '14px', lg: '20px' };
-  const color = isWin ? '#2ecc71' : '#ef4444';
+  const color = isWin ? '#00E701' : '#FF3333';
   const glowClass = isWin ? 'glow-green' : 'glow-red';
   const sign = showSign ? (isWin ? '+' : '-') : '';
   const displayAmount = typeof amount === 'number'
@@ -120,7 +120,7 @@ export function WinAmountDisplay({
 export function LiveRoundBanner({
   title,
   subtitle,
-  accentColor = '#2ecc71',
+  accentColor = '#00E701',
   count,
 }: {
   title: string;
@@ -178,7 +178,7 @@ export function LiveRoundBanner({
 // Small badge showing game type with color coding
 export function GameTypeBadge({ type }: { type: 'rug' | 'candle' | 'trading' | 'solo' | 'prediction' }) {
   const config = {
-    rug: { label: 'RUG', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.08)' },
+    rug: { label: 'RUG', color: '#FF3333', bg: 'rgba(239, 68, 68, 0.08)' },
     candle: { label: 'FLIP', color: '#d97706', bg: 'rgba(217, 119, 6, 0.08)' },
     trading: { label: 'SIM', color: '#059669', bg: 'rgba(5, 150, 105, 0.08)' },
     solo: { label: 'SOLO', color: '#3b82f6', bg: 'rgba(59, 130, 246, 0.08)' },
@@ -206,10 +206,10 @@ export function GameTypeBadge({ type }: { type: 'rug' | 'candle' | 'trading' | '
 // ─── StatusBadge ────────────────────────────────────────────────────────────
 export function StatusBadge({ status, size = 'sm' }: { status: 'cashed' | 'rugged' | 'bullish' | 'bearish' | 'winner'; size?: 'sm' | 'md' }) {
   const config = {
-    cashed: { label: 'CASHED', color: '#2ecc71', bg: 'rgba(46, 204, 113, 0.08)' },
-    rugged: { label: 'RUGGED', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.08)' },
-    bullish: { label: 'BULL', color: '#2ecc71', bg: 'rgba(46, 204, 113, 0.08)' },
-    bearish: { label: 'BEAR', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.08)' },
+    cashed: { label: 'CASHED', color: '#00E701', bg: 'rgba(0, 231, 1, 0.08)' },
+    rugged: { label: 'RUGGED', color: '#FF3333', bg: 'rgba(239, 68, 68, 0.08)' },
+    bullish: { label: 'BULL', color: '#00E701', bg: 'rgba(0, 231, 1, 0.08)' },
+    bearish: { label: 'BEAR', color: '#FF3333', bg: 'rgba(239, 68, 68, 0.08)' },
     winner: { label: 'WINNER', color: '#8b5cf6', bg: 'rgba(139, 92, 246, 0.08)' },
   }[status];
 

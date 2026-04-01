@@ -166,7 +166,12 @@ export class SettlementWorker {
           settledAt: new Date(),
         }).where(eq(bets.id, bet.id));
 
-        // Update user stats
+        // Update user stats + daily streak
+        const todayStr = new Date().toISOString().split('T')[0];
+        const yesterdayDate = new Date();
+        yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+        const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+
         await this.db.execute(sql`
           UPDATE user_profiles
           SET rounds_played = rounds_played + 1,
@@ -181,7 +186,18 @@ export class SettlementWorker {
                 WHEN ${payoutLamports} > ${bet.amount} THEN current_streak + 1
                 ELSE 0
               END),
-              xp = xp + ${result.xpGained},
+              -- Daily play streak: increment if played yesterday, reset if gap, skip if already played today
+              daily_streak = CASE
+                WHEN last_played_date = ${todayStr} THEN daily_streak
+                WHEN last_played_date = ${yesterdayStr} THEN daily_streak + 1
+                ELSE 1
+              END,
+              longest_daily_streak = GREATEST(longest_daily_streak, CASE
+                WHEN last_played_date = ${todayStr} THEN daily_streak
+                WHEN last_played_date = ${yesterdayStr} THEN daily_streak + 1
+                ELSE 1
+              END),
+              last_played_date = ${todayStr},
               updated_at = now()
           WHERE user_id = ${bet.userId}
         `);

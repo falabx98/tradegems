@@ -2,13 +2,17 @@ import crypto from 'node:crypto';
 import { getDb } from '../../config/database.js';
 import { rugGames, users } from '@tradingarena/db';
 import { WalletService } from '../wallet/wallet.service.js';
+import { UserService } from '../user/user.service.js';
+import { MissionsService } from '../missions/missions.service.js';
 import { eq, and, desc, sql } from 'drizzle-orm';
 
-const HOUSE_EDGE = 0.04; // 4% house edge applied to crash point
+const HOUSE_EDGE = 0.05; // 5% house edge applied to crash point
 
 export class RugGameService {
   private db = getDb();
   private wallet = new WalletService();
+  private userService = new UserService();
+  private missionsService = new MissionsService();
 
   // ─── Generate crash point using provably fair seed ─────────
   private generateCrashPoint(seed: string, gameId: string): number {
@@ -128,6 +132,10 @@ export class RugGameService {
       .where(eq(rugGames.id, gameId))
       .returning();
 
+    // Award XP + track missions for successful cashout (win)
+    this.userService.addXP(userId, 25, 'rug_game').catch(() => {});
+    this.missionsService.trackProgress(userId, 'rug_result', true).catch(() => {});
+
     return {
       ...resolved,
       rugMultiplier: resolved.rugMultiplier, // reveal after game ends
@@ -161,6 +169,20 @@ export class RugGameService {
       );
     } catch (err) {
       console.error('[RugGame] resolveRug settlement failed:', err, { userId: game.userId, gameId });
+      // Record for admin retry — funds are still locked
+      try {
+        const { recordFailedSettlement } = await import('../../utils/settlementRecovery.js');
+        await recordFailedSettlement({
+          userId: game.userId,
+          game: 'rug_game',
+          gameRefType: 'rug_game',
+          gameRefId: gameId,
+          betAmount: game.betAmount,
+          fee: 0,
+          payoutAmount: 0,
+          errorMessage: err instanceof Error ? err.message : String(err),
+        });
+      } catch { /* don't fail the game flow */ }
     }
 
     const [resolved] = await this.db
@@ -172,6 +194,10 @@ export class RugGameService {
       })
       .where(eq(rugGames.id, gameId))
       .returning();
+
+    // Award XP + track missions for rug (loss)
+    this.userService.addXP(game.userId, 10, 'rug_game').catch(() => {});
+    this.missionsService.trackProgress(game.userId, 'rug_result', false).catch(() => {});
 
     return {
       ...resolved,

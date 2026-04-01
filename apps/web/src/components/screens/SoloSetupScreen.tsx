@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type CSSProperties } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -10,9 +10,14 @@ import { api, getServerConfig } from '../../utils/api';
 import { BetPanel } from '../ui/BetPanel';
 import { RecentGames } from '../ui/RecentGames';
 import { toast } from '../../stores/toastStore';
+import { GameHeader } from '../game/GameHeader';
+import { HowToPlayInline } from '../game/HowToPlayInline';
+import { CasinoGameLayout, GameControlRail, GameStage, GameFooterBar } from '../game/CasinoGameLayout';
+import { Card } from '../primitives/Card';
+import { Badge } from '../primitives/Badge';
 
-// Defaults that match server — will be overwritten by getServerConfig()
-let _feeRate = 0.03;
+// Default to actual production fee (5%) so total cost never jumps upward after config loads
+let _feeRate = 0.05;
 let _minBetLamports = 1_000_000;
 
 export function SoloSetupScreen() {
@@ -22,7 +27,6 @@ export function SoloSetupScreen() {
   const [feeRate, setFeeRate] = useState(_feeRate);
   const [minBetLamports, setMinBetLamports] = useState(_minBetLamports);
 
-  // M1 fix: Fetch fee rate from server on mount
   useEffect(() => {
     getServerConfig().then(cfg => {
       _feeRate = cfg.feeRate;
@@ -32,12 +36,9 @@ export function SoloSetupScreen() {
     });
   }, []);
 
-  // M3: Include fee in balance check
   const fee = Math.floor(betAmount * feeRate);
   const totalCost = betAmount + fee;
   const canAfford = totalCost <= profile.balance;
-
-  // M4: Minimum bet validation
   const meetsMinBet = betAmount >= minBetLamports;
 
   const handleStart = () => {
@@ -53,168 +54,201 @@ export function SoloSetupScreen() {
     startRound();
   };
 
-  return (
-    <div style={{
-      ...styles.container,
-      ...(isMobile ? { padding: '12px' } : {}),
-    }}>
-      {/* Header */}
-      <div style={styles.header}>
-        <button onClick={() => go('lobby')} style={styles.backBtn}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="15 18 9 12 15 6" /></svg>
-        </button>
-        <span style={styles.headerTitle}>Solo Setup</span>
-        <div style={{ width: '36px' }} />
-      </div>
+  const { gap, textSize } = theme;
+  const ts = (key: keyof typeof textSize) => isMobile ? textSize[key].mobile : textSize[key].desktop;
 
-      <div style={{
-        ...styles.content,
-        ...(isMobile ? { maxWidth: '100%' } : {}),
-      }}>
-        {/* Trading pair info */}
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '12px 16px', borderRadius: '12px',
-          background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+  /* ─── HEADER ─── */
+  const header = (
+    <GameHeader
+      title="Solo"
+      subtitle="Trade vs. the chart"
+      icon={
+        <div style={{ width: 36, height: 36, borderRadius: theme.radius.md, background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={theme.accent.purple} strokeWidth="2" strokeLinecap="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+        </div>
+      }
+      howToPlay={
+        <HowToPlayInline steps={[
+          { icon: '🎯', label: 'Set your bet and risk level', desc: 'Higher risk = bigger potential rewards and losses' },
+          { icon: '📊', label: 'Watch 10 candles reveal on the chart', desc: 'Tap green gem nodes to boost your multiplier' },
+          { icon: '🛡️', label: 'Avoid penalty dividers, use shields', desc: 'Shields block one divider hit. Miss a gem? No penalty.' },
+          { icon: '💰', label: 'Your final multiplier determines payout', desc: 'All hits and misses combine into your result' },
+        ]} />
+      }
+    />
+  );
+
+  /* ─── CONTROL RAIL ─── */
+  const railContent = (
+    <GameControlRail>
+      {/* BetPanel with risk selection */}
+      <BetPanel
+        presets={[
+          { label: '0.1', lamports: 100_000_000 },
+          { label: '0.5', lamports: 500_000_000 },
+          { label: '1', lamports: 1_000_000_000 },
+          { label: '5', lamports: 5_000_000_000 },
+          { label: '10', lamports: 10_000_000_000 },
+          { label: '50', lamports: 50_000_000_000 },
+          { label: '100', lamports: 100_000_000_000 },
+        ]}
+        selectedAmount={betAmount}
+        onAmountChange={setBetAmount}
+        balance={profile.balance}
+          demoBalance={profile.demoBalance}
+        feeRate={feeRate}
+        minBet={minBetLamports}
+        choices={[
+          { id: 'conservative', label: 'LOW RISK', color: theme.success, payout: '1.2–1.5x' },
+          { id: 'balanced', label: 'BALANCED', color: theme.warning, payout: '1.5–3x' },
+          { id: 'aggressive', label: 'HIGH RISK', color: theme.danger, payout: '2–10x' },
+        ]}
+        selectedChoice={riskTier}
+        onChoiceSelect={(id) => setRiskTier(id as RiskTier)}
+        submitLabel="Start Round"
+        onSubmit={handleStart}
+        submitDisabled={!canAfford || !meetsMinBet}
+      />
+
+      {/* Recent Games */}
+      <RecentGames
+        title="Recent Solo Games"
+        fetchGames={async () => {
+          const res = await api.getRecentRounds(10) as any;
+          return (res.data || res || []).map((r: any) => ({
+            id: r.id || r.roundId,
+            result: r.resultType === 'win' ? 'win' as const : 'loss' as const,
+            multiplier: r.finalMultiplier || 0,
+            amount: r.amount || r.betAmount || 0,
+            payout: r.payoutAmount || 0,
+            time: r.createdAt,
+          }));
+        }}
+      />
+    </GameControlRail>
+  );
+
+  /* ─── GAME STAGE ─── */
+  const SOLO_ATMOSPHERE = 'radial-gradient(ellipse at 50% 40%, rgba(139,92,246,0.04) 0%, transparent 70%)';
+  const stageContent = (
+    <GameStage atmosphere={SOLO_ATMOSPHERE} style={{ minHeight: isMobile ? undefined : 380, padding: gap.lg }}>
+      {/* Desktop header inside stage */}
+      {!isMobile && (
+        <div style={{ marginBottom: gap.md }}>
+          {header}
+        </div>
+      )}
+
+      {/* Trading pair + game info */}
+      <Card variant="panel" padding={`${gap.md}px ${gap.lg}px`} style={{ background: 'rgba(255,255,255,0.02)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: gap.sm }}>
             <div style={{
               width: 32, height: 32, borderRadius: '50%',
               background: 'linear-gradient(135deg, #9945FF, #14F195)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: '14px', fontWeight: 800, color: '#fff',
+              fontSize: ts('md'), fontWeight: 700, color: '#fff',
             }}>S</div>
             <div>
-              <div style={{ fontSize: '14px', fontWeight: 700, color: theme.text.primary }}>SOL / USD</div>
-              <div style={{ fontSize: '11px', color: theme.text.muted }}>Live price feed</div>
+              <div style={{ fontSize: ts('md'), fontWeight: 700, color: theme.text.primary }}>SOL / USD</div>
+              <div style={{ fontSize: ts('xs'), color: theme.text.muted }}>Live price feed</div>
             </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: '11px', color: theme.text.muted }}>You trade the chart</div>
-            <div style={{ fontSize: '11px', color: '#8b5cf6', fontWeight: 600 }}>10 candles revealed</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: gap.sm }}>
+            <Badge variant="purple" size="sm">10 candles</Badge>
+            <Badge variant="default" size="sm">15s round</Badge>
           </div>
         </div>
+      </Card>
 
-        <BetPanel
-          presets={[
-            { label: '0.01', lamports: 10_000_000 },
-            { label: '0.05', lamports: 50_000_000 },
-            { label: '0.1', lamports: 100_000_000 },
-            { label: '0.25', lamports: 250_000_000 },
-            { label: '0.5', lamports: 500_000_000 },
-            { label: '1', lamports: 1_000_000_000 },
-            { label: '2', lamports: 2_000_000_000 },
-            { label: '5', lamports: 5_000_000_000 },
-          ]}
-          selectedAmount={betAmount}
-          onAmountChange={setBetAmount}
-          balance={profile.balance}
-          feeRate={feeRate}
-          minBet={minBetLamports}
-          choices={[
-            { id: 'conservative', label: 'SAFE', color: theme.success, payout: '1.2-1.5x' },
-            { id: 'balanced', label: 'STANDARD', color: theme.warning, payout: '1.5-3x' },
-            { id: 'aggressive', label: 'DEGEN', color: theme.danger, payout: '2-10x' },
-          ]}
-          selectedChoice={riskTier}
-          onChoiceSelect={(id) => setRiskTier(id as RiskTier)}
-          submitLabel="START ROUND"
-          onSubmit={handleStart}
-          submitDisabled={!canAfford || !meetsMinBet}
-        />
-
-        <RecentGames
-          title="Recent Solo Games"
-          fetchGames={async () => {
-            const res = await api.getRecentRounds(10) as any;
-            return (res.data || res || []).map((r: any) => ({
-              id: r.id || r.roundId,
-              result: r.resultType === 'win' ? 'win' : 'loss',
-              multiplier: r.finalMultiplier || 0,
-              amount: r.amount || r.betAmount || 0,
-              payout: r.payoutAmount || 0,
-              time: r.createdAt,
-            }));
-          }}
-        />
-
-        {/* How it works */}
-        <div style={{
-          padding: '14px 16px', borderRadius: '12px',
-          background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`,
-        }}>
-          <div style={{ fontSize: '12px', fontWeight: 700, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px' }}>
-            How It Works
-          </div>
-          <div style={{ display: 'flex', gap: '12px' }}>
-            {[
-              { step: '1', label: 'Set bet & risk', color: '#8b5cf6' },
-              { step: '2', label: 'Watch 10 candles', color: '#3b82f6' },
-              { step: '3', label: 'Win multiplier', color: '#2ecc71' },
-            ].map(({ step, label, color }) => (
-              <div key={step} style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: '50%', margin: '0 auto 6px',
-                  background: `${color}15`, border: `1px solid ${color}30`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '12px', fontWeight: 800, color,
-                }}>{step}</div>
-                <div style={{ fontSize: '11px', color: theme.text.secondary, fontWeight: 600 }}>{label}</div>
+      {/* Mechanic + risk info — desktop only (mobile gets this via HowToPlay + risk selector in BetPanel) */}
+      {!isMobile && (
+        <Card variant="panel" padding={`${gap.md}px ${gap.lg}px`} style={{ marginTop: gap.md, background: 'rgba(255,255,255,0.02)' }}>
+          <div style={{ display: 'flex', gap: gap.sm, flexWrap: 'wrap', marginBottom: gap.md }}>
+            <div style={legendItem}>
+              <span style={{ fontSize: ts('md') }}>💎</span>
+              <div>
+                <div style={{ fontSize: ts('sm'), fontWeight: 700, color: theme.game.multiplier }}>Gems</div>
+                <div style={{ fontSize: ts('xs'), color: theme.text.muted }}>Boost multiplier</div>
               </div>
-            ))}
+            </div>
+            <div style={legendItem}>
+              <span style={{ fontSize: ts('md') }}>💣</span>
+              <div>
+                <div style={{ fontSize: ts('sm'), fontWeight: 700, color: theme.game.divider }}>Dividers</div>
+                <div style={{ fontSize: ts('xs'), color: theme.text.muted }}>Cut multiplier</div>
+              </div>
+            </div>
+            <div style={legendItem}>
+              <span style={{ fontSize: ts('md') }}>🛡️</span>
+              <div>
+                <div style={{ fontSize: ts('sm'), fontWeight: 700, color: theme.game.shield }}>Shields</div>
+                <div style={{ fontSize: ts('xs'), color: theme.text.muted }}>Block one hit</div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
+          <div style={{ borderTop: `1px solid ${theme.border.subtle}`, paddingTop: gap.md }}>
+            <div style={{ fontSize: ts('xs'), fontWeight: 600, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: gap.sm }}>
+              Risk Tiers
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: gap.xs }}>
+              <div style={riskRow}>
+                <span style={{ color: theme.success, fontWeight: 700, fontSize: ts('sm'), minWidth: 70 }}>LOW</span>
+                <span style={{ color: theme.text.secondary, fontSize: ts('sm') }}>Smaller gems, weaker dividers. Steady gains.</span>
+              </div>
+              <div style={riskRow}>
+                <span style={{ color: theme.warning, fontWeight: 700, fontSize: ts('sm'), minWidth: 70 }}>BALANCED</span>
+                <span style={{ color: theme.text.secondary, fontSize: ts('sm') }}>Standard gems and dividers. Fair risk.</span>
+              </div>
+              <div style={riskRow}>
+                <span style={{ color: theme.danger, fontWeight: 700, fontSize: ts('sm'), minWidth: 70 }}>HIGH</span>
+                <span style={{ color: theme.text.secondary, fontSize: ts('sm') }}>Bigger gems, harsher dividers. Higher ceiling.</span>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+    </GameStage>
+  );
+
+  /* ─── FOOTER ─── */
+  const footerContent = (
+    <GameFooterBar>
+      <span>Solo · Provably Fair</span>
+      <span>SOL/USD · 10 candles · 15s</span>
+    </GameFooterBar>
+  );
+
+  return (
+    <>
+      {isMobile && <div style={{ padding: `${gap.sm}px 12px` }}>{header}</div>}
+      <CasinoGameLayout
+        rail={railContent}
+        stage={stageContent}
+        footer={footerContent}
+      />
+    </>
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles ─────────────────────────────────────────────────
 
-const styles: Record<string, React.CSSProperties> = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: '100%',
-    padding: '16px',
-    boxSizing: 'border-box',
-  },
+const legendItem: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.gap.sm,
+  flex: '1 1 140px',
+  padding: theme.gap.sm,
+  background: theme.bg.primary,
+  borderRadius: theme.radius.md,
+  border: `1px solid ${theme.border.subtle}`,
+};
 
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    marginBottom: '16px',
-  },
-  backBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '36px',
-    height: '36px',
-    borderRadius: '10px',
-    border: `1px solid ${theme.border.medium}`,
-    background: theme.bg.secondary,
-    color: theme.text.secondary,
-    cursor: 'pointer',
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: '20px',
-    fontWeight: 700,
-    color: theme.text.primary,
-    fontFamily: "inherit",
-    textTransform: 'uppercase' as const,
-    letterSpacing: '1px',
-    textAlign: 'center' as const,
-  },
-
-  content: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
-    maxWidth: '520px',
-    margin: '0 auto',
-    width: '100%',
-  },
+const riskRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: theme.gap.sm,
+  padding: `${theme.gap.xs}px 0`,
 };

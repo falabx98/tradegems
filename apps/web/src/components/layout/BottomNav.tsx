@@ -4,104 +4,73 @@ import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { NavIcon } from './NavIcons';
 import { playButtonClick, hapticLight } from '../../utils/sounds';
+import { GamesSheet } from '../primitives/GamesSheet';
 
 const TABS = [
-  { id: 'lobby', label: 'Lobby', icon: 'grid' },
-  { id: 'solo', label: 'Solo', icon: 'play' },
+  { id: 'lobby', label: 'Home', icon: 'grid' },
+  { id: 'games', label: 'Games', icon: 'play' },
   { id: 'leaderboard', label: 'Ranks', icon: 'trophy' },
   { id: 'wallet', label: 'Wallet', icon: 'wallet' },
-  { id: 'more', label: 'More', icon: 'more' },
+  { id: 'my-bets', label: 'My Bets', icon: 'list' },
 ] as const;
 
-const MORE_ITEMS = [
-  { id: 'prediction', label: 'Predict', icon: 'candles' },
-  { id: 'rewards', label: 'Rewards', icon: 'gift' },
-  { id: 'history', label: 'History', icon: 'clock' },
-  { id: 'settings', label: 'Settings', icon: 'gear' },
-] as const;
+// Game screen IDs that should highlight the "Games" tab
+const GAME_SCREENS = ['solo', 'setup', 'prediction', 'trading-sim', 'candleflip', 'rug-game', 'lottery', 'playing', 'result'];
 
 export function BottomNav() {
   const screen = useGameStore((s) => s.screen);
   const go = useAppNavigate();
-  const [showMore, setShowMore] = useState(false);
+  const [showGames, setShowGames] = useState(false);
 
-  const activeId = screen === 'setup' ? 'solo' : screen;
-  const isMoreActive = MORE_ITEMS.some((m) => m.id === activeId);
+  const isGameScreen = GAME_SCREENS.includes(screen);
 
   const handleTab = (id: string) => {
     playButtonClick();
     hapticLight();
-    if (id === 'more') {
-      setShowMore((v) => !v);
+    if (id === 'games') {
+      setShowGames((v) => !v);
       return;
     }
-    setShowMore(false);
-    if (id === 'solo') {
-      go('setup');
+    setShowGames(false);
+    if (id === 'lobby') {
+      go('lobby');
     } else {
       go(id);
     }
   };
 
-  const handleMoreItem = (id: string) => {
-    playButtonClick();
-    hapticLight();
-    setShowMore(false);
-    go(id);
+  const getIsActive = (tabId: string) => {
+    if (tabId === 'games') return isGameScreen || showGames;
+    if (tabId === 'lobby') return screen === 'lobby';
+    return screen === tabId;
   };
 
   return (
     <>
-      {/* More menu overlay */}
-      {showMore && (
-        <div style={styles.overlay} onClick={() => setShowMore(false)}>
-          <div style={styles.moreMenu} onClick={(e) => e.stopPropagation()}>
-            {MORE_ITEMS.map((item) => {
-              const isActive = activeId === item.id;
-              return (
-                <button
-                  key={item.id}
-                  onClick={() => handleMoreItem(item.id)}
-                  style={{
-                    ...styles.moreItem,
-                    ...(isActive ? styles.moreItemActive : {}),
-                  }}
-                >
-                  <NavIcon name={item.icon} size={20} color={isActive ? theme.accent.purple : theme.text.secondary} />
-                  <span style={{
-                    fontSize: '14px',
-                    fontWeight: isActive ? 700 : 500,
-                    color: isActive ? theme.accent.purple : theme.text.primary,
-                  }}>
-                    {item.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {/* Games sheet */}
+      <GamesSheet open={showGames} onClose={() => setShowGames(false)} />
 
       {/* Bottom tab bar */}
-      <nav style={styles.bar}>
+      <nav style={s.bar}>
         {TABS.map((tab) => {
-          const isActive = tab.id === 'more' ? isMoreActive || showMore : activeId === tab.id;
+          const isActive = getIsActive(tab.id);
           return (
             <button
               key={tab.id}
               onClick={() => handleTab(tab.id)}
-              style={styles.tab}
+              style={s.tab}
             >
               <NavIcon
                 name={tab.icon}
-                size={21}
+                size={20}
                 color={isActive ? theme.accent.purple : theme.text.muted}
               />
               <span style={{
-                fontSize: '10px',
-                fontWeight: isActive ? 700 : 500,
+                fontSize: 10,
+                fontWeight: isActive ? 600 : 500,
                 color: isActive ? theme.accent.purple : theme.text.muted,
-                marginTop: '3px',
+                marginTop: 2,
+                letterSpacing: '0.02em',
               }}>
                 {tab.label}
               </span>
@@ -113,7 +82,7 @@ export function BottomNav() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const s: Record<string, React.CSSProperties> = {
   bar: {
     position: 'fixed',
     bottom: 0,
@@ -127,8 +96,6 @@ const styles: Record<string, React.CSSProperties> = {
     background: theme.bg.secondary,
     borderTop: `1px solid ${theme.border.subtle}`,
     zIndex: 200,
-    backdropFilter: 'none',
-    WebkitBackdropFilter: 'none',
   },
   tab: {
     display: 'flex',
@@ -142,44 +109,6 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     fontFamily: 'inherit',
     padding: 0,
-  },
-  overlay: {
-    position: 'fixed',
-    inset: 0,
-    background: 'rgba(0,0,0,0.7)',
-    backdropFilter: 'none',
-    zIndex: 199,
-    display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingBottom: '76px',
-  },
-  moreMenu: {
-    background: 'linear-gradient(160deg, #1a1c21 0%, #121418 100%)',
-    border: `1px solid ${theme.border.medium}`,
-    borderRadius: '16px',
-    padding: '8px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '2px',
-    width: 'calc(100% - 32px)',
-    maxWidth: '400px',
-    animation: 'slideUp 0.15s ease',
-    boxShadow: '0 -8px 40px rgba(0, 0, 0, 0.5)',
-  },
-  moreItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '14px',
-    padding: '13px 18px',
-    background: 'transparent',
-    border: 'none',
-    borderRadius: '10px',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    transition: 'background 0.15s ease',
-  },
-  moreItemActive: {
-    background: 'rgba(139, 92, 246, 0.06)',
+    minHeight: '44px',
   },
 };

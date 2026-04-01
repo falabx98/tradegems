@@ -1,7 +1,10 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
+import { requireNotExcluded } from '../middleware/selfExclusion.js';
 import { TradingSimService } from '../modules/trading-sim/tradingSim.service.js';
+import { requireGameEnabled } from '../utils/gameGates.js';
+import { validateBetLimits } from '../utils/betLimits.js';
 
 export async function tradingSimRoutes(server: FastifyInstance) {
   const tradingSimService = new TradingSimService();
@@ -24,14 +27,16 @@ export async function tradingSimRoutes(server: FastifyInstance) {
 
   // ─── Create Room (auth) ──────────────────────────────────────
 
-  server.post('/create', { preHandler: [requireAuth] }, async (request, reply) => {
+  server.post('/create', { preHandler: [requireAuth, requireNotExcluded] }, async (request, reply) => {
+    await requireGameEnabled('trading-sim');
     const user = getAuthUser(request);
 
     const body = z.object({
-      entryFee: z.number().int().positive().max(10_000_000_000), // Max 10 SOL
+      entryFee: z.number().int().positive().max(100_000_000_000),
       maxPlayers: z.number().int().min(2).max(8),
     }).parse(request.body);
 
+    await validateBetLimits(user.userId, body.entryFee);
     try {
       const room = await tradingSimService.createRoom(
         user.userId,
@@ -46,15 +51,20 @@ export async function tradingSimRoutes(server: FastifyInstance) {
 
   // ─── Join Room (auth) ────────────────────────────────────────
 
-  server.post('/join', { preHandler: [requireAuth] }, async (request, reply) => {
+  server.post('/join', { preHandler: [requireAuth, requireNotExcluded] }, async (request, reply) => {
+    await requireGameEnabled('trading-sim');
     const user = getAuthUser(request);
 
     const body = z.object({
       roomId: z.string().uuid(),
+      isDemoBet: z.boolean().optional().default(false),
     }).parse(request.body);
 
+    const { detectDemoBet } = await import('../utils/demoDetect.js');
+    const isDemoBet = await detectDemoBet(user.userId, body.isDemoBet);
+
     try {
-      const room = await tradingSimService.joinRoom(user.userId, body.roomId);
+      const room = await tradingSimService.joinRoom(user.userId, body.roomId, isDemoBet);
       return { success: true, room };
     } catch (err: any) {
       return reply.status(400).send({ error: err.message });

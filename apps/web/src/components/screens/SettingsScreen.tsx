@@ -249,7 +249,7 @@ export function SettingsScreen() {
           <StatCard label="Total Wagered" value={`${formatSol(profile.totalWagered)} SOL`} />
           <StatCard label="Total Won" value={`${formatSol(profile.totalWon)} SOL`} color={theme.success} trend="up" />
           <StatCard label="Win Rate" value={`${(profile.winRate * 100).toFixed(1)}%`} />
-          <StatCard label="Best Mult" value={`${profile.bestMultiplier.toFixed(2)}x`} color={theme.accent.blue} />
+          <StatCard label="Best Mult" value={`${Number(profile.bestMultiplier).toFixed(2)}x`} color={theme.accent.blue} />
           <StatCard label="Balance" value={`${formatSol(profile.balance)} SOL`} color={theme.accent.blue} />
         </div>
       </div>
@@ -350,7 +350,7 @@ export function SettingsScreen() {
           {secMsg && (
             <p style={{
               fontSize: '13px', margin: 0, fontWeight: 600,
-              color: secMsg.type === 'success' ? '#2ecc71' : '#f87171',
+              color: secMsg.type === 'success' ? '#00E701' : '#FF3333',
             }}>
               {secMsg.text}
             </p>
@@ -360,10 +360,41 @@ export function SettingsScreen() {
             disabled={secSaving || !secPassword || !secConfirm}
             style={{
               ...styles.uploadBtn,
+              width: '100%',
+              justifyContent: 'center',
+              padding: '14px 18px',
               opacity: (secSaving || !secPassword || !secConfirm) ? 0.5 : 1,
             }}
           >
             {secSaving ? 'Saving...' : 'Set Password'}
+          </button>
+        </div>
+      </div>
+
+      {/* ─── Responsible Gambling ─── */}
+      <div style={{ ...styles.section, animationDelay: '0.5s' }} className="card-enter card-enter-5b">
+        <h3 style={styles.sectionTitle}>Responsible Gambling</h3>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <span style={{ fontSize: 13, color: theme.text.secondary }}>
+            Set session reminders, self-exclude, or learn about responsible play.
+          </span>
+          <button
+            onClick={() => go('responsible-gambling')}
+            style={{
+              width: '100%',
+              padding: '14px 24px',
+              background: 'rgba(139,92,246,0.1)',
+              border: '1px solid rgba(139,92,246,0.25)',
+              borderRadius: theme.radius.md,
+              color: theme.accent.purple,
+              fontSize: '15px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            Responsible Gambling →
           </button>
         </div>
       </div>
@@ -500,7 +531,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '22px',
-    fontWeight: 900,
+    fontWeight: 700,
     fontFamily: "inherit",
     color: '#fff',
     flexShrink: 0,
@@ -546,7 +577,7 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     fontSize: '34px',
-    fontWeight: 900,
+    fontWeight: 700,
     fontFamily: "inherit",
     color: '#fff',
     border: `3px solid ${theme.accent.purple}`,
@@ -578,7 +609,7 @@ const styles: Record<string, React.CSSProperties> = {
     background: 'rgba(248, 113, 113, 0.1)',
     border: '1px solid rgba(248, 113, 113, 0.3)',
     borderRadius: '8px',
-    color: '#f87171',
+    color: '#FF3333',
     fontSize: '14px',
     fontWeight: 600,
     cursor: 'pointer',
@@ -593,7 +624,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   avatarErrorText: {
     fontSize: '13px',
-    color: '#f87171',
+    color: '#FF3333',
     margin: 0,
     fontFamily: 'inherit',
     fontWeight: 600,
@@ -648,10 +679,10 @@ const styles: Record<string, React.CSSProperties> = {
   logoutBtn: {
     width: '100%',
     padding: '14px',
-    background: 'rgba(255, 71, 87, 0.08)',
-    border: `1px solid rgba(255, 71, 87, 0.25)`,
+    background: '#dc2626',
+    border: 'none',
     borderRadius: theme.radius.md,
-    color: theme.accent.red,
+    color: '#fff',
     fontSize: '15px',
     fontWeight: 700,
     cursor: 'pointer',

@@ -3,11 +3,14 @@ import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
 import { api, API_BASE, apiFetch } from '../../utils/api';
 import { formatSol, solToLamports } from '../../utils/sol';
+import { funnelTrack, walletTrack } from '../../utils/analytics';
 import { isPhantomInstalled, connectPhantom, sendSolToTreasury, getConnectedAddress } from '../../utils/phantom';
 import { theme } from '../../styles/theme';
 import { CheckIcon, GiftIcon, WalletIcon } from '../ui/GameIcons';
+import { SolIcon } from '../ui/SolIcon';
 import { PageHeader } from '../ui/PageHeader';
 import { TabBar } from '../ui/TabBar';
+import { ContentNarrow } from '../primitives/ContentContainer';
 
 interface Transaction {
   id: string;
@@ -21,7 +24,7 @@ interface Transaction {
 }
 
 type Tab = 'deposit' | 'withdraw' | 'pnl';
-type DepositState = 'idle' | 'sending' | 'verifying' | 'confirmed' | 'error';
+type DepositState = 'idle' | 'sending' | 'verifying' | 'confirming' | 'confirmed' | 'error';
 type WithdrawState = 'idle' | 'processing' | 'confirmed' | 'error';
 
 const QUICK_AMOUNTS = [0.1, 0.25, 0.5, 1, 5];
@@ -96,8 +99,13 @@ export function WalletScreen() {
     } catch {}
   }
 
+  const [depositConfirmations, setDepositConfirmations] = useState(0);
+  const [depositRequired, setDepositRequired] = useState(1);
+
   async function handleDeposit() {
     setDepositError('');
+    walletTrack.open();
+    funnelTrack.depositStart();
     const lamports = solToLamports(parseFloat(depositAmount));
     if (lamports < 10_000_000) {
       setDepositError('Minimum deposit is 0.01 SOL');
@@ -110,16 +118,59 @@ export function WalletScreen() {
       const treasury = treasuryAddress || (await api.getDepositInfo('SOL')).address;
       const txHash = await sendSolToTreasury(treasury, lamports);
       setDepositState('verifying');
-      await api.verifyDeposit(txHash);
-      setDepositState('confirmed');
-      await syncProfile();
-      await loadTransactions();
-      await loadDepositBonusStatus();
-      setTimeout(() => setDepositState('idle'), 3000);
+      const result = await api.verifyDeposit(txHash);
+
+      if (result.status === 'confirmed') {
+        setDepositState('confirmed');
+        funnelTrack.depositComplete(lamports);
+        await syncProfile();
+        await loadTransactions();
+        await loadDepositBonusStatus();
+        setTimeout(() => setDepositState('idle'), 3000);
+      } else {
+        // Deposit is confirming — start polling
+        setDepositState('confirming');
+        setDepositConfirmations(0);
+        pollDepositStatus();
+      }
     } catch (err: any) {
       setDepositError(err.message || 'Deposit failed');
       setDepositState('error');
     }
+  }
+
+  async function pollDepositStatus() {
+    let attempts = 0;
+    const maxAttempts = 60; // 5 minutes max (5s × 60)
+    const poll = async () => {
+      try {
+        const data = await api.getActiveDeposits();
+        if (data.active.length > 0) {
+          const dep = data.active[0];
+          setDepositConfirmations(dep.confirmations);
+          setDepositRequired(dep.requiredConfirmations);
+        }
+        if (data.active.length === 0 || data.lastConfirmed) {
+          // No more active deposits = confirmed
+          setDepositState('confirmed');
+          await syncProfile();
+          await loadTransactions();
+          await loadDepositBonusStatus();
+          setTimeout(() => setDepositState('idle'), 3000);
+          return; // Stop polling
+        }
+      } catch { /* ignore poll errors */ }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        setTimeout(poll, 5000);
+      } else {
+        // Timeout — show confirming state but stop polling
+        setDepositError('Deposit is still confirming. Your balance will update automatically.');
+        setDepositState('idle');
+      }
+    };
+    setTimeout(poll, 5000); // First poll after 5s
   }
 
   async function handleWithdraw() {
@@ -177,8 +228,8 @@ export function WalletScreen() {
   }
 
   function txColor(type: string) {
-    if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock', 'signup_bonus'].includes(type)) return '#2ecc71';
-    if (['bet_lock', 'bet_settle', 'withdraw_complete'].includes(type)) return '#f87171';
+    if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock', 'signup_bonus'].includes(type)) return '#00E701';
+    if (['bet_lock', 'bet_settle', 'withdraw_complete'].includes(type)) return '#FF3333';
     return theme.text.secondary;
   }
 
@@ -192,13 +243,13 @@ export function WalletScreen() {
     if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock', 'signup_bonus'].includes(type)) {
       return (
         <div style={{ ...s.txIconCircle, background: 'rgba(46, 204, 113, 0.1)', border: '1px solid rgba(46, 204, 113, 0.2)' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2ecc71" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 15 12 9 18 15" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00E701" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 15 12 9 18 15" /></svg>
         </div>
       );
     }
     return (
       <div style={{ ...s.txIconCircle, background: 'rgba(248, 113, 113, 0.1)', border: '1px solid rgba(248, 113, 113, 0.2)' }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF3333" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg>
       </div>
     );
   }
@@ -232,6 +283,25 @@ export function WalletScreen() {
                 {formatSol(profile.balance, 4)}
                 <span style={{ ...s.balanceSuffix, WebkitTextFillColor: theme.text.muted, background: 'none' }}>SOL</span>
               </div>
+            </div>
+            {/* Balance breakdown */}
+            <div style={{ display: 'flex', gap: theme.gap.lg, marginTop: theme.gap.sm, padding: `${theme.gap.sm}px 0`, borderTop: `1px solid ${theme.border.subtle}` }}>
+              <div>
+                <div style={{ fontSize: 10, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Available</div>
+                <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: theme.accent.neonGreen }}>{formatSol(profile.balance, 4)} <SolIcon size="0.8em" /></div>
+              </div>
+              {profile.lockedBalance > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>In Play</div>
+                  <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: theme.accent.amber }}>{formatSol(profile.lockedBalance, 4)} <SolIcon size="0.8em" /></div>
+                </div>
+              )}
+              {profile.lockedBalance > 0 && (
+                <div>
+                  <div style={{ fontSize: 10, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>Total</div>
+                  <div className="mono" style={{ fontSize: 13, fontWeight: 700, color: theme.text.primary }}>{formatSol(profile.balance + profile.lockedBalance, 4)} <SolIcon size="0.8em" /></div>
+                </div>
+              )}
             </div>
             {linkedAddress && (
               <div style={s.linkedRow}>
@@ -272,7 +342,7 @@ export function WalletScreen() {
                           ...s.copyBtn,
                           background: copied ? 'rgba(46, 204, 113, 0.1)' : theme.bg.elevated,
                           borderColor: copied ? 'rgba(46, 204, 113, 0.3)' : theme.border.medium,
-                          color: copied ? '#2ecc71' : theme.accent.purple,
+                          color: copied ? '#00E701' : theme.accent.purple,
                         }}
                         onClick={() => {
                           navigator.clipboard.writeText(treasuryAddress);
@@ -280,7 +350,7 @@ export function WalletScreen() {
                           setTimeout(() => setCopied(false), 2000);
                         }}
                       >
-                        {copied ? <><CheckIcon size={14} color="#2ecc71" /> Copied!</> : 'Copy Address'}
+                        {copied ? <><CheckIcon size={14} color="#00E701" /> Copied!</> : 'Copy Address'}
                       </button>
                     </>
                   ) : (
@@ -290,6 +360,22 @@ export function WalletScreen() {
                       </span>
                     </div>
                   )}
+                </div>
+
+                {/* Deposit guidance */}
+                <div style={{ display: 'flex', gap: theme.gap.md, marginTop: theme.gap.sm, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: theme.text.muted }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    Confirms in ~30-60 seconds
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: theme.text.muted }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+                    Min: 0.01 SOL
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: theme.text.muted }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    Solana network only
+                  </div>
                 </div>
 
                 {/* Divider */}
@@ -323,16 +409,48 @@ export function WalletScreen() {
                 </div>
 
                 <button
-                  style={{ ...s.primaryBtn, opacity: depositState === 'sending' || depositState === 'verifying' ? 0.6 : 1 }}
+                  style={{ ...s.primaryBtn, opacity: ['sending', 'verifying', 'confirming'].includes(depositState) ? 0.6 : 1 }}
                   onClick={handleDeposit}
-                  disabled={depositState === 'sending' || depositState === 'verifying'}
+                  disabled={['sending', 'verifying', 'confirming'].includes(depositState)}
                 >
                   {depositState === 'idle' || depositState === 'error'
                     ? 'One-Click Deposit via Phantom'
                     : depositState === 'sending' ? 'Approve in Wallet...'
-                    : depositState === 'verifying' ? 'Confirming on-chain...'
+                    : depositState === 'verifying' ? 'Submitting to blockchain...'
+                    : depositState === 'confirming' ? `Confirming (${depositConfirmations}/${depositRequired})...`
                     : 'Deposit Confirmed!'}
                 </button>
+
+                {/* Deposit Status Tracker */}
+                {depositState === 'confirming' && (
+                  <div style={{
+                    padding: '12px 16px',
+                    background: 'rgba(139, 92, 246, 0.06)',
+                    border: '1px solid rgba(139, 92, 246, 0.15)',
+                    borderRadius: theme.radius.md,
+                    marginTop: 8,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: theme.accent.purple, animation: 'pulse 1.5s ease infinite' }} />
+                      <span style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary }}>
+                        Transaction detected — waiting for confirmations
+                      </span>
+                    </div>
+                    <div style={{
+                      height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        height: '100%', borderRadius: 2,
+                        width: `${depositRequired > 0 ? Math.min(100, (depositConfirmations / depositRequired) * 100) : 0}%`,
+                        background: theme.accent.purple,
+                        transition: 'width 0.5s ease',
+                      }} />
+                    </div>
+                    <div style={{ fontSize: 11, color: theme.text.muted, marginTop: 6 }}>
+                      {depositConfirmations}/{depositRequired} confirmations · Usually takes 30-60 seconds
+                    </div>
+                  </div>
+                )}
 
                 {depositState === 'confirmed' && <div style={s.successMsg}>Deposit confirmed and credited!</div>}
                 {depositError && <div style={s.errorMsg}>{depositError}</div>}
@@ -341,8 +459,8 @@ export function WalletScreen() {
                 {depositBonusUsed === false && (
                   <div style={s.bonusBanner}>
                     <div style={s.bonusBannerHeader}>
-                      <GiftIcon size={18} color="#2ecc71" />
-                      <span style={{ ...s.bonusBannerTitle, color: '#2ecc71' }}>100% First Deposit Bonus</span>
+                      <GiftIcon size={18} color="#00E701" />
+                      <span style={{ ...s.bonusBannerTitle, color: '#00E701' }}>100% First Deposit Bonus</span>
                     </div>
                     <div style={s.bonusBannerDesc}>
                       Deposit any amount and we'll <strong style={{ color: theme.accent.purple }}>double it</strong>. Your first deposit gets matched 100% — deposit 1 SOL, play with 2 SOL!
@@ -439,6 +557,12 @@ export function WalletScreen() {
 
           {/* ── P&L Tab ── */}
           {tab === 'pnl' && <PnlChart />}
+
+          {/* ── Promo Code ── */}
+          <PromoCodeSection />
+
+          {/* ── Send Tip ── */}
+          <TipSection />
         </div>
 
         {/* ── Right Column: Transaction History ── */}
@@ -580,7 +704,7 @@ function PnlChart() {
     // Line
     ctx.beginPath();
     points.forEach(([x, y], i) => i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
-    ctx.strokeStyle = isUp ? '#2ecc71' : '#f87171';
+    ctx.strokeStyle = isUp ? '#00E701' : '#FF3333';
     ctx.lineWidth = 2;
     ctx.stroke();
 
@@ -612,6 +736,162 @@ function PnlChart() {
             style={{ width: '100%', height: '220px', borderRadius: '8px', background: theme.bg.tertiary }}
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Promo Code Section ──────────────────────────────────────────────────────
+
+function PromoCodeSection() {
+  const [code, setCode] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+  const syncProfile = useGameStore((s) => s.syncProfile);
+
+  const handleRedeem = async () => {
+    if (!code.trim() || status === 'loading') return;
+    setStatus('loading');
+    try {
+      const res = await api.redeemBonusCode(code.trim());
+      setStatus('success');
+      setMessage(res.message || `Bonus applied! +${formatSol(res.amount)} SOL`);
+      setCode('');
+      syncProfile();
+    } catch (err: any) {
+      setStatus('error');
+      const msg = err?.error?.message || err?.message || 'Invalid or expired code';
+      setMessage(msg);
+    }
+  };
+
+  return (
+    <div style={s.card}>
+      <div style={s.section}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.text.primary, marginBottom: 8 }}>🎁 Promo Code</div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <input
+            type="text"
+            placeholder="Enter code..."
+            value={code}
+            onChange={e => { setCode(e.target.value.toUpperCase()); setStatus('idle'); }}
+            style={{ ...s.amountInput, flex: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+            className="mono"
+          />
+          <button
+            onClick={handleRedeem}
+            disabled={!code.trim() || status === 'loading'}
+            style={{
+              padding: '10px 16px',
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#fff',
+              background: status === 'loading' ? theme.bg.elevated : theme.accent.purple,
+              border: 'none',
+              borderRadius: 8,
+              cursor: !code.trim() || status === 'loading' ? 'not-allowed' : 'pointer',
+              fontFamily: 'inherit',
+              opacity: !code.trim() ? 0.5 : 1,
+              minWidth: 80,
+            }}
+          >
+            {status === 'loading' ? '...' : 'Redeem'}
+          </button>
+        </div>
+        {status === 'success' && <div style={{ fontSize: 11, color: theme.accent.neonGreen, marginTop: 6 }}>{message}</div>}
+        {status === 'error' && <div style={{ fontSize: 11, color: theme.accent.red, marginTop: 6 }}>{message}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Tip Section ─────────────────────────────────────────────────────────────
+
+function TipSection() {
+  const [toUsername, setToUsername] = useState('');
+  const [amount, setAmount] = useState('');
+  const [status, setStatus] = useState<'idle' | 'confirm' | 'loading' | 'success' | 'error'>('idle');
+  const [message, setMessage] = useState('');
+  const syncProfile = useGameStore((s) => s.syncProfile);
+
+  const handleSend = async () => {
+    if (status === 'idle') {
+      if (!toUsername.trim() || !amount.trim() || parseFloat(amount) <= 0) return;
+      setStatus('confirm');
+      return;
+    }
+    if (status !== 'confirm') return;
+    setStatus('loading');
+    try {
+      const lamports = Math.round(parseFloat(amount) * 1_000_000_000);
+      const res = await apiFetch<{ success: boolean }>('/v1/wallet/tip', {
+        method: 'POST',
+        body: JSON.stringify({ toUsername: toUsername.trim(), amount: lamports }),
+      });
+      setStatus('success');
+      setMessage(`Sent ${amount} SOL to @${toUsername}`);
+      setToUsername('');
+      setAmount('');
+      syncProfile();
+    } catch (err: any) {
+      setStatus('error');
+      setMessage(err?.error?.message || err?.message || 'Failed to send tip');
+    }
+  };
+
+  const cancel = () => { setStatus('idle'); setMessage(''); };
+
+  return (
+    <div style={s.card}>
+      <div style={s.section}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.text.primary, marginBottom: 8 }}>💎 Send Tip</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <input
+            type="text"
+            placeholder="Username"
+            value={toUsername}
+            onChange={e => { setToUsername(e.target.value); setStatus('idle'); }}
+            style={s.amountInput}
+            disabled={status === 'loading' || status === 'confirm'}
+          />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="number"
+              step="0.001"
+              min="0.001"
+              max="10"
+              placeholder="Amount (SOL)"
+              value={amount}
+              onChange={e => { setAmount(e.target.value); setStatus('idle'); }}
+              style={{ ...s.amountInput, flex: 1 }}
+              className="mono"
+              disabled={status === 'loading' || status === 'confirm'}
+            />
+            {status === 'confirm' ? (
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button onClick={handleSend} style={{ padding: '10px 12px', fontSize: 11, fontWeight: 700, color: '#fff', background: theme.accent.neonGreen, border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit' }}>Confirm</button>
+                <button onClick={cancel} style={{ padding: '10px 12px', fontSize: 11, fontWeight: 600, color: theme.text.muted, background: theme.bg.elevated, border: 'none', borderRadius: 8, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+              </div>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={!toUsername.trim() || !amount.trim() || status === 'loading'}
+                style={{
+                  padding: '10px 16px', fontSize: 12, fontWeight: 700, color: '#fff',
+                  background: status === 'loading' ? theme.bg.elevated : theme.accent.purple,
+                  border: 'none', borderRadius: 8,
+                  cursor: !toUsername.trim() || !amount.trim() ? 'not-allowed' : 'pointer',
+                  fontFamily: 'inherit', opacity: !toUsername.trim() || !amount.trim() ? 0.5 : 1, minWidth: 80,
+                }}
+              >
+                {status === 'loading' ? '...' : 'Send'}
+              </button>
+            )}
+          </div>
+        </div>
+        {status === 'confirm' && <div style={{ fontSize: 11, color: theme.accent.amber, marginTop: 6 }}>Send {amount} SOL to @{toUsername}?</div>}
+        {status === 'success' && <div style={{ fontSize: 11, color: theme.accent.neonGreen, marginTop: 6 }}>{message}</div>}
+        {status === 'error' && <div style={{ fontSize: 11, color: theme.accent.red, marginTop: 6 }}>{message}</div>}
       </div>
     </div>
   );
@@ -687,7 +967,7 @@ const s: Record<string, React.CSSProperties> = {
   },
   balanceValue: {
     fontSize: '32px',
-    fontWeight: 800,
+    fontWeight: 700,
     color: '#fff',
     lineHeight: 1,
     letterSpacing: '-0.5px',
@@ -711,7 +991,7 @@ const s: Record<string, React.CSSProperties> = {
     width: '6px',
     height: '6px',
     borderRadius: '50%',
-    background: '#2ecc71',
+    background: '#00E701',
     display: 'inline-block',
   },
   linkedText: {
@@ -1025,13 +1305,13 @@ const s: Record<string, React.CSSProperties> = {
   successMsg: {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#2ecc71',
+    color: '#00E701',
     textAlign: 'center' as const,
   },
   errorMsg: {
     fontSize: '14px',
     fontWeight: 600,
-    color: '#f87171',
+    color: '#FF3333',
     textAlign: 'center' as const,
   },
 
@@ -1206,6 +1486,6 @@ const s: Record<string, React.CSSProperties> = {
   bonusUnlockedText: {
     fontSize: '13px',
     fontWeight: 600,
-    color: '#2ecc71',
+    color: '#00E701',
   },
 };

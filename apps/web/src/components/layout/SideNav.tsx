@@ -11,36 +11,41 @@ interface NavItem {
   id: string;
   label: string;
   icon: string;
-  route?: string; // override if different from id
+  route?: string;
 }
 
 const MAIN_ITEMS: NavItem[] = [
-  { id: 'lobby', label: 'Main', icon: 'grid' },
+  { id: 'lobby', label: 'Casino', icon: 'grid' },
 ];
 
 const GAME_ITEMS: NavItem[] = [
-  { id: 'solo', label: 'Solo', icon: 'play', route: 'setup' },
+  { id: 'rug-game', label: 'Rug Game', icon: 'terminal' },
+  { id: 'mines', label: 'Mines', icon: 'diamond' },
+  { id: 'candleflip', label: 'Candleflip', icon: 'swords' },
   { id: 'prediction', label: 'Predictions', icon: 'candles' },
   { id: 'trading-sim', label: 'Trading Sim', icon: 'chart' },
-  { id: 'candleflip', label: 'Candleflip', icon: 'swords' },
-  { id: 'rug-game', label: 'Rug Game', icon: 'terminal' },
-  { id: 'lottery', label: 'Lottery', icon: 'diamond' },
+  { id: 'solo', label: 'Solo', icon: 'play', route: 'setup' },
+  { id: 'lottery', label: 'Lottery', icon: 'star' },
 ];
 
 const COMMUNITY_ITEMS: NavItem[] = [
-  { id: 'leaderboard', label: 'Ranks', icon: 'trophy' },
-  { id: 'season', label: 'Season', icon: 'star' },
-  { id: 'rewards', label: 'Rewards', icon: 'gift' },
+  { id: 'leaderboard', label: 'Leaderboard', icon: 'trophy' },
+  { id: 'season', label: 'VIP Club', icon: 'star' },
+  { id: 'rewards', label: 'Promotions', icon: 'gift' },
 ];
 
 const BOTTOM_ITEMS: NavItem[] = [
   { id: 'wallet', label: 'Wallet', icon: 'wallet' },
-  { id: 'history', label: 'History', icon: 'clock' },
+  { id: 'my-bets', label: 'My Bets', icon: 'list' },
   { id: 'fairness', label: 'Fairness', icon: 'shield' },
   { id: 'settings', label: 'Settings', icon: 'gear' },
 ];
 
-export function SideNav() {
+interface SideNavProps {
+  collapsed?: boolean;
+}
+
+export function SideNav({ collapsed = false }: SideNavProps) {
   const screen = useGameStore((s) => s.screen);
   const go = useAppNavigate();
   const { isAuthenticated } = useAuthStore();
@@ -73,6 +78,7 @@ export function SideNav() {
         onMouseLeave={() => setHoveredId(null)}
         style={{
           ...s.navItem,
+          ...(collapsed ? s.navItemCollapsed : {}),
           ...(isActive ? s.navItemActive : {}),
           ...(isHovered && !isActive ? s.navItemHover : {}),
         }}
@@ -81,29 +87,36 @@ export function SideNav() {
         {isActive && <div style={s.activeIndicator} />}
         <NavIcon
           name={item.icon}
-          size={18}
+          size={collapsed ? 20 : 18}
           color={isActive ? theme.accent.purple : theme.text.secondary}
         />
-        <span style={{
-          ...s.navLabel,
-          color: isActive ? theme.text.primary : theme.text.secondary,
-          fontWeight: isActive ? 600 : 400,
-        }}>
-          {item.label}
-        </span>
+        {!collapsed && (
+          <span style={{
+            ...s.navLabel,
+            color: isActive ? '#FFFFFF' : theme.text.secondary,
+            fontWeight: isActive ? 600 : 400,
+          }}>
+            {item.label}
+          </span>
+        )}
       </button>
     );
   };
 
   const renderSection = (title: string, items: NavItem[]) => (
     <div style={s.section}>
-      <div style={s.sectionTitle}>{title}</div>
+      {!collapsed && <div style={s.sectionTitle}>{title}</div>}
+      {collapsed && <div style={s.sectionDivider} />}
       {items.map(renderItem)}
     </div>
   );
 
+  const navWidth = collapsed ? theme.layout.sidebarCollapsed : theme.layout.sidebarWidth;
+
   return (
-    <nav style={s.nav}>
+    <nav style={{ ...s.nav, width: navWidth }}>
+      {/* No search bar — removed in v5 */}
+
       <div style={s.scrollArea}>
         {/* Main */}
         <div style={s.section}>
@@ -111,7 +124,7 @@ export function SideNav() {
         </div>
 
         {/* Games */}
-        {renderSection('Games', GAME_ITEMS)}
+        {renderSection('Originals', GAME_ITEMS)}
 
         {/* Community */}
         {renderSection('Community', COMMUNITY_ITEMS)}
@@ -127,16 +140,19 @@ export function SideNav() {
             onMouseLeave={() => setHoveredId(null)}
             style={{
               ...s.navItem,
+              ...(collapsed ? s.navItemCollapsed : {}),
               ...(activeId === 'admin' ? s.navItemActive : {}),
               ...(hoveredId === 'admin' && activeId !== 'admin' ? s.navItemHover : {}),
             }}
             title="Admin"
           >
             {activeId === 'admin' && <div style={{ ...s.activeIndicator, background: theme.accent.red }} />}
-            <NavIcon name="shield" size={18} color={theme.accent.red} />
-            <span style={{ ...s.navLabel, color: activeId === 'admin' ? theme.accent.red : theme.text.secondary }}>
-              Admin
-            </span>
+            <NavIcon name="shield" size={collapsed ? 20 : 18} color={theme.accent.red} />
+            {!collapsed && (
+              <span style={{ ...s.navLabel, color: activeId === 'admin' ? theme.accent.red : theme.text.secondary }}>
+                Admin
+              </span>
+            )}
           </button>
         )}
         {BOTTOM_ITEMS.map(renderItem)}
@@ -150,54 +166,65 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    width: theme.layout.sidebarWidth,
     background: theme.bg.secondary,
     borderRight: `1px solid ${theme.border.subtle}`,
     flexShrink: 0,
     overflow: 'hidden',
     position: 'relative',
     zIndex: 2,
+    transition: 'width 0.2s ease',
   },
   scrollArea: {
     flex: 1,
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: '12px 0',
+    padding: `${theme.gap.sm}px 0`,
   },
   section: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '1px',
-    padding: '0 10px',
-    marginBottom: '8px',
+    gap: 1,
+    padding: `0 ${theme.gap.sm}px`,
+    marginBottom: theme.gap.xs,
   },
   sectionTitle: {
-    fontSize: '10px',
+    fontSize: theme.textSize.xs.mobile,
     fontWeight: 600,
     textTransform: 'uppercase' as const,
-    letterSpacing: '1.2px',
+    letterSpacing: '0.8px',
     color: theme.text.muted,
-    padding: '12px 12px 6px',
+    padding: `${theme.gap.md}px ${theme.gap.md}px ${theme.gap.sm}px`,
+  },
+  sectionDivider: {
+    height: '1px',
+    background: theme.border.subtle,
+    margin: '6px 8px',
   },
   navItem: {
     position: 'relative' as const,
     display: 'flex',
     flexDirection: 'row' as const,
     alignItems: 'center',
-    gap: '12px',
-    padding: '9px 12px',
+    gap: theme.gap.md,
+    padding: `${theme.gap.sm}px ${theme.gap.md}px`,
     background: 'transparent',
     border: 'none',
-    borderRadius: '10px',
+    borderRadius: theme.radius.md,
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     fontFamily: 'inherit',
     width: '100%',
     textAlign: 'left' as const,
     overflow: 'hidden',
+    minHeight: 36,
+  },
+  navItemCollapsed: {
+    justifyContent: 'center',
+    padding: '10px',
+    gap: '0',
   },
   navItemActive: {
-    background: 'rgba(139, 92, 246, 0.08)',
+    background: 'rgba(139, 92, 246, 0.06)',
   },
   navItemHover: {
     background: 'rgba(255, 255, 255, 0.03)',
@@ -207,13 +234,13 @@ const s: Record<string, React.CSSProperties> = {
     left: 0,
     top: '50%',
     transform: 'translateY(-50%)',
-    width: '3px',
-    height: '20px',
+    width: '2px',
+    height: '18px',
     borderRadius: '0 3px 3px 0',
     background: theme.accent.purple,
   },
   navLabel: {
-    fontSize: '13px',
+    fontSize: theme.textSize.sm.mobile,
     fontWeight: 400,
     letterSpacing: '0.2px',
     lineHeight: 1.3,
@@ -224,12 +251,12 @@ const s: Record<string, React.CSSProperties> = {
   bottomSection: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '1px',
-    padding: '0 10px 12px',
+    gap: 1,
+    padding: `0 ${theme.gap.sm}px ${theme.gap.md}px`,
   },
   divider: {
-    height: '1px',
+    height: 1,
     background: theme.border.subtle,
-    margin: '4px 12px 8px',
+    margin: `${theme.gap.xs}px ${theme.gap.sm}px ${theme.gap.sm}px`,
   },
 };

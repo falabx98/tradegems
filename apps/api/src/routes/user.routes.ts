@@ -88,4 +88,41 @@ export async function userRoutes(server: FastifyInstance) {
 
     return { data: results };
   });
+
+  // ─── Demo Balance Refill ────────────────────────────────────
+  server.post('/me/demo-refill', async (request) => {
+    const { userId } = getAuthUser(request);
+    const { getDb } = await import('../config/database.js');
+    const { users } = await import('@tradingarena/db');
+    const db = getDb();
+
+    const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+    if (!user) return { success: false, message: 'User not found' };
+
+    const MAX_REFILLS = 3;
+    const REFILL_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+    const DEMO_REFILL_AMOUNT = 100_000_000_000; // 100 DEMO tokens in lamports
+
+    if ((user.demoRefillsUsed ?? 0) >= MAX_REFILLS) {
+      return { success: false, message: 'Maximum demo refills reached. Deposit SOL to keep playing.' };
+    }
+
+    if (user.lastDemoRefill && Date.now() - new Date(user.lastDemoRefill).getTime() < REFILL_COOLDOWN_MS) {
+      const nextRefillAt = new Date(new Date(user.lastDemoRefill).getTime() + REFILL_COOLDOWN_MS);
+      return { success: false, message: 'Refill available in 24 hours', nextRefillAt: nextRefillAt.toISOString() };
+    }
+
+    await db.update(users).set({
+      demoBalance: DEMO_REFILL_AMOUNT,
+      demoRefillsUsed: (user.demoRefillsUsed ?? 0) + 1,
+      lastDemoRefill: new Date(),
+    }).where(eq(users.id, userId));
+
+    return {
+      success: true,
+      demoBalance: DEMO_REFILL_AMOUNT,
+      refillsUsed: (user.demoRefillsUsed ?? 0) + 1,
+      refillsRemaining: MAX_REFILLS - ((user.demoRefillsUsed ?? 0) + 1),
+    };
+  });
 }

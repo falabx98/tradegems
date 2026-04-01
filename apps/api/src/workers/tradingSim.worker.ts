@@ -3,6 +3,7 @@ import { tradingSimRooms, tradingSimParticipants, users } from '@tradingarena/db
 import { eq, and, lte, sql } from 'drizzle-orm';
 import { TradingSimService } from '../modules/trading-sim/tradingSim.service.js';
 import { WalletService } from '../modules/wallet/wallet.service.js';
+import { createWorkerReporter, withWorkerRecovery } from '../utils/workerHealth.js';
 
 const POLL_INTERVAL_MS = 5_000; // 5 seconds — games are short
 
@@ -75,16 +76,18 @@ async function tick(): Promise<void> {
   }
 }
 
+const reporter = createWorkerReporter('trading-sim-expiry');
+
 export async function startTradingSimWorker(): Promise<void> {
   console.log('[TradingSimWorker] Starting trading sim worker...');
-  await tick();
-  workerTimer = setInterval(() => {
-    tick().catch((err) => console.error('[TradingSimWorker] Tick error:', err));
-  }, POLL_INTERVAL_MS);
+  const wrappedTick = withWorkerRecovery('trading-sim-expiry', tick, reporter);
+  await wrappedTick();
+  workerTimer = setInterval(wrappedTick, POLL_INTERVAL_MS);
   console.log('[TradingSimWorker] Worker started successfully');
 }
 
 export function stopTradingSimWorker(): void {
+  reporter.stop();
   if (workerTimer) {
     clearInterval(workerTimer);
     workerTimer = null;

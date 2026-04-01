@@ -6,11 +6,16 @@ import { nanoid } from 'nanoid';
 import { predictionRounds, activityFeedItems, users } from '@tradingarena/db';
 import { getDb } from '../config/database.js';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
+import { requireNotExcluded } from '../middleware/selfExclusion.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { WalletService } from '../modules/wallet/wallet.service.js';
 import { UserService } from '../modules/user/user.service.js';
 import { env } from '../config/env.js';
 import { getRedis } from '../config/redis.js';
+import { requireGameEnabled } from '../utils/gameGates.js';
+import { auditLog } from '../utils/auditLog.js';
+import { validateBetLimits } from '../utils/betLimits.js';
+import { checkPayoutOutlier } from '../utils/payoutMonitor.js';
 
 // In-memory store for prediction locks (maps lockRef → { userId, betAmount, fee, totalCost, ref, serverOutcome })
 // Entries expire after 120s via Redis TTL
@@ -20,9 +25,15 @@ interface PredictionLock {
   fee: number;
   totalCost: number;
   refId: string;
-  direction: 'up' | 'down' | 'sideways'; // locked at bet time — client cannot change
-  serverOutcome: 'win' | 'loss'; // Server-determined result — client cannot override
-  createdAt: number; // Date.now() timestamp for orphan cleanup
+  direction: 'up' | 'down' | 'sideways';
+  serverOutcome: 'win' | 'loss';
+  createdAt: number;
+  isDemoBet?: boolean;
+  // Provably fair fields
+  serverSeed: string;
+  seedHash: string;
+  clientSeed: string;
+  nonce: number;
 }
 
 // ── Win probabilities per direction (house edge ~8-10% after 3% fee) ──
@@ -44,30 +55,41 @@ export async function predictionRoutes(server: FastifyInstance) {
 
   // Step 1: Pre-lock funds before prediction game starts
   // Direction is sent at lock time so the server can pre-determine the outcome
-  server.post('/lock', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request) => {
+  server.post('/lock', { preHandler: [requireAuth, requireNotExcluded], config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request) => {
+    await requireGameEnabled('predictions');
     const userId = getAuthUser(request).userId;
 
     const body = z.object({
       betAmount: z.number().int().positive(),
       direction: z.enum(['up', 'down', 'sideways']),
+      isDemoBet: z.boolean().optional().default(false),
     }).parse(request.body);
 
+    const { detectDemoBet } = await import('../utils/demoDetect.js');
+    const isDemoBet = await detectDemoBet(userId, body.isDemoBet);
+
     const feeRate = env.PLATFORM_FEE_RATE;
-    const fee = Math.floor(body.betAmount * feeRate);
+    const fee = isDemoBet ? 0 : Math.floor(body.betAmount * feeRate);
+    if (!isDemoBet) await validateBetLimits(userId, body.betAmount, fee);
     const totalCost = body.betAmount + fee;
 
     const refId = nanoid();
     const ref = { type: 'prediction', id: refId };
 
     // Lock funds now (before game starts)
-    await walletService.lockFunds(userId, totalCost, 'SOL', ref);
+    await walletService.lockFunds(userId, totalCost, 'SOL', ref, isDemoBet);
 
-    // ── Server determines outcome using crypto-safe RNG ──
+    // ── Provably Fair outcome determination ──
+    const { generateServerSeed, hashSeed, generatePredictionOutcome, useNonce } = await import('../utils/provablyFair.js');
+
+    const serverSeed = generateServerSeed();
+    const seedHash = hashSeed(serverSeed);
+    const { clientSeed, nonce } = await useNonce(userId);
+
     const winProb = WIN_PROBABILITIES[body.direction] ?? 0.50;
-    const roll = crypto.randomInt(10000) / 10000; // 0.0000 - 0.9999
-    const serverOutcome: 'win' | 'loss' = roll < winProb ? 'win' : 'loss';
+    const { outcome: serverOutcome } = generatePredictionOutcome(serverSeed, clientSeed, nonce, winProb);
 
-    // Store lock info in Redis with 120s TTL (game takes ~20s + buffer)
+    // Store lock info in Redis with 120s TTL
     const redis = getRedis();
     const lockData: PredictionLock = {
       userId,
@@ -78,23 +100,28 @@ export async function predictionRoutes(server: FastifyInstance) {
       direction: body.direction,
       serverOutcome,
       createdAt: Date.now(),
+      isDemoBet,
+      serverSeed,
+      seedHash,
+      clientSeed,
+      nonce,
     };
     await redis.set(`prediction:lock:${refId}`, JSON.stringify(lockData), 'EX', 120);
 
-    // Return chart direction instead of raw win/loss to prevent cheating.
-    // If win: chart moves in the user's predicted direction. If loss: chart moves a different direction.
+    // Return chart direction (don't reveal outcome yet)
     const chartDirection: 'up' | 'down' | 'sideways' = serverOutcome === 'win'
       ? body.direction
       : (['up', 'down', 'sideways'] as const).filter(d => d !== body.direction)[Math.floor(Math.random() * 2)];
 
-    return { success: true, lockRef: refId, fee, chartDirection };
+    auditLog({ action: 'prediction_lock', requestId: request.id, userId, game: 'predictions', betAmount: body.betAmount, fee, status: 'success', meta: { direction: body.direction, lockRef: refId, seedHash } });
+    return { success: true, lockRef: refId, fee, chartDirection, seedHash };
   });
 
   // Step 2: Settle prediction after game resolves (uses pre-locked funds)
   server.post('/save', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async (request) => {
     const userId = getAuthUser(request).userId;
 
-    const ALLOWED_MULTIPLIERS: Record<string, number> = { up: 1.9, down: 1.9, sideways: 3.0 };
+    const ALLOWED_MULTIPLIERS: Record<string, number> = { up: 1.92, down: 1.92, sideways: 3.18 };
 
     const body = z.object({
       lockRef: z.string().min(1),
@@ -137,9 +164,12 @@ export async function predictionRoutes(server: FastifyInstance) {
       : 0;
 
     // Settle: unlock locked funds and credit payout (funds were already locked in /lock)
-    await walletService.settlePayout(userId, lock.betAmount, lock.fee, actualPayout, 'SOL', ref);
+    await walletService.settlePayout(userId, lock.betAmount, lock.fee, actualPayout, 'SOL', ref, lock.isDemoBet);
+    auditLog({ action: 'prediction_settle', requestId: request.id, userId, game: 'predictions', betAmount: lock.betAmount, fee: lock.fee, payoutAmount: actualPayout, multiplier: safeMultiplier, outcome: serverResult, status: 'success', meta: { lockRef: lock.refId, direction: lock.direction } });
+    // Outlier check (non-blocking)
+    checkPayoutOutlier({ game: 'predictions', userId, gameId: lock.refId, betAmount: lock.betAmount, payoutAmount: actualPayout, multiplier: safeMultiplier, requestId: request.id }).catch(() => {});
 
-    // Save prediction record to DB
+    // Save prediction record to DB (with provably fair data)
     const [saved] = await db.insert(predictionRounds).values({
       userId,
       direction: lock.direction,
@@ -148,6 +178,10 @@ export async function predictionRoutes(server: FastifyInstance) {
       payout: actualPayout,
       multiplier: String(safeMultiplier),
       pattern: body.pattern ?? null,
+      serverSeed: lock.serverSeed,
+      seedHash: lock.seedHash,
+      clientSeed: lock.clientSeed,
+      nonce: lock.nonce,
       metadata: { savedAt: Date.now(), fee: lock.fee, ref: lock.refId },
     }).returning();
 
@@ -187,13 +221,18 @@ export async function predictionRoutes(server: FastifyInstance) {
       // Non-critical
     }
 
-    // Award XP
+    // Award XP + track missions
     const xpGained = serverResult === 'win' ? 25 : 15;
     try {
       await userService.addXP(userId, xpGained, 'prediction');
     } catch (err) {
       request.log.warn({ err, userId, xpGained }, 'Failed to award prediction XP');
     }
+    try {
+      const { MissionsService } = await import('../modules/missions/missions.service.js');
+      await new MissionsService().trackProgress(userId, 'prediction_result', serverResult === 'win');
+    } catch {}
+
 
     // Insert activity feed item for real players
     try {

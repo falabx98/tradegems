@@ -42,9 +42,21 @@ export async function fairnessRoutes(server: FastifyInstance) {
       // Seed data (revealed after resolution)
       serverSeed: round.seed,
       serverSeedHash: round.seedCommitment,
-      clientSeed: `player-${userId}`,
+      clientSeed: await (async () => {
+        try {
+          const { getUserSeedState } = await import('../utils/provablyFair.js');
+          const state = await getUserSeedState(userId);
+          return state.clientSeed;
+        } catch { return `player-${userId}`; }
+      })(),
       roundSeed: round.seed,
-      nonce: 0,
+      nonce: await (async () => {
+        try {
+          const { getUserSeedState } = await import('../utils/provablyFair.js');
+          const state = await getUserSeedState(userId);
+          return state.nonce;
+        } catch { return 0; }
+      })(),
       resultHash: round.seedCommitment,
       // Round metadata
       configSnapshot: round.configSnapshot,
@@ -59,5 +71,24 @@ export async function fairnessRoutes(server: FastifyInstance) {
       createdAt: round.createdAt?.toISOString(),
       resolvedAt: round.resolvedAt?.toISOString(),
     };
+  });
+
+  // ─── User Seed State (view + rotate) ──────────────────────
+
+  server.get('/seed-state', { preHandler: [requireAuth] }, async (request) => {
+    const userId = getAuthUser(request).userId;
+    const { getUserSeedState } = await import('../utils/provablyFair.js');
+    const state = await getUserSeedState(userId);
+    return { data: state };
+  });
+
+  server.post('/rotate-seed', { preHandler: [requireAuth] }, async (request) => {
+    const userId = getAuthUser(request).userId;
+    const { z } = await import('zod');
+    const body = z.object({ newSeed: z.string().min(1).max(64).optional() }).safeParse(request.body);
+    const newSeed = body.success ? body.data.newSeed : undefined;
+    const { rotateClientSeed } = await import('../utils/provablyFair.js');
+    const state = await rotateClientSeed(userId, newSeed);
+    return { data: state, message: 'Client seed rotated. Nonce reset to 0.' };
   });
 }

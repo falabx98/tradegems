@@ -29,7 +29,7 @@ import { ResponsibleGamblingScreen } from './components/screens/ResponsibleGambl
 import { PrivacyScreen } from './components/screens/PrivacyScreen';
 import { TermsScreen } from './components/screens/TermsScreen';
 import { SessionTimeReminder, FooterDisclaimer } from './components/ResponsibleGambling';
-import { OnboardingModal, useOnboarding } from './components/OnboardingModal';
+
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggle } from './components/layout/ChatToggle';
 import { ToastOverlay } from './components/ToastOverlay';
@@ -45,7 +45,6 @@ export default function App() {
   const syncProfile = useGameStore((state) => state.syncProfile);
   const { isAuthenticated, checkAuth } = useAuthStore();
   const [authChecked, setAuthChecked] = useState(false);
-  const { showOnboarding, closeOnboarding } = useOnboarding();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -122,7 +121,7 @@ export default function App() {
   return (
     <>
       <AppLayout>
-        {showOnboarding && <OnboardingModal onClose={closeOnboarding} />}
+
         {(screen === 'lobby' || screen === 'auth') && <LobbyScreen />}
         {screen === 'setup' && <SoloSetupScreen />}
         {screen === 'result' && <ResultScreen />}

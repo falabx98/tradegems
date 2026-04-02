@@ -20,7 +20,7 @@ export function ChatPage() {
   const [muteUserId, setMuteUserId] = useState<string | null>(null);
   const [muteUsername, setMuteUsername] = useState('');
   const [muteDuration, setMuteDuration] = useState(10);
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
+  const intervalRef = useRef<ReturnType<typeof setInterval>>(undefined);
   const addToast = useToastStore((s) => s.addToast);
 
   useEffect(() => {
@@ -44,9 +44,9 @@ export function ChatPage() {
     try {
       await adminApi.deleteChatMessage(messageId);
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
-      addToast({ type: 'success', title: 'Message deleted' });
+      addToast('Message deleted', 'success');
     } catch {
-      addToast({ type: 'error', title: 'Failed to delete message' });
+      addToast('Failed to delete message', 'error');
     }
   }
 
@@ -54,10 +54,10 @@ export function ChatPage() {
     if (!muteUserId) return;
     try {
       await adminApi.muteUser(muteUserId, muteDuration);
-      addToast({ type: 'success', title: `${muteUsername} muted for ${muteDuration}m` });
+      addToast(`${muteUsername} muted for ${muteDuration}m`, 'success');
       setMuteUserId(null);
     } catch {
-      addToast({ type: 'error', title: 'Failed to mute user' });
+      addToast('Failed to mute user', 'error');
     }
   }
 

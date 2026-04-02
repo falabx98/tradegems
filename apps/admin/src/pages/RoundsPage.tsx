@@ -109,7 +109,7 @@ export function RoundsPage() {
               <DetailRow label="Seed Commitment" value={(selectedRound.seedCommitment as string) || '—'} mono />
             </div>
 
-            {selectedRound.pool && (
+            {!!selectedRound.pool && (
               <div>
                 <h4 style={styles.subTitle}>Pool</h4>
                 <div style={styles.detailGrid}>
@@ -121,7 +121,7 @@ export function RoundsPage() {
               </div>
             )}
 
-            {selectedRound.nodes && Array.isArray(selectedRound.nodes) && (
+            {!!selectedRound.nodes && Array.isArray(selectedRound.nodes) && (
               <div>
                 <h4 style={styles.subTitle}>Nodes ({(selectedRound.nodes as unknown[]).length})</h4>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -139,7 +139,7 @@ export function RoundsPage() {
               </div>
             )}
 
-            {selectedRound.bets && Array.isArray(selectedRound.bets) && (selectedRound.bets as unknown[]).length > 0 && (
+            {!!selectedRound.bets && Array.isArray(selectedRound.bets) && (selectedRound.bets as unknown[]).length > 0 && (
               <div>
                 <h4 style={styles.subTitle}>Bets ({(selectedRound.bets as unknown[]).length})</h4>
                 <div style={styles.detailGrid}>

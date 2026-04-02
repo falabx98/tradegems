@@ -56,13 +56,15 @@ export async function buildServer() {
   });
 
   // ─── Plugins ─────────────────────────────────────────────
-  // CORS: always include production domain + common dev origins
+  // CORS: production domains are always included; localhost only in dev/staging
   // env.CORS_ORIGINS can add extra domains but never removes the core set
   const coreOrigins = [
     'https://tradegems.gg',
     'https://www.tradegems.gg',
-    'http://localhost:5173',
-    'http://localhost:3000',
+    ...(env.NODE_ENV !== 'production' ? [
+      'http://localhost:5173',
+      'http://localhost:3000',
+    ] : []),
   ];
   const extraOrigins = env.CORS_ORIGINS
     ? env.CORS_ORIGINS.split(',').map(s => s.trim()).filter(Boolean)

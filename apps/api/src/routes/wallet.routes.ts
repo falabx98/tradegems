@@ -29,7 +29,7 @@ const depositVerifySchema = z.object({
 
 const linkWalletSchema = z.object({
   address: z.string().min(32).max(64).regex(/^[1-9A-HJ-NP-Za-km-z]+$/, 'Invalid Solana address format'),
-  signature: z.string().min(64).max(256).optional(), // TODO: make required once frontend sends signatures
+  signature: z.string().min(64).max(256), // Required: wallet ownership must be cryptographically verified
 });
 
 export async function walletRoutes(server: FastifyInstance) {

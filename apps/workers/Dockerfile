@@ -1,4 +1,4 @@
-FROM node:20-slim AS base
+FROM node:20.18-slim AS base
 RUN corepack enable
 WORKDIR /app
 
@@ -22,7 +22,7 @@ COPY apps/workers/ apps/workers/
 RUN npx turbo build --filter=@tradingarena/workers
 
 # --- Production ---
-FROM node:20-slim AS runner
+FROM node:20.18-slim AS runner
 WORKDIR /app
 
 COPY --from=base /app/node_modules ./node_modules

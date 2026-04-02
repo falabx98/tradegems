@@ -15,10 +15,10 @@ const envSchema = z.object({
   JWT_ACCESS_EXPIRY: z.string().default('1h'),
   JWT_REFRESH_EXPIRY: z.string().default('7d'),
   PLATFORM_FEE_RATE: z.coerce.number().default(0.05),
-  SOLANA_RPC_URL: z.string().default('https://api.devnet.solana.com'),
-  SOLANA_CLUSTER: z.string().default('devnet'),
+  SOLANA_RPC_URL: z.string().default('https://api.mainnet-beta.solana.com'),
+  SOLANA_CLUSTER: z.string().default('mainnet-beta'),
   TREASURY_PRIVATE_KEY: z.string().optional(),
-  SOLANA_REQUIRED_CONFIRMATIONS: z.coerce.number().default(1),
+  SOLANA_REQUIRED_CONFIRMATIONS: z.coerce.number().default(3),
   WITHDRAWAL_FEE_LAMPORTS: z.coerce.number().default(5000),
   WALLET_ENCRYPTION_KEY: z.string().optional(), // 32-byte hex key for AES-256-GCM
   DEPOSIT_SWEEP_INTERVAL_MS: z.coerce.number().default(60_000), // 1 min
@@ -37,6 +37,20 @@ if (!parsed.success) {
   console.error('Invalid environment variables:');
   console.error(parsed.error.format());
   process.exit(1);
+}
+
+// Production-only strict validation
+if (parsed.data.NODE_ENV === 'production') {
+  const missing: string[] = [];
+  if (!parsed.data.TREASURY_PRIVATE_KEY) missing.push('TREASURY_PRIVATE_KEY');
+  if (!parsed.data.WALLET_ENCRYPTION_KEY) missing.push('WALLET_ENCRYPTION_KEY');
+  if (parsed.data.SOLANA_CLUSTER === 'devnet') {
+    console.warn('[ENV] WARNING: SOLANA_CLUSTER is set to devnet in production — ensure this is intentional for testing');
+  }
+  if (missing.length > 0) {
+    console.error(`[ENV] FATAL: Missing required production variables: ${missing.join(', ')}`);
+    process.exit(1);
+  }
 }
 
 export const env = parsed.data;

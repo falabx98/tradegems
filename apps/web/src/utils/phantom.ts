@@ -57,7 +57,7 @@ export async function sendSolToTreasury(
   const provider = getPhantomProvider();
   if (!provider || !provider.publicKey) throw new Error('Wallet not connected');
 
-  const rpcUrl = (import.meta as any).env?.VITE_SOLANA_RPC_URL || clusterApiUrl('devnet');
+  const rpcUrl = (import.meta as any).env?.VITE_SOLANA_RPC_URL || clusterApiUrl('mainnet-beta');
   const connection = new Connection(rpcUrl, 'confirmed');
 
   const transaction = new Transaction().add(

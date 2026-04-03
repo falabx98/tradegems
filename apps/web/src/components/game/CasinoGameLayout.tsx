@@ -190,6 +190,7 @@ const desktopStage: CSSProperties = {
   minHeight: 0,
   display: 'flex',
   flexDirection: 'column',
+  overflow: 'hidden',
 };
 
 const mobileShell: CSSProperties = {

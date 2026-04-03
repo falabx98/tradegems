@@ -219,6 +219,13 @@ export async function buildServer() {
   const { analyticsRoutes } = await import('./routes/analytics.routes.js');
   await server.register(analyticsRoutes, { prefix: '/v1/analytics' });
 
+  // Run pending migrations (safe — uses IF NOT EXISTS)
+  try {
+    const { sql } = await import('drizzle-orm');
+    const db = (await import('./config/database.js')).getDb();
+    await db.execute(sql`ALTER TABLE user_mission_progress ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'`);
+  } catch (e) { server.log.error(e, 'Migration failed (non-fatal)'); }
+
   // Start round managers (with error handling)
   try { startRugRoundManager(); } catch (e) { server.log.error(e, 'Failed to start rug round manager'); }
   try { startCandleflipRoundManager(); } catch (e) { server.log.error(e, 'Failed to start candleflip round manager'); }

@@ -496,9 +496,12 @@ export class WalletService {
     const bonusAmount = (bal as any)?.bonusAmount ?? 0;
     const totalBalance = (bal?.availableAmount ?? 0) + (bal?.lockedAmount ?? 0);
 
-    // User needs to profit enough above their bonus to withdraw
-    const profitNeeded = Math.max(0, BONUS_PROFIT_THRESHOLD - (totalBalance - bonusAmount));
-    const withdrawalEligible = profitNeeded <= 0 || !claimed;
+    // Only apply bonus lock if user actually received a bonus amount
+    // If bonusAmount is 0, no lock applies regardless of claimed flag
+    const profitNeeded = bonusAmount > 0
+      ? Math.max(0, BONUS_PROFIT_THRESHOLD - (totalBalance - bonusAmount))
+      : 0;
+    const withdrawalEligible = profitNeeded <= 0 || !claimed || bonusAmount <= 0;
 
     return {
       claimed,

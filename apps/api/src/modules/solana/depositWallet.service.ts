@@ -70,14 +70,35 @@ export class DepositWalletService {
     const cb = getSolanaCircuitBreaker();
     const balance = await cb.execute(() => connection.getBalance(depositKeypair.publicKey));
 
-    // Need enough to cover rent + tx fee (5000 lamports fee minimum)
-    const fee = 5000;
-    const sweepAmount = balance - fee;
+    // Get the actual transaction fee from a recent blockhash
+    const { blockhash, lastValidBlockHeight } = await cb.execute(() =>
+      connection.getLatestBlockhash('confirmed')
+    );
+    const feeResult = await cb.execute(() =>
+      connection.getFeeForMessage(
+        new Transaction({
+          recentBlockhash: blockhash,
+          feePayer: depositKeypair.publicKey,
+        }).add(
+          SystemProgram.transfer({
+            fromPubkey: depositKeypair.publicKey,
+            toPubkey: treasuryKeypair.publicKey,
+            lamports: 1, // placeholder
+          }),
+        ).compileMessage(),
+        'confirmed',
+      )
+    );
+    const fee = feeResult.value ?? 5000;
 
+    // Send entire balance minus fee — account goes to 0 (closed)
+    const sweepAmount = balance - fee;
     if (sweepAmount <= 0) return null;
 
-    // Transfer all available funds to treasury
-    const transaction = new Transaction().add(
+    const transaction = new Transaction({
+      recentBlockhash: blockhash,
+      feePayer: depositKeypair.publicKey,
+    }).add(
       SystemProgram.transfer({
         fromPubkey: depositKeypair.publicKey,
         toPubkey: treasuryKeypair.publicKey,

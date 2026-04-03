@@ -18,6 +18,7 @@ const DEGRADED_THRESHOLD = 60_000;  // 60s without heartbeat = degraded
 // All known worker names — must match what workers register as
 export const WORKER_NAMES = [
   'deposit-confirmation',
+  'deposit-monitor',
   'orphan-cleanup',
   'trading-sim-expiry',
   'lottery-draw',

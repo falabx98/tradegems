@@ -18,6 +18,7 @@ import { referralRoutes } from './routes/referral.routes.js';
 import { chatRoutes } from './routes/chat.routes.js';
 import { tipRoutes } from './routes/tip.routes.js';
 import { startDepositWorker } from './workers/depositConfirmation.worker.js';
+import { startDepositMonitor } from './workers/depositMonitor.worker.js';
 import { startBotEngine } from './workers/botEngine.worker.js';
 import { startLotteryDrawWorker } from './workers/lotteryDraw.worker.js';
 import { startTradingSimWorker } from './workers/tradingSim.worker.js';
@@ -224,6 +225,7 @@ export async function buildServer() {
 
   // Start background workers (with error handling)
   try { startDepositWorker(); } catch (e) { server.log.error(e, 'Failed to start deposit worker'); }
+  try { startDepositMonitor(); } catch (e) { server.log.error(e, 'Failed to start deposit monitor'); }
   try { startBotEngine(); } catch (e) { server.log.error(e, 'Failed to start bot engine'); }
   try { startLotteryDrawWorker(); } catch (e) { server.log.error(e, 'Failed to start lottery draw worker'); }
   try { startTradingSimWorker(); } catch (e) { server.log.error(e, 'Failed to start trading sim worker'); }

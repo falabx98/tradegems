@@ -325,13 +325,6 @@ main > div { animation: screenFadeIn 0.15s ease-out both; }
 .auth-switch { background: none; border: none; cursor: pointer; font-family: var(--font-sans); font-size: 13px; color: var(--text-muted); transition: color 0.2s ease; text-align: center; }
 .auth-switch:hover { color: #a78bfa; }
 
-.auth-phantom { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; padding: 13px; background: linear-gradient(135deg, #7c3aed, #8b5cf6, #a78bfa); border: none; border-radius: 8px; cursor: pointer; font-size: 15px; font-weight: 700; color: #fff; font-family: var(--font-sans); transition: all 0.2s ease; }
-.auth-phantom:hover { box-shadow: 0 4px 20px rgba(139, 92, 246, 0.35); transform: translateY(-1px); }
-.auth-phantom:active { transform: scale(0.96); }
-.auth-phantom:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.auth-phantom-link { font-size: 13px; color: #a78bfa; text-decoration: none; text-align: center; display: block; }
-
 /* ─── Mobile ─────────────────────────────────────────────────────────────── */
 @media (max-width: 767px) { .hide-mobile { display: none !important; } }
 @media (min-width: 768px) { .hide-desktop { display: none !important; } }

@@ -3,8 +3,8 @@ import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
 import { api, API_BASE, apiFetch } from '../../utils/api';
 import { formatSol, solToLamports } from '../../utils/sol';
-import { funnelTrack, walletTrack } from '../../utils/analytics';
-import { isPhantomInstalled, connectPhantom, sendSolToTreasury, getConnectedAddress } from '../../utils/phantom';
+
+
 import { theme } from '../../styles/theme';
 import { CheckIcon, GiftIcon, WalletIcon } from '../ui/GameIcons';
 import { SolIcon } from '../ui/SolIcon';
@@ -24,7 +24,6 @@ interface Transaction {
 }
 
 type Tab = 'deposit' | 'withdraw' | 'pnl';
-type DepositState = 'idle' | 'sending' | 'verifying' | 'confirming' | 'confirmed' | 'error';
 type WithdrawState = 'idle' | 'processing' | 'confirmed' | 'error';
 
 const QUICK_AMOUNTS = [0.1, 0.25, 0.5, 1, 5];
@@ -32,7 +31,6 @@ const QUICK_AMOUNTS = [0.1, 0.25, 0.5, 1, 5];
 export function WalletScreen() {
   const profile = useGameStore((s) => s.profile);
   const syncProfile = useGameStore((s) => s.syncProfile);
-  const walletAddress = useAuthStore((s) => s.walletAddress);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
@@ -44,17 +42,13 @@ export function WalletScreen() {
   const [treasuryAddress, setTreasuryAddress] = useState('');
   const [copied, setCopied] = useState(false);
 
-  const [depositAmount, setDepositAmount] = useState('0.1');
-  const [depositState, setDepositState] = useState<DepositState>('idle');
-  const [depositError, setDepositError] = useState('');
-
   const [withdrawAmount, setWithdrawAmount] = useState('0.1');
   const [withdrawDest, setWithdrawDest] = useState('');
   const [withdrawState, setWithdrawState] = useState<WithdrawState>('idle');
   const [withdrawError, setWithdrawError] = useState('');
   const [withdrawTx, setWithdrawTx] = useState('');
 
-  const [linkedAddress, setLinkedAddress] = useState<string | null>(walletAddress);
+  const [linkedAddress, setLinkedAddress] = useState<string | null>(null);
 
   const [depositBonusUsed, setDepositBonusUsed] = useState<boolean | null>(null);
 
@@ -99,79 +93,6 @@ export function WalletScreen() {
     } catch {}
   }
 
-  const [depositConfirmations, setDepositConfirmations] = useState(0);
-  const [depositRequired, setDepositRequired] = useState(1);
-
-  async function handleDeposit() {
-    setDepositError('');
-    walletTrack.open();
-    funnelTrack.depositStart();
-    const lamports = solToLamports(parseFloat(depositAmount));
-    if (lamports < 10_000_000) {
-      setDepositError('Minimum deposit is 0.01 SOL');
-      return;
-    }
-    try {
-      setDepositState('sending');
-      let addr = getConnectedAddress();
-      if (!addr) addr = await connectPhantom();
-      const treasury = treasuryAddress || (await api.getDepositInfo('SOL')).address;
-      const txHash = await sendSolToTreasury(treasury, lamports);
-      setDepositState('verifying');
-      const result = await api.verifyDeposit(txHash);
-
-      if (result.status === 'confirmed') {
-        setDepositState('confirmed');
-        funnelTrack.depositComplete(lamports);
-        await syncProfile();
-        await loadTransactions();
-        await loadDepositBonusStatus();
-        setTimeout(() => setDepositState('idle'), 3000);
-      } else {
-        // Deposit is confirming — start polling
-        setDepositState('confirming');
-        setDepositConfirmations(0);
-        pollDepositStatus();
-      }
-    } catch (err: any) {
-      setDepositError(err.message || 'Deposit failed');
-      setDepositState('error');
-    }
-  }
-
-  async function pollDepositStatus() {
-    let attempts = 0;
-    const maxAttempts = 60; // 5 minutes max (5s × 60)
-    const poll = async () => {
-      try {
-        const data = await api.getActiveDeposits();
-        if (data.active.length > 0) {
-          const dep = data.active[0];
-          setDepositConfirmations(dep.confirmations);
-          setDepositRequired(dep.requiredConfirmations);
-        }
-        if (data.active.length === 0 || data.lastConfirmed) {
-          // No more active deposits = confirmed
-          setDepositState('confirmed');
-          await syncProfile();
-          await loadTransactions();
-          await loadDepositBonusStatus();
-          setTimeout(() => setDepositState('idle'), 3000);
-          return; // Stop polling
-        }
-      } catch { /* ignore poll errors */ }
-
-      attempts++;
-      if (attempts < maxAttempts) {
-        setTimeout(poll, 5000);
-      } else {
-        // Timeout — show confirming state but stop polling
-        setDepositError('Deposit is still confirming. Your balance will update automatically.');
-        setDepositState('idle');
-      }
-    };
-    setTimeout(poll, 5000); // First poll after 5s
-  }
 
   async function handleWithdraw() {
     setWithdrawError('');
@@ -203,14 +124,6 @@ export function WalletScreen() {
     }
   }
 
-  async function handleLinkWallet() {
-    try {
-      const addr = await connectPhantom();
-      await api.linkWallet(addr);
-      setLinkedAddress(addr);
-      setWithdrawDest(addr);
-    } catch {}
-  }
 
   function formatTxType(type: string) {
     switch (type) {
@@ -378,82 +291,6 @@ export function WalletScreen() {
                   </div>
                 </div>
 
-                {/* Divider */}
-                <div style={s.depositDivider}>
-                  <div style={s.depositDividerLine} />
-                  <span style={s.depositDividerText}>or quick deposit</span>
-                  <div style={s.depositDividerLine} />
-                </div>
-
-                <div style={s.fieldLabel}>Amount</div>
-                <div style={s.amountInputRow}>
-                  <input
-                    type="number" step="0.01" min="0.01"
-                    value={depositAmount}
-                    onChange={(e) => setDepositAmount(e.target.value)}
-                    style={s.amountInput} className="mono" placeholder="0.00"
-                  />
-                  <span style={s.amountSuffix}>SOL</span>
-                </div>
-
-                <div style={s.quickRow}>
-                  {QUICK_AMOUNTS.map((amt) => (
-                    <button
-                      key={amt}
-                      style={depositAmount === String(amt) ? s.quickBtnActive : s.quickBtn}
-                      onClick={() => setDepositAmount(String(amt))}
-                    >
-                      {amt}
-                    </button>
-                  ))}
-                </div>
-
-                <button
-                  style={{ ...s.primaryBtn, opacity: ['sending', 'verifying', 'confirming'].includes(depositState) ? 0.6 : 1 }}
-                  onClick={handleDeposit}
-                  disabled={['sending', 'verifying', 'confirming'].includes(depositState)}
-                >
-                  {depositState === 'idle' || depositState === 'error'
-                    ? 'One-Click Deposit via Phantom'
-                    : depositState === 'sending' ? 'Approve in Wallet...'
-                    : depositState === 'verifying' ? 'Submitting to blockchain...'
-                    : depositState === 'confirming' ? `Confirming (${depositConfirmations}/${depositRequired})...`
-                    : 'Deposit Confirmed!'}
-                </button>
-
-                {/* Deposit Status Tracker */}
-                {depositState === 'confirming' && (
-                  <div style={{
-                    padding: '12px 16px',
-                    background: 'rgba(139, 92, 246, 0.06)',
-                    border: '1px solid rgba(139, 92, 246, 0.15)',
-                    borderRadius: theme.radius.md,
-                    marginTop: 8,
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                      <div style={{ width: 8, height: 8, borderRadius: '50%', background: theme.accent.purple, animation: 'pulse 1.5s ease infinite' }} />
-                      <span style={{ fontSize: 13, fontWeight: 600, color: theme.text.primary }}>
-                        Transaction detected — waiting for confirmations
-                      </span>
-                    </div>
-                    <div style={{
-                      height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden',
-                    }}>
-                      <div style={{
-                        height: '100%', borderRadius: 2,
-                        width: `${depositRequired > 0 ? Math.min(100, (depositConfirmations / depositRequired) * 100) : 0}%`,
-                        background: theme.accent.purple,
-                        transition: 'width 0.5s ease',
-                      }} />
-                    </div>
-                    <div style={{ fontSize: 11, color: theme.text.muted, marginTop: 6 }}>
-                      {depositConfirmations}/{depositRequired} confirmations · Usually takes 30-60 seconds
-                    </div>
-                  </div>
-                )}
-
-                {depositState === 'confirmed' && <div style={s.successMsg}>Deposit confirmed and credited!</div>}
-                {depositError && <div style={s.errorMsg}>{depositError}</div>}
 
                 {/* 100% Deposit Bonus Banner */}
                 {depositBonusUsed === false && (
@@ -525,11 +362,6 @@ export function WalletScreen() {
                   placeholder="Solana wallet address"
                 />
 
-                {!linkedAddress && isPhantomInstalled() && (
-                  <button style={s.linkBtn} onClick={handleLinkWallet}>
-                    Connect Phantom wallet
-                  </button>
-                )}
 
                 <div style={s.infoRow}>
                   <span style={s.infoDot}>i</span>

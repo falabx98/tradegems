@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../stores/authStore';
-import { isPhantomInstalled } from '../../utils/phantom';
+
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 
@@ -18,7 +18,7 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
     const params = new URLSearchParams(window.location.search);
     return params.get('ref') || '';
   });
-  const { login, register, connectWallet, isLoading, error, clearError } = useAuthStore();
+  const { login, register, isLoading, error, clearError } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -143,28 +143,6 @@ export function AuthScreen({ onSuccess }: AuthScreenProps) {
           {mode === 'login' ? "Don't have an account? Register" : 'Already have an account? Sign in'}
         </button>
 
-        {/* Divider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{ flex: 1, height: '1px', background: theme.border.subtle }} />
-          <span style={{ fontSize: '12px', color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '1px' }}>or</span>
-          <div style={{ flex: 1, height: '1px', background: theme.border.subtle }} />
-        </div>
-
-        {/* Phantom */}
-        {isPhantomInstalled() ? (
-          <button
-            onClick={async () => { try { await connectWallet(); onSuccess(); } catch {} }}
-            disabled={isLoading}
-            className="auth-phantom"
-          >
-            <img src="/logo-phantom.svg" alt="Phantom" style={{ width: '20px', height: '20px' }} />
-            <span>{isLoading ? 'Connecting...' : 'Connect Phantom'}</span>
-          </button>
-        ) : (
-          <a href="https://phantom.app/" target="_blank" rel="noopener noreferrer" className="auth-phantom-link">
-            Install Phantom Wallet
-          </a>
-        )}
       </div>
     </div>
   );

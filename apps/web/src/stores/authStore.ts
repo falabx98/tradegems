@@ -1,19 +1,17 @@
 import { create } from 'zustand';
 import { api, setAccessToken, getAccessToken, setRefreshToken } from '../utils/api';
-import { connectPhantom, signMessage, disconnectPhantom } from '../utils/phantom';
+
 import { funnelTrack, track } from '../utils/analytics';
 
 interface AuthState {
   userId: string | null;
   username: string | null;
-  walletAddress: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
 
   register: (email: string, username: string, password: string, referralCode?: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  connectWallet: () => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
   clearError: () => void;
@@ -22,7 +20,6 @@ interface AuthState {
 export const useAuthStore = create<AuthState>((set) => ({
   userId: null,
   username: null,
-  walletAddress: null,
   isAuthenticated: !!getAccessToken(),
   isLoading: false,
   error: null,
@@ -73,45 +70,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  connectWallet: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const address = await connectPhantom();
-      const { nonce, message } = await api.walletChallenge(address);
-      const signature = await signMessage(message);
-      const res = await api.walletVerify({ address, signature, nonce });
-      setAccessToken(res.accessToken);
-      if (res.refreshToken) setRefreshToken(res.refreshToken);
-      set({
-        userId: res.userId,
-        walletAddress: address,
-        isAuthenticated: true,
-        isLoading: false,
-      });
-      try {
-        const me = await api.getMe();
-        set({ username: me.username });
-      } catch {}
-    } catch (err: any) {
-      set({ error: err.message, isLoading: false });
-      throw err;
-    }
-  },
-
   logout: async () => {
     track('auth.logout');
     try {
       await api.logout();
-    } catch {}
-    try {
-      await disconnectPhantom();
     } catch {}
     setAccessToken(null);
     setRefreshToken(null);
     set({
       userId: null,
       username: null,
-      walletAddress: null,
       isAuthenticated: false,
     });
     // Reset game state to prevent data leaking to next user

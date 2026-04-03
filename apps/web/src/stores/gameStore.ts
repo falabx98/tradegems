@@ -369,7 +369,8 @@ export const useGameStore = create<GameState>((set, get) => ({
         getServerConfig().then(cfg => { (globalThis as any).__serverConfig = cfg; }).catch(() => {}),
       ]);
 
-      const solBalance = balances.balances?.find((b: any) => b.asset === 'SOL');
+      const balanceList = Array.isArray(balances) ? balances : (balances as any).balances ?? [];
+      const solBalance = balanceList.find((b: any) => b.asset === 'SOL');
       const parsed = solBalance ? parseInt(solBalance.available) : NaN;
       const parsedLocked = solBalance ? parseInt(solBalance.locked || '0') : 0;
       // Only update balance if we got a valid number; otherwise keep old balance

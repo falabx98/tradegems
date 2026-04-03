@@ -70,35 +70,20 @@ export class DepositWalletService {
     const cb = getSolanaCircuitBreaker();
     const balance = await cb.execute(() => connection.getBalance(depositKeypair.publicKey));
 
-    // Get the actual transaction fee from a recent blockhash
-    const { blockhash, lastValidBlockHeight } = await cb.execute(() =>
-      connection.getLatestBlockhash('confirmed')
-    );
-    const feeResult = await cb.execute(() =>
-      connection.getFeeForMessage(
-        new Transaction({
-          recentBlockhash: blockhash,
-          feePayer: depositKeypair.publicKey,
-        }).add(
-          SystemProgram.transfer({
-            fromPubkey: depositKeypair.publicKey,
-            toPubkey: treasuryKeypair.publicKey,
-            lamports: 1, // placeholder
-          }),
-        ).compileMessage(),
-        'confirmed',
-      )
-    );
-    const fee = feeResult.value ?? 5000;
+    console.log(`[Sweep] User ${userId}: deposit wallet ${depositKeypair.publicKey.toBase58()} balance=${balance}, treasury=${treasuryKeypair.publicKey.toBase58()}`);
 
-    // Send entire balance minus fee — account goes to 0 (closed)
+    // Simple fee: 5000 lamports for a single-signer transfer on Solana
+    // sweepAmount = balance - fee → account ends at exactly 0 (gets garbage collected)
+    const fee = 5000;
     const sweepAmount = balance - fee;
-    if (sweepAmount <= 0) return null;
+    if (sweepAmount <= 0) {
+      console.log(`[Sweep] User ${userId}: balance ${balance} too low to sweep (need > ${fee})`);
+      return null;
+    }
 
-    const transaction = new Transaction({
-      recentBlockhash: blockhash,
-      feePayer: depositKeypair.publicKey,
-    }).add(
+    console.log(`[Sweep] User ${userId}: sweeping ${sweepAmount} lamports to treasury...`);
+
+    const transaction = new Transaction().add(
       SystemProgram.transfer({
         fromPubkey: depositKeypair.publicKey,
         toPubkey: treasuryKeypair.publicKey,
@@ -112,6 +97,8 @@ export class DepositWalletService {
       [depositKeypair],
       { commitment: 'confirmed' },
     ));
+
+    console.log(`[Sweep] User ${userId}: SUCCESS tx=${txHash}`);
 
     // Update last swept timestamp
     await this.db.update(userDepositWallets).set({

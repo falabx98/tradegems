@@ -226,6 +226,17 @@ export async function buildServer() {
     await db.execute(sql`ALTER TABLE user_mission_progress ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'`);
   } catch (e) { server.log.error(e, 'Migration failed (non-fatal)'); }
 
+  // Verify critical config on startup
+  try {
+    const { getTreasuryKeypair, getSolanaConnection } = await import('./modules/solana/treasury.js');
+    const treasury = getTreasuryKeypair();
+    const conn = getSolanaConnection();
+    const treasuryBal = await conn.getBalance(treasury.publicKey);
+    server.log.info(`[Startup] Treasury: ${treasury.publicKey.toBase58()} (balance: ${treasuryBal} lamports)`);
+    server.log.info(`[Startup] WALLET_ENCRYPTION_KEY set: ${!!process.env.WALLET_ENCRYPTION_KEY}`);
+    server.log.info(`[Startup] NODE_ENV: ${process.env.NODE_ENV}`);
+  } catch (e) { server.log.error(e, 'Startup config check failed'); }
+
   // Start round managers (with error handling)
   try { startRugRoundManager(); } catch (e) { server.log.error(e, 'Failed to start rug round manager'); }
   try { startCandleflipRoundManager(); } catch (e) { server.log.error(e, 'Failed to start candleflip round manager'); }

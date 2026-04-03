@@ -224,6 +224,19 @@ export async function buildServer() {
     const { sql } = await import('drizzle-orm');
     const db = (await import('./config/database.js')).getDb();
     await db.execute(sql`ALTER TABLE user_mission_progress ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}'`);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS ops_alerts (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        severity TEXT NOT NULL,
+        category TEXT NOT NULL,
+        message TEXT NOT NULL,
+        user_id UUID,
+        game TEXT,
+        request_id TEXT,
+        metadata JSONB DEFAULT '{}',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
   } catch (e) { server.log.error(e, 'Migration failed (non-fatal)'); }
 
   // Verify critical config on startup

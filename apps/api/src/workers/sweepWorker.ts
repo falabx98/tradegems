@@ -25,6 +25,9 @@ export function startSweepWorker() {
     await sweepAllWallets();
     await checkTreasuryBalance();
   }, reporter);
+
+  // Run immediately on startup to sweep any pending balances
+  wrappedWork();
   sweepInterval = setInterval(wrappedWork, intervalMs);
 }
 
@@ -83,18 +86,36 @@ async function sweepAllWallets() {
     .from(userDepositWallets)
     .where(eq(userDepositWallets.isActive, true));
 
+  if (wallets.length === 0) return;
+
+  let swept = 0;
+  let skipped = 0;
+  let failed = 0;
+
   for (const wallet of wallets) {
     try {
       // Check on-chain balance before attempting sweep
       const balance = await depositWalletService.getWalletBalance(wallet.address);
-      if (balance <= minSweep) continue;
+      if (balance <= minSweep) {
+        skipped++;
+        continue;
+      }
 
+      console.log(`[SweepWorker] Wallet ${wallet.address} has ${balance} lamports, sweeping...`);
       const txHash = await depositWalletService.sweepToTreasury(wallet.userId);
       if (txHash) {
+        swept++;
         console.log(`[SweepWorker] Swept ${wallet.address} → treasury: ${txHash}`);
+      } else {
+        skipped++;
       }
     } catch (err: any) {
+      failed++;
       console.error(`[SweepWorker] Failed to sweep ${wallet.address}:`, err.message);
     }
+  }
+
+  if (swept > 0 || failed > 0) {
+    console.log(`[SweepWorker] Cycle complete: ${wallets.length} wallets checked, ${swept} swept, ${skipped} skipped, ${failed} failed`);
   }
 }

@@ -154,7 +154,6 @@ export class LotteryService {
     userId: string,
     drawId: string,
     tickets: { entryType: 'standard' | 'power'; numbers: number[]; gemBall: number }[],
-    isDemoBet = false,
   ) {
     const db = getDb();
 
@@ -205,7 +204,7 @@ export class LotteryService {
     await LotteryService.walletService.lockFunds(userId, totalCost, 'SOL', {
       type: 'lottery_ticket',
       id: drawId,
-    }, isDemoBet);
+    });
 
     await LotteryService.walletService.settlePayout(
       userId,
@@ -214,7 +213,6 @@ export class LotteryService {
       0,         // payoutAmount = 0 (no payout, just deduction)
       'SOL',
       { type: 'lottery_purchase', id: drawId },
-      isDemoBet,
     );
 
     auditLog({ action: 'lottery_buy', userId, game: 'lottery', gameId: drawId, betAmount: totalCost, status: 'success', meta: { ticketCount: tickets.length } });

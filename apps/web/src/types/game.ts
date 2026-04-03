@@ -101,8 +101,6 @@ export interface PlayerProfile {
   avatarUrl: string | null;
   balance: number;
   lockedBalance: number;
-  demoBalance: number;
-  demoRefillsUsed: number;
   totalWagered: number;
   totalWon: number;
   roundsPlayed: number;

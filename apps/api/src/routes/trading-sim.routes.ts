@@ -57,14 +57,10 @@ export async function tradingSimRoutes(server: FastifyInstance) {
 
     const body = z.object({
       roomId: z.string().uuid(),
-      isDemoBet: z.boolean().optional().default(false),
     }).parse(request.body);
 
-    const { detectDemoBet } = await import('../utils/demoDetect.js');
-    const isDemoBet = await detectDemoBet(user.userId, body.isDemoBet);
-
     try {
-      const room = await tradingSimService.joinRoom(user.userId, body.roomId, isDemoBet);
+      const room = await tradingSimService.joinRoom(user.userId, body.roomId);
       return { success: true, room };
     } catch (err: any) {
       return reply.status(400).send({ error: err.message });

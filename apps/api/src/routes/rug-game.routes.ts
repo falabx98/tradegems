@@ -40,23 +40,16 @@ export async function rugGameRoutes(server: FastifyInstance) {
     const userId = getAuthUser(request).userId;
     const body = z.object({
       betAmount: z.number().int().positive().min(1_000_000),
-      isDemoBet: z.boolean().optional().default(false),
     }).parse(request.body);
 
-    // Detect demo mode
-    const { detectDemoBet } = await import('../utils/demoDetect.js');
-    const isDemoBet = await detectDemoBet(userId, body.isDemoBet);
-
-    if (!isDemoBet) {
-      try {
-        await validateBetLimits(userId, body.betAmount);
-      } catch (err: any) {
-        await recordOpsAlert({ severity: 'warning', category: err?.code === 'EXPOSURE_LIMIT' ? 'exposure_limit_violation' : 'bet_cap_violation', message: err.message, userId, game: 'rug-game', requestId: reqId, metadata: { betAmount: body.betAmount } });
-        throw err;
-      }
+    try {
+      await validateBetLimits(userId, body.betAmount);
+    } catch (err: any) {
+      await recordOpsAlert({ severity: 'warning', category: err?.code === 'EXPOSURE_LIMIT' ? 'exposure_limit_violation' : 'bet_cap_violation', message: err.message, userId, game: 'rug-game', requestId: reqId, metadata: { betAmount: body.betAmount } });
+      throw err;
     }
 
-    const result = await joinRound(userId, body.betAmount, isDemoBet);
+    const result = await joinRound(userId, body.betAmount);
     if (!result.success) {
       auditLog({ action: 'rug_join', requestId: reqId, userId, game: 'rug-game', betAmount: body.betAmount, status: 'failed', error: result.message });
       throw new AppError(400, 'JOIN_FAILED', result.message || 'Cannot join round');

@@ -87,7 +87,7 @@ export class TradingSimService {
 
   // ─── Join Room ──────────────────────────────────────────────
 
-  async joinRoom(userId: string, roomId: string, isDemoBet = false) {
+  async joinRoom(userId: string, roomId: string) {
     const room = await this.db.query.tradingSimRooms.findFirst({
       where: eq(tradingSimRooms.id, roomId),
     });
@@ -109,7 +109,7 @@ export class TradingSimService {
     await this.walletService.lockFunds(userId, room.entryFee, 'SOL', {
       type: 'trading_sim',
       id: roomId,
-    }, isDemoBet);
+    });
     auditLog({ action: 'trading_sim_join', userId, game: 'trading-sim', gameId: roomId, betAmount: room.entryFee, status: 'success' });
 
     // Add participant

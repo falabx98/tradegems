@@ -298,7 +298,6 @@ export function PredictionScreen() {
             selectedAmount={betAmount}
             onAmountChange={setBetAmount}
             balance={profile.balance}
-          demoBalance={profile.demoBalance}
             feeRate={feeRate}
             submitLabel={selectedDir ? `Confirm ${DIRECTION_INFO[selectedDir].label}` : 'Select a Direction'}
             onSubmit={handleConfirmPrediction}

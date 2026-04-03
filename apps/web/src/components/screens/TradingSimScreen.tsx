@@ -641,7 +641,6 @@ export function TradingSimScreen() {
           selectedAmount={entryAmount}
           onAmountChange={setEntryAmount}
           balance={profile.balance}
-          demoBalance={profile.demoBalance}
           allowCustom={false}
           showModifiers={false}
           submitLabel="JOIN ROOM"

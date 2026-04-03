@@ -16,7 +16,6 @@ const placeBetSchema = z.object({
   amount: z.number().int().positive().min(1_000_000).max(100_000_000_000),
   riskTier: z.enum(['conservative', 'balanced', 'aggressive']),
   idempotencyKey: z.string().min(1).max(128),
-  isDemoBet: z.boolean().optional().default(false),
 });
 
 export async function gameplayRoutes(server: FastifyInstance) {
@@ -91,16 +90,13 @@ export async function gameplayRoutes(server: FastifyInstance) {
     const body = placeBetSchema.parse(request.body);
 
     const userId = getAuthUser(request).userId;
-    const { detectDemoBet } = await import('../utils/demoDetect.js');
-    const isDemoBet = await detectDemoBet(userId, body.isDemoBet);
-    if (!isDemoBet) await validateBetLimits(userId, body.amount, Math.floor(body.amount * env.PLATFORM_FEE_RATE));
+    await validateBetLimits(userId, body.amount, Math.floor(body.amount * env.PLATFORM_FEE_RATE));
     const result = await betService.placeBet({
       userId,
       roundId: id,
       amount: body.amount,
       riskTier: body.riskTier,
       idempotencyKey: body.idempotencyKey,
-      isDemoBet,
     });
 
     return reply.status(201).send(result);

@@ -151,7 +151,7 @@ export function MinesScreen() {
     try {
       const res = await apiFetch<{ success: boolean; game: MinesGamePublic }>('/v1/mines/start', {
         method: 'POST',
-        body: JSON.stringify({ betAmount, mineCount, isDemoBet: balance === 0 && profile.demoBalance > 0 }),
+        body: JSON.stringify({ betAmount, mineCount }),
       });
       if (!mountedRef.current) return;
       setGame(res.game);
@@ -420,7 +420,6 @@ export function MinesScreen() {
           selectedAmount={betAmount}
           onAmountChange={setBetAmount}
           balance={balance}
-          demoBalance={profile.demoBalance}
           feeRate={0}
           submitLabel="Start Game"
           onSubmit={handleStart}

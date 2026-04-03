@@ -22,7 +22,6 @@ interface RoundBet {
   betAmount: number;
   cashOutMultiplier: number | null;
   status: 'active' | 'cashed_out' | 'rugged';
-  isDemo: boolean;
 }
 
 interface RoundState {
@@ -150,7 +149,7 @@ async function settleAllBets() {
         const user = await database.query.users.findFirst({ where: eq(users.id, bet.userId) });
         if (user && user.role !== 'bot') {
           try {
-            await wallet.settlePayout(bet.userId, bet.betAmount, 0, 0, 'SOL', { type: 'rug_round', id: state.roundId }, bet.isDemo);
+            await wallet.settlePayout(bet.userId, bet.betAmount, 0, 0, 'SOL', { type: 'rug_round', id: state.roundId });
           } catch (err) {
             console.error('[RugRound] settleAllBets settlement failed:', err, { userId: bet.userId, roundId: state.roundId });
           }
@@ -262,7 +261,7 @@ export async function getCurrentRound(): Promise<RoundState | null> {
   } : null;
 }
 
-export async function joinRound(userId: string, betAmount: number, isDemoBet = false): Promise<{ success: boolean; message?: string }> {
+export async function joinRound(userId: string, betAmount: number): Promise<{ success: boolean; message?: string }> {
   if (!state || state.status !== 'waiting') {
     return { success: false, message: 'No round in waiting phase. Wait for next round.' };
   }
@@ -286,7 +285,7 @@ export async function joinRound(userId: string, betAmount: number, isDemoBet = f
 
       // Lock funds (skip for bots)
       if (user.role !== 'bot') {
-        await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state!.roundId }, isDemoBet);
+        await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state!.roundId });
       }
 
       try {
@@ -296,12 +295,12 @@ export async function joinRound(userId: string, betAmount: number, isDemoBet = f
           userId,
           betAmount,
           status: 'active',
-          isDemo: isDemoBet,
+          isDemo: false,
         });
       } catch (err) {
         // DB insert failed — rollback the fund lock
         if (user.role !== 'bot') {
-          try { await wallet.releaseFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state!.roundId }, isDemoBet); } catch {}
+          try { await wallet.releaseFunds(userId, betAmount, 'SOL', { type: 'rug_round', id: state!.roundId }); } catch {}
         }
         throw err;
       }
@@ -314,7 +313,6 @@ export async function joinRound(userId: string, betAmount: number, isDemoBet = f
         betAmount,
         cashOutMultiplier: null,
         status: 'active',
-        isDemo: isDemoBet,
       });
 
       await saveToRedis();
@@ -371,7 +369,7 @@ export async function cashOut(userId: string): Promise<{ success: boolean; multi
     const user = await database.query.users.findFirst({ where: eq(users.id, userId) });
     if (user && user.role !== 'bot') {
       try {
-        await wallet.settlePayout(userId, bet.betAmount, 0, payout, 'SOL', { type: 'rug_round', id: state!.roundId }, bet.isDemo);
+        await wallet.settlePayout(userId, bet.betAmount, 0, payout, 'SOL', { type: 'rug_round', id: state!.roundId });
       } catch (settleErr: any) {
         await recordFailedSettlement({
           userId, game: 'rug-game', gameRefType: 'rug_round', gameRefId: state!.roundId,

@@ -1581,7 +1581,6 @@ export async function adminRoutes(server: FastifyInstance) {
       UPDATE users SET
         level = 1, xp_total = 0, xp_current = 0, xp_to_next = 100,
         bonus_claimed = false, vip_tier = 'bronze',
-        demo_balance = 100000000000, demo_refills_used = 0,
         updated_at = now()
       WHERE role IN ('admin', 'superadmin', 'operator')
     `);

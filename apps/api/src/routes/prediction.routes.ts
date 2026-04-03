@@ -28,7 +28,6 @@ interface PredictionLock {
   direction: 'up' | 'down' | 'sideways';
   serverOutcome: 'win' | 'loss';
   createdAt: number;
-  isDemoBet?: boolean;
   // Provably fair fields
   serverSeed: string;
   seedHash: string;
@@ -62,22 +61,18 @@ export async function predictionRoutes(server: FastifyInstance) {
     const body = z.object({
       betAmount: z.number().int().positive(),
       direction: z.enum(['up', 'down', 'sideways']),
-      isDemoBet: z.boolean().optional().default(false),
     }).parse(request.body);
 
-    const { detectDemoBet } = await import('../utils/demoDetect.js');
-    const isDemoBet = await detectDemoBet(userId, body.isDemoBet);
-
     const feeRate = env.PLATFORM_FEE_RATE;
-    const fee = isDemoBet ? 0 : Math.floor(body.betAmount * feeRate);
-    if (!isDemoBet) await validateBetLimits(userId, body.betAmount, fee);
+    const fee = Math.floor(body.betAmount * feeRate);
+    await validateBetLimits(userId, body.betAmount, fee);
     const totalCost = body.betAmount + fee;
 
     const refId = nanoid();
     const ref = { type: 'prediction', id: refId };
 
     // Lock funds now (before game starts)
-    await walletService.lockFunds(userId, totalCost, 'SOL', ref, isDemoBet);
+    await walletService.lockFunds(userId, totalCost, 'SOL', ref);
 
     // ── Provably Fair outcome determination ──
     const { generateServerSeed, hashSeed, generatePredictionOutcome, useNonce } = await import('../utils/provablyFair.js');
@@ -100,7 +95,6 @@ export async function predictionRoutes(server: FastifyInstance) {
       direction: body.direction,
       serverOutcome,
       createdAt: Date.now(),
-      isDemoBet,
       serverSeed,
       seedHash,
       clientSeed,
@@ -164,7 +158,7 @@ export async function predictionRoutes(server: FastifyInstance) {
       : 0;
 
     // Settle: unlock locked funds and credit payout (funds were already locked in /lock)
-    await walletService.settlePayout(userId, lock.betAmount, lock.fee, actualPayout, 'SOL', ref, lock.isDemoBet);
+    await walletService.settlePayout(userId, lock.betAmount, lock.fee, actualPayout, 'SOL', ref);
     auditLog({ action: 'prediction_settle', requestId: request.id, userId, game: 'predictions', betAmount: lock.betAmount, fee: lock.fee, payoutAmount: actualPayout, multiplier: safeMultiplier, outcome: serverResult, status: 'success', meta: { lockRef: lock.refId, direction: lock.direction } });
     // Outlier check (non-blocking)
     checkPayoutOutlier({ game: 'predictions', userId, gameId: lock.refId, betAmount: lock.betAmount, payoutAmount: actualPayout, multiplier: safeMultiplier, requestId: request.id }).catch(() => {});

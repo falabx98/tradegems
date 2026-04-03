@@ -101,20 +101,6 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
               )}
             </div>
 
-            {/* Demo balance pill — only when user has demo but no real balance */}
-            {profile.demoBalance > 0 && profile.balance === 0 && (
-              <div style={{
-                ...s.balancePill,
-                background: 'rgba(139, 92, 246, 0.15)',
-                borderColor: 'rgba(139, 92, 246, 0.3)',
-              }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: '#8B5CF6', letterSpacing: '0.05em' }}>DEMO</span>
-                <span style={{ ...s.balanceValue, color: '#A78BFA' }} className="mono">
-                  {formatSol(profile.demoBalance)}
-                </span>
-              </div>
-            )}
-
             {/* Deposit button */}
             <button style={s.depositBtn} onClick={() => go('wallet')}>
               {isMobile ? (

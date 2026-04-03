@@ -31,8 +31,6 @@ export class UserService {
       displayName: profile?.displayName,
       avatarUrl: profile?.avatarUrl,
       country: profile?.country,
-      demoBalance: user.demoBalance ?? 0,
-      demoRefillsUsed: user.demoRefillsUsed ?? 0,
     };
   }
 

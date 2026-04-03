@@ -18,7 +18,6 @@ const ticketSchema = z.object({
 const buySchema = z.object({
   drawId: z.string().uuid(),
   tickets: z.array(ticketSchema).min(1).max(50),
-  isDemoBet: z.boolean().optional().default(false),
 });
 
 const autoFillSchema = z.object({
@@ -68,16 +67,13 @@ export async function lotteryRoutes(server: FastifyInstance) {
   // ─── POST /buy — purchase tickets (auth required) ──────────
   server.post('/buy', { preHandler: [requireAuth, requireNotExcluded] }, async (request) => {
     await requireGameEnabled('lottery');
-    const { drawId, tickets, isDemoBet: reqDemo } = buySchema.parse(request.body);
+    const { drawId, tickets } = buySchema.parse(request.body);
     const userId = getAuthUser(request).userId;
-
-    const { detectDemoBet } = await import('../utils/demoDetect.js');
-    const isDemoBet = await detectDemoBet(userId, reqDemo);
 
     // Estimate total cost for bet limit check
     const estimatedCost = tickets.reduce((sum, t) => sum + (t.entryType === 'power' ? 500_000_000 : 100_000_000), 0);
-    if (!isDemoBet) await validateBetLimits(userId, estimatedCost);
-    return LotteryService.buyTickets(userId, drawId, tickets, isDemoBet);
+    await validateBetLimits(userId, estimatedCost);
+    return LotteryService.buyTickets(userId, drawId, tickets);
   });
 
   // ─── GET /my-tickets — user's tickets for current draw (auth) ─

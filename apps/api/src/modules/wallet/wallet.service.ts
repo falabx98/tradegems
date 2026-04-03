@@ -55,21 +55,7 @@ export class WalletService {
   // ─── Lock Funds (for bet placement) ──────────────────────
   // ATOMIC: Redis lock + DB transaction (balance update + ledger) in one commit
 
-  async lockFunds(userId: string, amount: number, asset: string, ref: LedgerRef, isDemoBet = false) {
-    // Demo bets: deduct from users.demo_balance instead of balances.available_amount
-    if (isDemoBet) {
-      const result = await this.db.execute(sql`
-        UPDATE users
-        SET demo_balance = demo_balance - ${amount}
-        WHERE id = ${userId} AND demo_balance >= ${amount}
-        RETURNING demo_balance
-      `) as unknown as { demo_balance: number }[];
-      if (!result || result.length === 0) {
-        throw new AppError(400, 'INSUFFICIENT_DEMO_BALANCE', 'Insufficient demo balance');
-      }
-      return { available: 0, locked: 0, isDemoBet: true, demoBalance: result[0].demo_balance };
-    }
-    // Real money flow below
+  async lockFunds(userId: string, amount: number, asset: string, ref: LedgerRef) {
     // Enforce loss limits (fire-and-forget on error, never block for non-limit failures)
     try {
       const { checkLossLimit } = await import('../../utils/limitEnforcement.js');
@@ -134,14 +120,7 @@ export class WalletService {
   // ─── Release Funds (bet cancel / refund) ─────────────────
   // ATOMIC: balance update + ledger in one transaction
 
-  async releaseFunds(userId: string, amount: number, asset: string, ref: LedgerRef, isDemoBet = false) {
-    if (isDemoBet) {
-      // Demo: just return the amount to demo_balance
-      await this.db.execute(sql`
-        UPDATE users SET demo_balance = demo_balance + ${amount} WHERE id = ${userId}
-      `);
-      return;
-    }
+  async releaseFunds(userId: string, amount: number, asset: string, ref: LedgerRef) {
     await this.db.transaction(async (tx) => {
       const result = await tx.execute(sql`
         UPDATE balances
@@ -181,19 +160,7 @@ export class WalletService {
     payoutAmount: number,
     asset: string,
     ref: LedgerRef,
-    isDemoBet = false,
   ) {
-    // Demo bets: credit payout to demo_balance (bet was already deducted in lockFunds)
-    if (isDemoBet) {
-      if (payoutAmount > 0) {
-        await this.db.execute(sql`
-          UPDATE users SET demo_balance = demo_balance + ${payoutAmount} WHERE id = ${userId}
-        `);
-      }
-      // No ledger entries, no idempotency guard needed for demo
-      return;
-    }
-
     const totalLocked = betAmount + fee;
 
     // Idempotency guard: same user + game + round + amount = same key

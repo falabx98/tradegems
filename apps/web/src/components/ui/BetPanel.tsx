@@ -33,8 +33,6 @@ export interface BetPanelProps {
   submitLoading?: boolean;
   submitVariant?: 'primary' | 'success' | 'danger';
   compact?: boolean;
-  /** Demo balance in lamports — if > 0 and balance === 0, show demo mode */
-  demoBalance?: number;
 }
 
 export function BetPanel({
@@ -55,18 +53,14 @@ export function BetPanel({
   submitLoading,
   submitVariant = 'primary',
   compact,
-  demoBalance = 0,
 }: BetPanelProps) {
   const [customBet, setCustomBet] = useState('');
   const { isAuthenticated } = useAuthStore();
   const go = useAppNavigate();
 
-  const isDemo = balance === 0 && demoBalance > 0;
-  const effectiveBalance = isDemo ? demoBalance : balance;
-
   const fee = Math.floor(selectedAmount * feeRate);
   const totalCost = selectedAmount + fee;
-  const canAfford = totalCost <= effectiveBalance;
+  const canAfford = totalCost <= balance;
   const meetsMin = selectedAmount >= minBet;
 
   const handleCustomBet = () => {
@@ -75,7 +69,7 @@ export function BetPanel({
     const lamports = solToLamports(val);
     if (lamports < minBet) return;
     const cFee = Math.floor(lamports * feeRate);
-    if (lamports + cFee > effectiveBalance) return;
+    if (lamports + cFee > balance) return;
     onAmountChange(lamports);
     setCustomBet('');
   };
@@ -101,31 +95,13 @@ export function BetPanel({
   return (
     <div style={{ ...s.panel, ...(compact ? { gap: '8px' } : {}) }}>
       {/* Amount Section */}
-      {/* Demo mode banner */}
-      {isDemo && (
-        <div style={{
-          padding: '8px 12px',
-          background: 'rgba(139, 92, 246, 0.08)',
-          border: '1px solid rgba(139, 92, 246, 0.2)',
-          borderRadius: 10,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          fontSize: 12,
-          marginBottom: 8,
-        }}>
-          <span style={{ color: '#A78BFA', fontWeight: 600 }}>Playing with demo balance</span>
-          <span style={{ color: theme.accent.purple, fontWeight: 700, cursor: 'pointer', fontSize: 11 }} onClick={() => go('wallet')}>Deposit →</span>
-        </div>
-      )}
-
       <div style={s.section}>
         <div style={s.sectionHeader}>
           <span style={s.sectionLabel}>AMOUNT</span>
           <div style={s.balanceRow}>
-            <span style={s.balanceLabel}>{isDemo ? 'Demo:' : 'Bal:'}</span>
-            <span className="mono" style={{ ...s.balanceValue, color: isDemo ? '#A78BFA' : undefined }}>
-              {formatSol(effectiveBalance)} {isDemo ? <span style={{ fontSize: 9, fontWeight: 700, color: '#8B5CF6' }}>DEMO</span> : <SolIcon size="0.9em" />}
+            <span style={s.balanceLabel}>Bal:</span>
+            <span className="mono" style={s.balanceValue}>
+              {formatSol(balance)} <SolIcon size="0.9em" />
             </span>
           </div>
         </div>
@@ -141,7 +117,7 @@ export function BetPanel({
           {presets.map((p) => {
             const active = selectedAmount === p.lamports;
             const pFee = Math.floor(p.lamports * feeRate);
-            const affordable = p.lamports + pFee <= effectiveBalance;
+            const affordable = p.lamports + pFee <= balance;
             return (
               <button
                 key={p.lamports}
@@ -224,7 +200,7 @@ export function BetPanel({
             {showModifiers && (
               <button
                 onClick={() => {
-                  const maxLamports = Math.floor(effectiveBalance / (1 + feeRate));
+                  const maxLamports = Math.floor(balance / (1 + feeRate));
                   if (maxLamports >= minBet) {
                     onAmountChange(maxLamports);
                     setCustomBet('');

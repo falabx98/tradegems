@@ -24,7 +24,6 @@ interface RoundBet {
   betAmount: number;
   payout: number;
   status: 'pending' | 'won' | 'lost';
-  isDemo: boolean;
 }
 
 interface CandleflipState {
@@ -153,7 +152,7 @@ async function transitionToResolved() {
     const user = await database.query.users.findFirst({ where: eq(users.id, bet.userId) });
     if (user && user.role !== 'bot') {
       try {
-        await wallet.settlePayout(bet.userId, bet.betAmount, 0, bet.payout, 'SOL', { type: 'candleflip_round', id: state.roundId }, bet.isDemo);
+        await wallet.settlePayout(bet.userId, bet.betAmount, 0, bet.payout, 'SOL', { type: 'candleflip_round', id: state.roundId });
         auditLog({ action: 'candleflip_round_settle', userId: bet.userId, game: 'candleflip_round', gameId: state.roundId, betAmount: bet.betAmount, payoutAmount: bet.payout, status: 'success' });
       } catch (err: any) {
         console.error('[CandleflipRound] settlePayout failed:', err, { userId: bet.userId, roundId: state.roundId, payout: bet.payout });
@@ -228,7 +227,7 @@ export async function getCandleflipCurrentRound(): Promise<CandleflipState | nul
   return state ? { ...state, seed: state.status === 'resolved' ? state.seed : null } : null;
 }
 
-export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', betAmount: number, isDemoBet = false): Promise<{ success: boolean; message?: string }> {
+export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', betAmount: number): Promise<{ success: boolean; message?: string }> {
   if (!state || state.status !== 'waiting') {
     return { success: false, message: 'No round in waiting phase.' };
   }
@@ -247,7 +246,7 @@ export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', be
     if (!user) return { success: false, message: 'User not found.' };
 
     if (user.role !== 'bot') {
-      await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId }, isDemoBet);
+      await wallet.lockFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId });
     }
 
     try {
@@ -257,12 +256,12 @@ export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', be
         pick,
         betAmount,
         status: 'pending',
-        isDemo: isDemoBet,
+        isDemo: false,
       });
     } catch (err) {
       // DB insert failed — rollback the fund lock
       if (user.role !== 'bot') {
-        try { await wallet.releaseFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId }, isDemoBet); } catch {}
+        try { await wallet.releaseFunds(userId, betAmount, 'SOL', { type: 'candleflip_round', id: state.roundId }); } catch {}
       }
       throw err;
     }
@@ -275,7 +274,6 @@ export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', be
       betAmount,
       payout: 0,
       status: 'pending',
-      isDemo: isDemoBet,
     });
 
     await saveToRedis();

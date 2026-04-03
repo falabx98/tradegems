@@ -50,7 +50,7 @@ export class MinesService {
 
   // ─── Start Game ──────────────────────────────────────────
 
-  async startGame(userId: string, betAmount: number, mineCount: number, isDemoBet = false): Promise<MinesGamePublic> {
+  async startGame(userId: string, betAmount: number, mineCount: number): Promise<MinesGamePublic> {
     // Validate mine count
     if (!(VALID_MINE_COUNTS as readonly number[]).includes(mineCount)) {
       throw new AppError(400, 'INVALID_MINE_COUNT', `Mine count must be one of: ${VALID_MINE_COUNTS.join(', ')}`);
@@ -68,7 +68,7 @@ export class MinesService {
     await this.wallet.lockFunds(userId, betAmount, 'SOL', {
       type: 'mines',
       id: gameId,
-    }, isDemoBet);
+    });
 
     // Generate provably fair seeds + board
     const serverSeed = generateServerSeed();
@@ -93,7 +93,7 @@ export class MinesService {
           seedHash,
           clientSeed,
           board: JSON.stringify(board),
-          isDemo: isDemoBet,
+          isDemo: false,
         })
         .returning();
       game = inserted;
@@ -174,7 +174,7 @@ export class MinesService {
         await this.wallet.settlePayout(userId, game.betAmount, 0, 0, 'SOL', {
           type: 'mines',
           id: gameId,
-        }, game.isDemo);
+        });
       } catch (err: any) {
         await recordFailedSettlement({
           userId,
@@ -415,7 +415,7 @@ export class MinesService {
       await this.wallet.settlePayout(game.userId, game.betAmount, 0, payout, 'SOL', {
         type: 'mines',
         id: game.id,
-      }, game.isDemo);
+      });
     } catch (err: any) {
       await recordFailedSettlement({
         userId: game.userId,
@@ -484,7 +484,7 @@ export class MinesService {
       await this.wallet.settlePayout(game.userId, game.betAmount, 0, 0, 'SOL', {
         type: 'mines',
         id: game.id,
-      }, game.isDemo);
+      });
     } catch (err: any) {
       await recordFailedSettlement({
         userId: game.userId,

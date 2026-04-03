@@ -31,13 +31,10 @@ export async function candleflipRoutes(server: FastifyInstance) {
     const body = z.object({
       pick: z.enum(['bullish', 'bearish']),
       betAmount: z.number().int().positive().min(1_000_000),
-      isDemoBet: z.boolean().optional().default(false),
     }).parse(request.body);
 
-    const { detectDemoBet } = await import('../utils/demoDetect.js');
-    const isDemoBet = await detectDemoBet(userId, body.isDemoBet);
-    if (!isDemoBet) await validateBetLimits(userId, body.betAmount);
-    const result = await betOnRound(userId, body.pick, body.betAmount, isDemoBet);
+    await validateBetLimits(userId, body.betAmount);
+    const result = await betOnRound(userId, body.pick, body.betAmount);
     if (!result.success) {
       throw new AppError(400, 'BET_FAILED', result.message || 'Cannot place bet');
     }

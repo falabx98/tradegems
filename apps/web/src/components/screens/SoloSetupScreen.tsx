@@ -97,7 +97,6 @@ export function SoloSetupScreen() {
         selectedAmount={betAmount}
         onAmountChange={setBetAmount}
         balance={profile.balance}
-          demoBalance={profile.demoBalance}
         feeRate={feeRate}
         minBet={minBetLamports}
         choices={[

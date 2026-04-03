@@ -277,7 +277,6 @@ export function BattleScreen() {
             selectedAmount={betAmount}
             onAmountChange={setBetAmount}
             balance={profile.balance}
-          demoBalance={profile.demoBalance}
             allowCustom={false}
             showModifiers={false}
             submitLabel="JOIN BATTLE"

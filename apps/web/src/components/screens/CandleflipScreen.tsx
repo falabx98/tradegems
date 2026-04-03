@@ -376,7 +376,6 @@ export function CandleflipScreen() {
           selectedAmount={betAmount}
           onAmountChange={setBetAmount}
           balance={profile.balance}
-          demoBalance={profile.demoBalance}
           choices={[
             { id: 'bullish', label: 'BULL', color: theme.accent.neonGreen, icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={theme.accent.neonGreen} strokeWidth="2.5" strokeLinecap="round"><polyline points="18 15 12 9 6 15" /></svg>, payout: '1.9x' },
             { id: 'bearish', label: 'BEAR', color: theme.accent.red, icon: <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={theme.accent.red} strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg>, payout: '1.9x' },

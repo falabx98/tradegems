@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { eq } from 'drizzle-orm';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { MinesService } from '../modules/mines/mines.service.js';
@@ -40,25 +39,8 @@ export async function minesRoutes(server: FastifyInstance) {
         (v) => (VALID_MINE_COUNTS as readonly number[]).includes(v),
         { message: `Mine count must be one of: ${VALID_MINE_COUNTS.join(', ')}` },
       ),
-      isDemoBet: z.boolean().optional().default(false),
     }).parse(request.body);
 
-    // Determine demo mode: only if frontend requests it AND user has no real balance
-    let isDemoBet = false;
-    if (body.isDemoBet) {
-      const { getDb } = await import('../config/database.js');
-      const { balances, users: usersTable } = await import('@tradingarena/db');
-      const db = getDb();
-      const bal = await db.query.balances.findFirst({ where: eq(balances.userId, userId) });
-      const user = await db.query.users.findFirst({ where: eq(usersTable.id, userId) });
-      const realBalance = parseInt(String(bal?.availableAmount ?? 0)) || 0;
-      const demoBalance = user?.demoBalance ?? 0;
-      // Demo only if no real balance AND has demo balance
-      isDemoBet = realBalance === 0 && demoBalance > 0;
-    }
-
-    // Skip bet limits for demo bets
-    if (!isDemoBet) {
     try {
       await validateBetLimits(userId, body.betAmount);
     } catch (err: any) {
@@ -73,9 +55,8 @@ export async function minesRoutes(server: FastifyInstance) {
       });
       throw err;
     }
-    }
 
-    const game = await service.startGame(userId, body.betAmount, body.mineCount, isDemoBet);
+    const game = await service.startGame(userId, body.betAmount, body.mineCount);
     reply.header('X-Request-Id', reqId);
     return { success: true, game };
   });

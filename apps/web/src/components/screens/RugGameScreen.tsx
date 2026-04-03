@@ -496,7 +496,6 @@ export function RugGameScreen() {
           selectedAmount={betAmount}
           onAmountChange={setBetAmount}
           balance={profile.balance}
-          demoBalance={profile.demoBalance}
           submitLabel="Join Round"
           onSubmit={handleJoin}
           submitDisabled={betAmount <= 0}

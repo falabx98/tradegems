@@ -641,9 +641,6 @@ export const api = {
   claimDailyMission: (missionId: string) =>
     apiFetch<{ success: boolean; xpReward: number }>(`/v1/missions/claim/${missionId}`, { method: 'POST' }),
 
-  demoRefill: () =>
-    apiFetch<{ success: boolean; demoBalance: number; refillsUsed: number; refillsRemaining: number; message?: string; nextRefillAt?: string }>('/v1/users/me/demo-refill', { method: 'POST' }),
-
   getReturnHooks: () =>
     apiFetch<{ hooks: Array<{ type: string; priority: number; icon: string; title: string; subtitle: string; cta?: string }> }>('/v1/hooks/active'),
 

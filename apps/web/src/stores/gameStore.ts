@@ -93,8 +93,6 @@ const DEFAULT_PROFILE: PlayerProfile = {
   avatarUrl: null,
   balance: 0, // lamports (available)
   lockedBalance: 0, // lamports (in play)
-  demoBalance: 0,
-  demoRefillsUsed: 0,
   totalWagered: 0,
   totalWon: 0,
   roundsPlayed: 0,
@@ -401,8 +399,6 @@ export const useGameStore = create<GameState>((set, get) => ({
           avatarUrl: me.avatarUrl ?? state.profile.avatarUrl,
           balance: validBalance ? parsed : state.profile.balance,
           lockedBalance: !isNaN(parsedLocked) ? parsedLocked : state.profile.lockedBalance,
-          demoBalance: (me as any).demoBalance ?? state.profile.demoBalance,
-          demoRefillsUsed: (me as any).demoRefillsUsed ?? state.profile.demoRefillsUsed,
           // Real progression data from backend
           xp: progression.xpCurrent ?? state.profile.xp,
           xpToNext: progression.xpToNext ?? state.profile.xpToNext,

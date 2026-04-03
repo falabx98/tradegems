@@ -53,6 +53,7 @@ export function WalletScreen() {
   const [depositBonusUsed, setDepositBonusUsed] = useState<boolean | null>(null);
 
   useEffect(() => {
+    syncProfile(); // Refresh balance on mount
     loadTransactions();
     loadLinkedWallet();
     loadDepositAddress();

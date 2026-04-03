@@ -35,8 +35,8 @@ import { ChatToggle } from './components/layout/ChatToggle';
 import { ToastOverlay } from './components/ToastOverlay';
 import { PATH_TO_SCREEN, SCREEN_TO_PATH } from './hooks/useAppNavigate';
 import { getServerConfig, getAccessToken, setSessionExpiredCallback } from './utils/api';
-import { connectWebSocket, disconnectWebSocket } from './utils/ws';
-import { requestNotificationPermission } from './utils/notifications';
+import { connectWebSocket, disconnectWebSocket, useWebSocket } from './utils/ws';
+import { requestNotificationPermission, notifyDeposit } from './utils/notifications';
 import './styles/global.css';
 
 export default function App() {
@@ -75,6 +75,12 @@ export default function App() {
       disconnectWebSocket();
     }
   }, [isAuthenticated, syncProfile]);
+
+  // Auto-refresh balance when a deposit is confirmed via WebSocket
+  useWebSocket('deposit_confirmed', (msg: any) => {
+    syncProfile();
+    if (msg?.amount) notifyDeposit(Number(msg.amount));
+  });
 
   // Sync URL → store on first load and browser back/forward
   useEffect(() => {

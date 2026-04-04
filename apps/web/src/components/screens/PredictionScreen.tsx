@@ -374,7 +374,7 @@ export function PredictionScreen() {
   const stageContent = (
     <GameStage atmosphere={PRED_ATMOSPHERE} style={{ position: 'relative' }}>
       {!isMobile && <div style={{ padding: `${gap.sm}px ${gap.md}px 0` }}>{headerEl}</div>}
-      <div style={{ position: 'relative', flex: isMobile ? undefined : 1, height: isMobile ? 240 : undefined, minHeight: isMobile ? undefined : 200 }}>
+      <div style={{ position: 'relative', flex: isMobile ? undefined : 1, height: isMobile ? 240 : undefined, minHeight: isMobile ? undefined : 0, overflow: 'hidden' }}>
         <CandlestickChart
           historicalCandles={roundConfig.historicalCandles}
           revealCandles={roundConfig.revealCandles}

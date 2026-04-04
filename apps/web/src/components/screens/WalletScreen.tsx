@@ -11,6 +11,7 @@ import { SolIcon } from '../ui/SolIcon';
 import { PageHeader } from '../ui/PageHeader';
 import { TabBar } from '../ui/TabBar';
 import { ContentNarrow } from '../primitives/ContentContainer';
+import { useIsMobile } from '../../hooks/useIsMobile';
 
 interface Transaction {
   id: string;
@@ -33,7 +34,7 @@ export function WalletScreen() {
   const syncProfile = useGameStore((s) => s.syncProfile);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
-  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+  const isMobile = useIsMobile();
 
   const [tab, setTab] = useState<Tab>('deposit');
   const [transactions, setTransactions] = useState<Transaction[]>([]);

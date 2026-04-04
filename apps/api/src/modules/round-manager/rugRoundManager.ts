@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { getDb } from '../../config/database.js';
 import { rugRounds, rugRoundBets, users } from '@tradingarena/db';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, inArray } from 'drizzle-orm';
 import { getRedis } from '../../config/redis.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { generateRugCandle, generateCrashCandles, estimateRoundTicks, type Candle } from '../../utils/chartGenerator.js';
@@ -134,25 +134,34 @@ async function settleAllBets() {
     if (!state) return;
     const database = db();
 
-    for (const bet of state.bets) {
-      if (bet.status === 'active') {
-        // Not cashed out = rugged
-        bet.status = 'rugged';
-        await database.update(rugRoundBets)
-          .set({ status: 'rugged', payout: 0, settledAt: new Date() })
-          .where(and(
-            eq(rugRoundBets.roundId, state.roundId),
-            eq(rugRoundBets.userId, bet.userId)
-          ));
+    const activeBets = state.bets.filter(b => b.status === 'active');
+    if (activeBets.length === 0) return;
 
-        // Settle wallet: player loses bet
-        const user = await database.query.users.findFirst({ where: eq(users.id, bet.userId) });
-        if (user && user.role !== 'bot') {
-          try {
-            await wallet.settlePayout(bet.userId, bet.betAmount, 0, 0, 'SOL', { type: 'rug_round', id: state.roundId });
-          } catch (err) {
-            console.error('[RugRound] settleAllBets settlement failed:', err, { userId: bet.userId, roundId: state.roundId });
-          }
+    // Batch-load user roles to avoid N+1 queries
+    const userIds = [...new Set(activeBets.map(b => b.userId))];
+    const userRows = await database
+      .select({ id: users.id, role: users.role })
+      .from(users)
+      .where(inArray(users.id, userIds));
+    const roleMap = new Map(userRows.map(u => [u.id, u.role]));
+
+    for (const bet of activeBets) {
+      // Not cashed out = rugged
+      bet.status = 'rugged';
+      await database.update(rugRoundBets)
+        .set({ status: 'rugged', payout: 0, settledAt: new Date() })
+        .where(and(
+          eq(rugRoundBets.roundId, state.roundId),
+          eq(rugRoundBets.userId, bet.userId)
+        ));
+
+      // Settle wallet: player loses bet (skip bots)
+      const role = roleMap.get(bet.userId);
+      if (role && role !== 'bot') {
+        try {
+          await wallet.settlePayout(bet.userId, bet.betAmount, 0, 0, 'SOL', { type: 'rug_round', id: state.roundId });
+        } catch (err) {
+          console.error('[RugRound] settleAllBets settlement failed:', err, { userId: bet.userId, roundId: state.roundId });
         }
       }
     }

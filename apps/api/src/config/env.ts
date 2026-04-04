@@ -17,10 +17,10 @@ const envSchema = z.object({
   PLATFORM_FEE_RATE: z.coerce.number().default(0.05),
   SOLANA_RPC_URL: z.string().default('https://api.mainnet-beta.solana.com'),
   SOLANA_CLUSTER: z.string().default('mainnet-beta'),
-  TREASURY_PRIVATE_KEY: z.string().optional(),
+  TREASURY_PRIVATE_KEY: z.string().min(60, 'TREASURY_PRIVATE_KEY must be a valid base58 Solana keypair').optional(),
   SOLANA_REQUIRED_CONFIRMATIONS: z.coerce.number().default(3),
   WITHDRAWAL_FEE_LAMPORTS: z.coerce.number().default(5000),
-  WALLET_ENCRYPTION_KEY: z.string().optional(), // 32-byte hex key for AES-256-GCM
+  WALLET_ENCRYPTION_KEY: z.string().regex(/^[a-f0-9]{64}$/, 'WALLET_ENCRYPTION_KEY must be a 64-char hex string (256-bit AES key)').optional(),
   DEPOSIT_SWEEP_INTERVAL_MS: z.coerce.number().default(60_000), // 1 min
   DEPOSIT_MIN_SWEEP_LAMPORTS: z.coerce.number().default(5000), // min balance to trigger sweep
   CORS_ORIGINS: z.string().optional(),

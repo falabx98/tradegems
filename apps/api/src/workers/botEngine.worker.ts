@@ -697,7 +697,7 @@ async function engineTick(): Promise<void> {
     const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);
     for (const bot of selectedBots) {
-      simulateSoloPlay(bot).catch(() => {});
+      simulateSoloPlay(bot).catch(e => console.warn('[BotEngine] SoloPlay failed:', e.message));
     }
   }
 
@@ -707,7 +707,7 @@ async function engineTick(): Promise<void> {
     predictionCooldown = randomBetween(15000, 45000);
 
     const bot = pickRandom(botUsers);
-    simulatePrediction(bot).catch(() => {});
+    simulatePrediction(bot).catch(e => console.warn('[BotEngine] Prediction failed:', e.message));
   }
 
   // Candleflip — bots join public rounds (cooldown 8-15s)
@@ -718,7 +718,7 @@ async function engineTick(): Promise<void> {
     const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);
     for (const bot of selectedBots) {
-      botJoinCandleflipRound(bot).catch(() => {});
+      botJoinCandleflipRound(bot).catch(e => console.warn('[BotEngine] Candleflip failed:', e.message));
     }
   }
 
@@ -730,7 +730,7 @@ async function engineTick(): Promise<void> {
     const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);
     for (const bot of selectedBots) {
-      botJoinRugRound(bot).catch(() => {});
+      botJoinRugRound(bot).catch(e => console.warn('[BotEngine] RugGame failed:', e.message));
     }
   }
 
@@ -742,14 +742,14 @@ async function engineTick(): Promise<void> {
     const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);
     for (const bot of selectedBots) {
-      botBuyLotteryTickets(bot).catch(() => {});
+      botBuyLotteryTickets(bot).catch(e => console.warn('[BotEngine] Lottery failed:', e.message));
     }
   }
 
   // Trading Sim room maintenance (every 30s)
   if (now - lastSimMaintenanceAt >= 30000) {
     lastSimMaintenanceAt = now;
-    maintainTradingSimRooms().catch(() => {});
+    maintainTradingSimRooms().catch(e => console.warn('[BotEngine] SimMaintenance failed:', e.message));
   }
 
   // Online presence tracking (cooldown 60s)

@@ -16,6 +16,8 @@ interface ClientConnection {
   subscribedRounds: Set<string>;
   isAlive: boolean;
   connectedAt: number;
+  messageCount: number;
+  messageWindowStart: number;
 }
 
 export class ConnectionManager {
@@ -23,6 +25,8 @@ export class ConnectionManager {
   private userConnections = new Map<string, Set<WebSocket>>();
   private roundSubscribers = new Map<string, Set<WebSocket>>();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private static readonly MAX_CONNECTIONS = 10_000;
+  private static readonly MAX_MESSAGES_PER_SECOND = 50;
 
   constructor(private logger: Logger) {
     this.startHeartbeat();
@@ -33,6 +37,13 @@ export class ConnectionManager {
   }
 
   handleConnection(ws: WebSocket, req: IncomingMessage) {
+    // Enforce connection limit to prevent DoS
+    if (this.clients.size >= ConnectionManager.MAX_CONNECTIONS) {
+      ws.close(1013, 'Server at capacity');
+      this.logger.warn({ total: this.clients.size }, 'Connection rejected: at capacity');
+      return;
+    }
+
     const conn: ClientConnection = {
       ws,
       userId: null,
@@ -40,6 +51,8 @@ export class ConnectionManager {
       subscribedRounds: new Set(),
       isAlive: true,
       connectedAt: Date.now(),
+      messageCount: 0,
+      messageWindowStart: Date.now(),
     };
 
     this.clients.set(ws, conn);
@@ -86,6 +99,18 @@ export class ConnectionManager {
   private handleMessage(ws: WebSocket, msg: { type: string; [key: string]: unknown }) {
     const conn = this.clients.get(ws);
     if (!conn) return;
+
+    // Rate limit messages per connection
+    const now = Date.now();
+    if (now - conn.messageWindowStart > 1000) {
+      conn.messageCount = 0;
+      conn.messageWindowStart = now;
+    }
+    if (++conn.messageCount > ConnectionManager.MAX_MESSAGES_PER_SECOND) {
+      this.logger.warn({ userId: conn.userId }, 'Client exceeded message rate limit');
+      ws.close(1008, 'Rate limit exceeded');
+      return;
+    }
 
     switch (msg.type) {
       case 'auth':

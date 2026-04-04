@@ -35,6 +35,7 @@ export function CandlestickChart({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef(0);
+  const lastSizeRef = useRef({ w: 0, h: 0 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -44,12 +45,17 @@ export function CandlestickChart({
     const draw = () => {
       const rect = container.getBoundingClientRect();
       const dpr = window.devicePixelRatio || 1;
-      const w = rect.width;
-      const h = rect.height;
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      canvas.style.width = `${w}px`;
-      canvas.style.height = `${h}px`;
+      const w = Math.round(rect.width);
+      const h = Math.round(rect.height);
+      if (w === 0 || h === 0) return;
+      // Only resize canvas if dimensions actually changed
+      if (lastSizeRef.current.w !== w || lastSizeRef.current.h !== h) {
+        lastSizeRef.current = { w, h };
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvas.style.width = `${w}px`;
+        canvas.style.height = `${h}px`;
+      }
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
       ctx.scale(dpr, dpr);
@@ -283,8 +289,15 @@ export function CandlestickChart({
       draw();
     });
 
-    // Redraw on resize
-    const ro = new ResizeObserver(() => {
+    // Redraw on resize — guard against feedback loops
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width: ew, height: eh } = entry.contentRect;
+      const rw = Math.round(ew);
+      const rh = Math.round(eh);
+      // Skip if dimensions haven't meaningfully changed
+      if (rw === lastSizeRef.current.w && rh === lastSizeRef.current.h) return;
       cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(draw);
     });
@@ -302,12 +315,13 @@ export function CandlestickChart({
       style={{
         width: '100%',
         height: '100%',
+        boxSizing: 'border-box',
         borderRadius: '12px',
         overflow: 'hidden',
         border: '1px solid rgba(119, 23, 255, 0.12)',
       }}
     >
-      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+      <canvas ref={canvasRef} style={{ display: 'block' }} />
     </div>
   );
 }

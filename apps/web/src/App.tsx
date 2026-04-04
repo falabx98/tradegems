@@ -94,6 +94,11 @@ export default function App() {
   useEffect(() => {
     const expectedPath = SCREEN_TO_PATH[screen] || '/';
     if (location.pathname !== expectedPath) {
+      // Don't override the URL if it already maps to a valid screen
+      // (prevents race condition on initial load where screen is still 'lobby'
+      //  but the URL already points to a valid deep-linked screen)
+      const currentUrlScreen = PATH_TO_SCREEN[location.pathname];
+      if (currentUrlScreen && currentUrlScreen !== screen) return;
       navigate(expectedPath, { replace: true });
     }
   }, [screen]); // eslint-disable-line react-hooks/exhaustive-deps

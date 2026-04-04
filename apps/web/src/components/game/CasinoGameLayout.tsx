@@ -109,7 +109,7 @@ export function GameStage({ children, atmosphere, style }: GameStageProps) {
           zIndex: 0,
         }} />
       )}
-      <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
         {children}
       </div>
     </div>

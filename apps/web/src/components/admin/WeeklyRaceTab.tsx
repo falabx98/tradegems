@@ -85,7 +85,7 @@ export function WeeklyRaceTab() {
               <tbody>
                 {race.leaderboard.slice(0, 20).map((e: any) => (
                   <tr key={e.userId}>
-                    <td style={s.td}><span style={{ fontWeight: 800, color: e.rank <= 3 ? ['', '#FFD700', '#C0C0C0', '#CD7F32'][e.rank] : theme.text.muted }}>{e.rank <= 3 ? ['', '🥇', '🥈', '🥉'][e.rank] : e.rank}</span></td>
+                    <td style={s.td}><span style={{ fontWeight: 800, color: e.rank <= 3 ? ['', '#FFD700', '#C0C0C0', '#CD7F32'][e.rank] : theme.text.muted }}>{e.rank}</span></td>
                     <td style={s.td}><span style={s.username}>{e.username}</span></td>
                     <td style={s.td}><span className="mono" style={{ color: theme.text.secondary }}>{formatSol(e.wagered)} SOL</span></td>
                     <td style={s.td}><span className="mono" style={{ color: e.prize > 0 ? theme.accent.neonGreen : theme.text.muted }}>{e.prize > 0 ? `${formatSol(e.prize)} SOL` : '—'}</span></td>

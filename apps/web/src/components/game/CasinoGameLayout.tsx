@@ -3,16 +3,13 @@
  *
  * Desktop: viewport-height layout. Rail scrolls internally, stage fills space.
  * Mobile: stage → rail → footer (stacked, normal scroll).
- * All panels: border-radius 20px.
+ * Edge-to-edge panels, no border-radius — clean Shuffle-style.
  */
 import type { CSSProperties, ReactNode } from 'react';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
 
-const RAIL_WIDTH = 296;
-const PANEL_RADIUS = 20;
-const DESKTOP_GAP = 12;
-const MOBILE_GAP = theme.gap.md;
+const RAIL_WIDTH = 300;
 const FOOTER_HEIGHT = 44;
 
 interface CasinoGameLayoutProps {
@@ -28,7 +25,7 @@ export function CasinoGameLayout({ rail, stage, footer, below }: CasinoGameLayou
   if (isMobile) {
     return (
       <div style={mobileShell}>
-        <div>{stage}</div>
+        <div style={{ flex: 1, minHeight: '50vh', display: 'flex', flexDirection: 'column' }}>{stage}</div>
         <div>{rail}</div>
         {footer && <div>{footer}</div>}
         {below}
@@ -59,18 +56,19 @@ export function GameControlRail({ children, style }: GameControlRailProps) {
   const isMobile = useIsMobile();
   return (
     <div style={{
-      background: '#0e0e12',
-      borderRadius: isMobile ? 0 : PANEL_RADIUS,
-      padding: isMobile ? '16px 16px' : '20px 16px',
+      background: theme.bg.surface,
+      padding: isMobile ? '16px' : '20px',
       display: 'flex',
       flexDirection: 'column',
       gap: theme.gap.md,
-      // Desktop: fill parent height, scroll internally
-      ...(isMobile ? {} : {
-        height: '100%',
-        overflowY: 'auto' as const,
-        scrollbarWidth: 'thin' as const,
-      }),
+      ...(isMobile
+        ? { borderTop: `1px solid ${theme.border.subtle}` }
+        : {
+            height: '100%',
+            overflowY: 'auto' as const,
+            scrollbarWidth: 'thin' as const,
+            borderRight: `1px solid ${theme.border.subtle}`,
+          }),
       ...style,
     }}>
       {children}
@@ -87,17 +85,17 @@ interface GameStageProps {
 }
 
 export function GameStage({ children, atmosphere, style }: GameStageProps) {
-  const isMobile = useIsMobile();
   return (
     <div style={{
       position: 'relative',
-      borderRadius: isMobile ? 0 : PANEL_RADIUS,
       overflow: 'hidden',
-      background: '#141418',
+      background: theme.bg.base,
       display: 'flex',
       flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
       minHeight: 0,
-      flex: isMobile ? undefined : 1,
+      flex: 1,
       ...style,
     }}>
       {atmosphere && (
@@ -109,7 +107,7 @@ export function GameStage({ children, atmosphere, style }: GameStageProps) {
           zIndex: 0,
         }} />
       )}
-      <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden', width: '100%' }}>
         {children}
       </div>
     </div>
@@ -124,25 +122,26 @@ interface GameFooterBarProps {
 }
 
 export function GameFooterBar({ children, style }: GameFooterBarProps) {
-  const isMobile = useIsMobile();
   return (
     <div style={{
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
-      padding: '10px 20px',
-      fontSize: theme.textSize.xs.mobile,
+      padding: '0 16px',
+      fontSize: 13,
       color: theme.text.muted,
-      background: '#1a1a20',
-      borderRadius: isMobile ? 0 : PANEL_RADIUS,
+      background: theme.bg.sidebar,
+      borderTop: `1px solid ${theme.border.subtle}`,
+      height: FOOTER_HEIGHT,
       minHeight: FOOTER_HEIGHT,
       ...style,
     }}>
+      <div />
       <img
         src="/logo-footer.png"
         alt="TradeGems"
         draggable={false}
-        style={{ height: 18, opacity: 0.6 }}
+        style={{ height: 28, opacity: 0.5 }}
       />
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         {children}
@@ -154,24 +153,19 @@ export function GameFooterBar({ children, style }: GameFooterBarProps) {
 // ─── Styles ─────────────────────────────────────────────────
 
 const desktopShell: CSSProperties = {
-  maxWidth: 1200,
-  margin: '0 auto',
   width: '100%',
-  padding: `${DESKTOP_GAP}px 24px`,
   display: 'flex',
   flexDirection: 'column',
-  gap: DESKTOP_GAP,
-  // Fixed viewport height — no page scroll
-  height: `calc(100vh - 64px)`, // 64px = TopBar height
+  height: 'calc(100vh - 64px)', // 64px = TopBar height
   overflow: 'hidden',
+  background: theme.bg.base,
 };
 
 const desktopBody: CSSProperties = {
   display: 'flex',
-  gap: DESKTOP_GAP,
   alignItems: 'stretch',
   flex: 1,
-  minHeight: 0, // Critical: allows flex children to shrink below content size
+  minHeight: 0,
   overflow: 'hidden',
 };
 
@@ -181,7 +175,7 @@ const desktopRail: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   minHeight: 0,
-  overflow: 'hidden', // Rail panel clips, GameControlRail scrolls internally
+  overflow: 'hidden',
 };
 
 const desktopStage: CSSProperties = {
@@ -195,8 +189,8 @@ const desktopStage: CSSProperties = {
 
 const mobileShell: CSSProperties = {
   width: '100%',
-  padding: `${MOBILE_GAP}px 0`,
   display: 'flex',
   flexDirection: 'column',
-  gap: 8, // Small visual rhythm between stage and rail on mobile
+  minHeight: 'calc(100vh - 64px)',
+  background: theme.bg.base,
 };

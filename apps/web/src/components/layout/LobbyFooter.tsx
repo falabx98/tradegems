@@ -2,39 +2,61 @@ import type { CSSProperties } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { theme } from '../../styles/theme';
+import { Icon } from '../primitives/Icon';
 
-// ─── Social SVGs ─────────────────────────────────────────────
+// ─── Trust Badge Items ──────────────────────────────────────
 
-const TwitterIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-);
-const TelegramIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-);
-const DiscordIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561 19.9312 19.9312 0 005.9932 3.0294.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286 19.8975 19.8975 0 006.0023-3.0294.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189z"/></svg>
-);
+const TRUST_ITEMS = [
+  { icon: 'shield', label: 'Provably Fair' },
+  { icon: 'clock', label: 'Instant Settlement' },
+  { icon: 'solana', label: 'Solana Powered' },
+  { icon: 'shield', label: '18+' },
+];
 
 // ─── Link Column ─────────────────────────────────────────────
 
-function FooterColumn({ title, links, go }: { title: string; links: { label: string; route: string }[]; go: (s: string) => void }) {
+function FooterColumn({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div style={{ minWidth: 120 }}>
+    <div style={{ minWidth: 0 }}>
       <div style={colTitle}>{title}</div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {links.map(l => (
-          <span
-            key={l.label}
-            onClick={() => go(l.route)}
-            style={colLink}
-            onMouseEnter={e => { (e.target as HTMLElement).style.color = '#fff'; }}
-            onMouseLeave={e => { (e.target as HTMLElement).style.color = '#888'; }}
-          >
-            {l.label}
-          </span>
-        ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {children}
       </div>
     </div>
+  );
+}
+
+function FooterLink({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <span
+      onClick={onClick}
+      style={colLink}
+      onMouseEnter={e => { (e.target as HTMLElement).style.color = theme.text.primary; }}
+      onMouseLeave={e => { (e.target as HTMLElement).style.color = theme.text.secondary; }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function FooterSocialLink({ icon, href }: { icon: React.ReactNode; href: string }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      style={socialLink}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)';
+        (e.currentTarget as HTMLElement).style.borderColor = theme.border.default;
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.background = theme.bg.elevated;
+        (e.currentTarget as HTMLElement).style.borderColor = theme.border.subtle;
+      }}
+    >
+      {icon}
+    </a>
   );
 }
 
@@ -44,106 +66,149 @@ export function LobbyFooter() {
   const go = useAppNavigate();
   const isMobile = useIsMobile();
 
-  const gameLinks = [
-    { label: 'Rug Game', route: 'rug-game' },
-    { label: 'Mines', route: 'mines' },
-    { label: 'Candleflip', route: 'candleflip' },
-    { label: 'Predictions', route: 'prediction' },
-    { label: 'Solo', route: 'setup' },
-    { label: 'Trading Arena', route: 'trading-sim' },
-    { label: 'Lottery', route: 'lottery' },
-  ];
-
-  const featureLinks = [
-    { label: 'Provably Fair', route: 'fairness' },
-    { label: 'Leaderboard', route: 'leaderboard' },
-    { label: 'Settings', route: 'settings' },
-    { label: 'Rewards', route: 'rewards' },
-  ];
-
-  const infoLinks = [
-    { label: 'About Us', route: 'about' },
-    { label: 'FAQ', route: 'about' },
-    { label: 'Responsible Gambling', route: 'responsible-gambling' },
-    { label: 'Privacy', route: 'privacy' },
-    { label: 'Terms of Service', route: 'terms' },
-  ];
-
-  const communityLinks = [
-    { label: 'Twitter / X', route: 'lobby' },
-    { label: 'Telegram', route: 'lobby' },
-    { label: 'Discord', route: 'lobby' },
-  ];
-
   return (
-    <footer style={footer}>
-      {/* ─── Main Content ─── */}
+    <footer style={{
+      ...footerBase,
+      // Break out of <main> padding to go full-width edge-to-edge
+      marginLeft: -24,
+      marginRight: -24,
+      marginBottom: isMobile ? -80 : -24, // mobile has 80px paddingBottom for BottomNav
+      paddingBottom: isMobile ? 80 : 0,   // re-add space so content isn't hidden behind BottomNav
+      width: 'calc(100% + 48px)',
+    }}>
       <div style={{
-        display: 'flex',
-        flexDirection: isMobile ? 'column' : 'row',
-        gap: isMobile ? 32 : 48,
-        padding: isMobile ? '40px 16px 24px' : '48px 32px 32px',
+        maxWidth: 1200,
+        margin: '0 auto',
+        padding: isMobile ? '40px 16px 24px' : '48px 24px 32px',
       }}>
-        {/* Left — Brand */}
-        <div style={{ flex: isMobile ? undefined : '1 1 0', maxWidth: isMobile ? '100%' : 480 }}>
-          <img
-            src="/logo-big-screens.png"
-            alt="TradeGems"
-            draggable={false}
-            style={{ height: isMobile ? 32 : 40, marginBottom: 16 }}
-          />
-
-          {/* Social icons */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-            {[
-              { Icon: TwitterIcon, url: '#' },
-              { Icon: TelegramIcon, url: '#' },
-              { Icon: DiscordIcon, url: '#' },
-            ].map(({ Icon, url }, i) => (
-              <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={socialIcon}>
-                <Icon />
-              </a>
-            ))}
-          </div>
-
-          <p style={descText}>
-            Welcome to TradeGems. Play 100% provably fair on-chain Solana games. TradeGems provides instant on-chain Solana deposits and withdrawals. All games use SHA-256 provably fair seeding that you can verify.
-          </p>
-          <p style={{ ...descText, marginTop: 12, color: theme.accent.purple }}>
-            support@tradegems.gg
-          </p>
-        </div>
-
-        {/* Right — Link Columns */}
+        {/* ─── 4-Column Grid ─── */}
         <div style={{
-          flex: isMobile ? undefined : '1 1 0',
           display: 'grid',
           gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
-          gap: isMobile ? 24 : 16,
+          gap: isMobile ? 28 : 40,
+          marginBottom: 40,
         }}>
-          <FooterColumn title="Games" links={gameLinks} go={go} />
-          <FooterColumn title="Features" links={featureLinks} go={go} />
-          <FooterColumn title="Info" links={infoLinks} go={go} />
-          <FooterColumn title="Community" links={communityLinks} go={go} />
-        </div>
-      </div>
+          {/* Col 1: Games */}
+          <FooterColumn title="Games">
+            <FooterLink label="Rug Game" onClick={() => go('rug-game')} />
+            <FooterLink label="Mines" onClick={() => go('mines')} />
+            <FooterLink label="Candleflip" onClick={() => go('candleflip')} />
+            <FooterLink label="Predictions" onClick={() => go('prediction')} />
+            <FooterLink label="Trading Sim" onClick={() => go('trading-sim')} />
+            <FooterLink label="Solo" onClick={() => go('setup')} />
+            <FooterLink label="Lottery" onClick={() => go('lottery')} />
+          </FooterColumn>
 
-      {/* ─── Bottom Bar ─── */}
-      <div style={bottomBar}>
+          {/* Col 2: Features */}
+          <FooterColumn title="Features">
+            <FooterLink label="Provably Fair" onClick={() => go('fairness')} />
+            <FooterLink label="Referrals" onClick={() => go('rewards')} />
+            <FooterLink label="VIP Club" onClick={() => go('season')} />
+            <FooterLink label="Daily Missions" onClick={() => go('rewards')} />
+          </FooterColumn>
+
+          {/* Col 3: Info */}
+          <FooterColumn title="Info">
+            <FooterLink label="About" onClick={() => go('about')} />
+            <FooterLink label="FAQ" onClick={() => go('faq')} />
+            <FooterLink label="Provably Fair" onClick={() => go('fairness')} />
+            <FooterLink label="Terms" onClick={() => go('terms')} />
+            <FooterLink label="Privacy" onClick={() => go('privacy')} />
+            <FooterLink label="Responsible Gambling" onClick={() => go('responsible-gambling')} />
+          </FooterColumn>
+
+          {/* Col 4: Community */}
+          <div style={{ minWidth: 0 }}>
+            <div style={colTitle}>Community</div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <FooterSocialLink icon={<Icon name="twitter-x" size={20} />} href="https://x.com/tradegems" />
+              <FooterSocialLink icon={<Icon name="telegram" size={20} />} href="https://t.me/tradegems" />
+              <FooterSocialLink icon={<Icon name="discord" size={20} />} href="https://discord.gg/tradegems" />
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Trust Badges ─── */}
         <div style={{
-          padding: '12px 32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: isMobile ? 'center' : 'flex-start',
+          flexWrap: 'wrap',
+          gap: isMobile ? 8 : 12,
+          marginBottom: 24,
+        }}>
+          {TRUST_ITEMS.map((item) => (
+            <div key={item.label} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              fontSize: 12,
+              fontWeight: 500,
+              color: theme.text.muted,
+              whiteSpace: 'nowrap',
+            }}>
+              <Icon name={item.icon} size={14} style={{ color: theme.text.disabled }} />
+              {item.label}
+            </div>
+          ))}
+        </div>
+
+        {/* ─── Divider ─── */}
+        <div style={{ height: 1, background: theme.border.subtle, marginBottom: 24 }} />
+
+        {/* ─── Bottom Bar ─── */}
+        <div style={{
           display: 'flex',
           flexDirection: isMobile ? 'column' : 'row',
           alignItems: isMobile ? 'center' : 'center',
           justifyContent: 'space-between',
-          gap: isMobile ? 6 : 0,
+          gap: isMobile ? 12 : 0,
         }}>
-          <span style={bottomText}>
-            TradeGems is a provably fair crypto casino built on Solana. Play responsibly. 18+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <img
+              src="/logo.png"
+              alt="TradeGems"
+              draggable={false}
+              style={{ height: 24, width: 'auto', opacity: 0.7 }}
+            />
+            <span style={bottomText}>© 2026 TradeGems</span>
+          </div>
+          <span style={{
+            ...bottomText,
+            textAlign: isMobile ? 'center' : 'right',
+          }}>
+            18+ | Gambling can be addictive. Play responsibly.
           </span>
-          <span style={bottomText}>
-            © 2026 TradeGems. All rights reserved.
-          </span>
+        </div>
+
+        {/* ─── Responsible Gambling Disclaimer ─── */}
+        <div style={{
+          borderTop: `1px solid ${theme.border.subtle}`,
+          marginTop: 24,
+          padding: '16px 0',
+          textAlign: 'center',
+          fontSize: 12,
+          color: theme.text.muted,
+          lineHeight: 1.6,
+        }}>
+          <div>18+ | Gambling can be addictive. Please play responsibly.</div>
+          <div style={{ marginTop: 4, display: 'flex', justifyContent: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span
+              style={{ color: theme.text.secondary, cursor: 'pointer', textDecoration: 'none' }}
+              onClick={() => go('responsible-gambling')}
+            >
+              Responsible Gambling
+            </span>
+            <span style={{ color: theme.text.muted }}>·</span>
+            <a
+              href="https://www.ncpgambling.org/help-treatment/national-helpline-1-800-522-4700/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ color: theme.text.secondary, textDecoration: 'none' }}
+            >
+              Problem Gambling Helpline
+            </a>
+          </div>
         </div>
       </div>
     </footer>
@@ -152,58 +217,45 @@ export function LobbyFooter() {
 
 // ─── Styles ─────────────────────────────────────────────────
 
-const footer: CSSProperties = {
-  background: '#111118',
-  borderTop: '1px solid rgba(255,255,255,0.06)',
+// Base footer style — getFooterStyle adds responsive breakout margins
+const footerBase: CSSProperties = {
+  background: theme.bg.sidebar,
+  borderTop: `1px solid ${theme.border.subtle}`,
   marginTop: 40,
-  width: '100%',
-};
-
-const socialIcon: CSSProperties = {
-  width: 36,
-  height: 36,
-  borderRadius: 8,
-  background: 'rgba(255,255,255,0.04)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  color: '#888',
-  transition: 'all 0.15s ease',
-  cursor: 'pointer',
-  textDecoration: 'none',
-};
-
-const descText: CSSProperties = {
-  fontSize: 12,
-  lineHeight: 1.6,
-  color: '#888',
-  margin: 0,
 };
 
 const colTitle: CSSProperties = {
-  fontSize: 11,
-  fontWeight: 700,
-  color: '#fff',
-  textTransform: 'uppercase',
-  letterSpacing: '0.1em',
-  marginBottom: 12,
+  fontSize: 16,
+  fontWeight: 600,
+  color: theme.text.primary,
+  marginBottom: 14,
 };
 
 const colLink: CSSProperties = {
   fontSize: 13,
-  color: '#888',
+  color: theme.text.secondary,
   cursor: 'pointer',
   transition: 'color 0.15s ease',
   textDecoration: 'none',
+  lineHeight: 1.4,
 };
 
-const bottomBar: CSSProperties = {
-  background: '#0c0c10',
-  borderTop: '1px solid rgba(255,255,255,0.04)',
+const socialLink: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: 44,
+  height: 44,
+  color: theme.text.secondary,
+  textDecoration: 'none',
+  cursor: 'pointer',
+  transition: 'all 150ms ease',
+  borderRadius: 10,
+  border: `1px solid ${theme.border.subtle}`,
+  background: theme.bg.elevated,
 };
 
 const bottomText: CSSProperties = {
-  fontSize: 11,
-  color: '#555',
+  fontSize: 12,
+  color: theme.text.muted,
 };

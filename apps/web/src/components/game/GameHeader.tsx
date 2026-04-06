@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { playButtonClick, hapticLight } from '../../utils/sounds';
+import { Icon } from '../primitives/Icon';
 
 export interface GameHeaderProps {
   title: string;
@@ -27,9 +28,7 @@ export function GameHeader({ title, subtitle, icon, backTo = 'lobby', howToPlay,
       <div style={s.root}>
         <div style={s.left}>
           <button style={s.backBtn} onClick={handleBack}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={theme.text.secondary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="15 18 9 12 15 6" />
-            </svg>
+            <Icon name="left-arrow" size={18} style={{ color: theme.text.secondary }} />
           </button>
           {icon && <div style={s.iconWrap}>{icon}</div>}
           <div>
@@ -40,12 +39,17 @@ export function GameHeader({ title, subtitle, icon, backTo = 'lobby', howToPlay,
         <div style={s.right}>
           {rightSlot}
           {howToPlay && (
-            <button style={s.helpBtn} onClick={() => setShowHelp(v => !v)}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.text.secondary} strokeWidth="2" strokeLinecap="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
-              </svg>
+            <button
+              style={{
+                ...s.helpBtn,
+                ...(showHelp ? {
+                  background: 'rgba(139, 92, 246, 0.1)',
+                  borderColor: 'rgba(139, 92, 246, 0.3)',
+                } : {}),
+              }}
+              onClick={() => setShowHelp(v => !v)}
+            >
+              <Icon name="info" size={16} style={{ color: showHelp ? theme.accent.purple : theme.text.secondary }} />
             </button>
           )}
         </div>

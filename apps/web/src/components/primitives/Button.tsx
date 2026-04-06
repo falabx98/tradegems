@@ -2,7 +2,7 @@ import { forwardRef } from 'react';
 import { theme } from '../../styles/theme';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant: 'primary' | 'success' | 'danger' | 'ghost' | 'ghost-accent';
+  variant: 'primary' | 'secondary' | 'success' | 'danger' | 'ghost' | 'ghost-accent';
   size?: 'sm' | 'md' | 'lg';
   fullWidth?: boolean;
   loading?: boolean;
@@ -10,9 +10,9 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const SIZES = {
-  sm: { height: '32px', padding: '6px 12px', fontSize: '13px', fontWeight: 600, iconSize: 14 },
-  md: { height: '40px', padding: '8px 16px', fontSize: '14px', fontWeight: 700, iconSize: 16 },
-  lg: { height: '48px', padding: '12px 20px', fontSize: '15px', fontWeight: 700, iconSize: 16 },
+  sm: { height: '34px', padding: '8px 14px', fontSize: '13px', fontWeight: 600, iconSize: 14 },
+  md: { height: '40px', padding: '10px 20px', fontSize: '14px', fontWeight: 600, iconSize: 16 },
+  lg: { height: '48px', padding: '14px 28px', fontSize: '16px', fontWeight: 600, iconSize: 16 },
 } as const;
 
 const VARIANTS: Record<ButtonProps['variant'], {
@@ -22,32 +22,38 @@ const VARIANTS: Record<ButtonProps['variant'], {
   hoverBg: string;
 }> = {
   primary: {
-    background: theme.gradient.primary,
+    background: theme.accent.primary,
     color: '#FFFFFF',
     border: 'none',
-    hoverBg: theme.gradient.primaryHover,
+    hoverBg: theme.accent.primaryHover,
+  },
+  secondary: {
+    background: theme.bg.elevated,
+    color: theme.text.secondary,
+    border: `1px solid ${theme.border.default}`,
+    hoverBg: '#252A4D',
   },
   success: {
-    background: theme.accent.neonGreen,
+    background: theme.accent.green,
     color: theme.text.inverse,
     border: 'none',
-    hoverBg: '#00CC00',
+    hoverBg: '#00C853',
   },
   danger: {
     background: theme.accent.red,
     color: '#FFFFFF',
     border: 'none',
-    hoverBg: '#E62E2E',
+    hoverBg: '#E63535',
   },
   ghost: {
     background: 'transparent',
     color: theme.text.secondary,
-    border: `1px solid ${theme.border.medium}`,
+    border: 'none',
     hoverBg: 'rgba(255, 255, 255, 0.04)',
   },
   'ghost-accent': {
     background: 'transparent',
-    color: theme.accent.purple,
+    color: theme.accent.primary,
     border: `1px solid ${theme.border.accent}`,
     hoverBg: 'rgba(139, 92, 246, 0.06)',
   },

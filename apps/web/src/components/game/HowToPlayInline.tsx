@@ -17,7 +17,6 @@ export function HowToPlayInline({ steps }: HowToPlayInlineProps) {
         <div key={i} style={s.step}>
           <div style={s.stepNumber}>{i + 1}</div>
           <div style={s.stepContent}>
-            <div style={s.stepIcon}>{step.icon}</div>
             <div style={s.stepLabel}>{step.label}</div>
             {step.desc && <div style={s.stepDesc}>{step.desc}</div>}
           </div>
@@ -58,10 +57,6 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: '2px',
-  },
-  stepIcon: {
-    fontSize: '16px',
-    lineHeight: 1,
   },
   stepLabel: {
     fontSize: '13px',

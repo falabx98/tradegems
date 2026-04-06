@@ -28,7 +28,8 @@ import { AboutScreen } from './components/screens/AboutScreen';
 import { ResponsibleGamblingScreen } from './components/screens/ResponsibleGamblingScreen';
 import { PrivacyScreen } from './components/screens/PrivacyScreen';
 import { TermsScreen } from './components/screens/TermsScreen';
-import { SessionTimeReminder, FooterDisclaimer } from './components/ResponsibleGambling';
+import { FAQScreen } from './components/screens/FAQScreen';
+import { SessionTimeReminder } from './components/ResponsibleGambling';
 
 import { ChatPanel } from './components/ChatPanel';
 import { ChatToggle } from './components/layout/ChatToggle';
@@ -156,11 +157,11 @@ export default function App() {
         {screen === 'responsible-gambling' && <ResponsibleGamblingScreen />}
         {screen === 'privacy' && <PrivacyScreen />}
         {screen === 'terms' && <TermsScreen />}
+        {screen === 'faq' && <FAQScreen />}
         {/* Chat disabled for now */}
         {/* {isAuthenticated && <ChatToggle />} */}
         {/* {isAuthenticated && <ChatPanel />} */}
         <SessionTimeReminder />
-        <FooterDisclaimer onNavigate={(s) => { setScreen(s as any); navigate(`/${s}`); }} />
         <ToastOverlay />
       </AppLayout>
       {authOverlay}

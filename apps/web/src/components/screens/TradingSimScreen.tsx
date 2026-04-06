@@ -32,9 +32,9 @@ interface Room { id: string; entryFee: number; maxPlayers: number; currentPlayer
 type View = 'list' | 'game' | 'result';
 
 const ENTRY_TIERS = [
-  { fee: 100_000_000, label: '0.1', color: '#00E701', gradient: 'linear-gradient(135deg, #064e3b, #059669)', icon: '💹' },
-  { fee: 250_000_000, label: '0.25', color: '#60a5fa', gradient: 'linear-gradient(135deg, #172554, #1d4ed8)', icon: '📊' },
-  { fee: 500_000_000, label: '0.5', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #78350f, #d97706)', icon: '🏆' },
+  { fee: 100_000_000, label: '0.1', color: '#00E701', gradient: 'linear-gradient(135deg, #064e3b, #059669)', icon: 'I' },
+  { fee: 250_000_000, label: '0.25', color: '#60a5fa', gradient: 'linear-gradient(135deg, #172554, #1d4ed8)', icon: 'II' },
+  { fee: 500_000_000, label: '0.5', color: '#8b5cf6', gradient: 'linear-gradient(135deg, #78350f, #d97706)', icon: 'III' },
 ];
 
 // ─── LIVE SPECTATOR CHART: Simulated trading round always running ───
@@ -1008,7 +1008,7 @@ export function TradingSimScreen() {
           {sorted.map((p, i) => {
             const isMe = p.userId === userId;
             const rankColors = ['#8b5cf6', '#94a3b8', '#cd7f32'];
-            const rankLabels = ['🥇', '🥈', '🥉'];
+            const rankLabels = ['1st', '2nd', '3rd'];
             return (
               <div key={p.id} style={{
                 ...s.podiumCard,

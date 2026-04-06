@@ -25,44 +25,44 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'DASHBOARD',
     items: [
-      { id: 'overview', label: 'Overview', icon: '📊' },
+      { id: 'overview', label: 'Overview', icon: 'OV' },
     ],
   },
   {
     title: 'OPERATIONS',
     items: [
-      { id: 'users', label: 'Users', icon: '👥' },
-      { id: 'deposits', label: 'Deposits', icon: '⬇️' },
-      { id: 'withdrawals', label: 'Withdrawals', icon: '⬆️' },
-      { id: 'treasury', label: 'Treasury', icon: '🏦' },
+      { id: 'users', label: 'Users', icon: 'US' },
+      { id: 'deposits', label: 'Deposits', icon: 'D+' },
+      { id: 'withdrawals', label: 'Withdrawals', icon: 'W-' },
+      { id: 'treasury', label: 'Treasury', icon: 'TR' },
     ],
   },
   {
     title: 'GAMES',
     items: [
-      { id: 'games', label: 'Rounds', icon: '🎲' },
-      { id: 'fairness', label: 'Fairness', icon: '🛡️' },
-      { id: 'weekly-race', label: 'Weekly Race', icon: '🏆' },
+      { id: 'games', label: 'Rounds', icon: 'RD' },
+      { id: 'fairness', label: 'Fairness', icon: 'FN' },
+      { id: 'weekly-race', label: 'Weekly Race', icon: 'WR' },
     ],
   },
   {
     title: 'MARKETING',
     items: [
-      { id: 'bonuses', label: 'Bonus Codes', icon: '🎁' },
-      { id: 'sponsored', label: 'Sponsored', icon: '⭐' },
-      { id: 'referrals', label: 'Referrals', icon: '🔗' },
+      { id: 'bonuses', label: 'Bonus Codes', icon: 'BC' },
+      { id: 'sponsored', label: 'Sponsored', icon: 'SP' },
+      { id: 'referrals', label: 'Referrals', icon: 'RF' },
     ],
   },
   {
     title: 'SYSTEM',
     items: [
-      { id: 'ops', label: 'Ops Health', icon: '💓' },
-      { id: 'settlements', label: 'Settlements', icon: '⚠️' },
-      { id: 'flags', label: 'Feature Flags', icon: '🚩' },
-      { id: 'engine', label: 'Engine Config', icon: '⚙️' },
-      { id: 'risk', label: 'Risk & Mod', icon: '🛡️' },
-      { id: 'simulation', label: 'Simulation', icon: '▶️' },
-      { id: 'logs', label: 'Audit Logs', icon: '📋' },
+      { id: 'ops', label: 'Ops Health', icon: 'OH' },
+      { id: 'settlements', label: 'Settlements', icon: 'ST' },
+      { id: 'flags', label: 'Feature Flags', icon: 'FF' },
+      { id: 'engine', label: 'Engine Config', icon: 'EC' },
+      { id: 'risk', label: 'Risk & Mod', icon: 'RM' },
+      { id: 'simulation', label: 'Simulation', icon: 'SM' },
+      { id: 'logs', label: 'Audit Logs', icon: 'AL' },
     ],
   },
 ];
@@ -113,7 +113,7 @@ export function AdminSidebar({ activeTab, onTabChange, collapsed, onToggleCollap
                   }}
                   title={collapsed ? item.label : undefined}
                 >
-                  <span style={{ fontSize: 14, lineHeight: 1, width: 20, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, lineHeight: 1, width: 20, textAlign: 'center', flexShrink: 0, letterSpacing: '-0.02em' }}>{item.icon}</span>
                   {!collapsed && <span style={{ fontSize: 13, fontWeight: isActive ? 600 : 500, flex: 1 }}>{item.label}</span>}
                   {!collapsed && badges[item.id] && badges[item.id]! > 0 && (
                     <span style={{ fontSize: 9, fontWeight: 700, color: '#fff', background: theme.accent.red, borderRadius: 8, padding: '1px 5px', minWidth: 16, textAlign: 'center' }}>{badges[item.id]}</span>

@@ -1,7 +1,7 @@
 import { theme } from '../../styles/theme';
 
 export interface CardProps {
-  variant?: 'panel' | 'game' | 'stat' | 'premium';
+  variant?: 'panel' | 'game' | 'stat' | 'premium' | 'elevated';
   padding?: string;
   onClick?: () => void;
   className?: string;
@@ -11,26 +11,32 @@ export interface CardProps {
 
 const VARIANTS = {
   panel: {
-    background: theme.bg.secondary,
+    background: theme.bg.surface,
     border: `1px solid ${theme.border.subtle}`,
     borderRadius: theme.radius.lg,
     defaultPadding: '16px',
   },
   game: {
-    background: theme.bg.secondary,
+    background: theme.bg.surface,
     border: `1px solid ${theme.border.subtle}`,
     borderRadius: theme.radius.lg,
     defaultPadding: '0',
   },
   stat: {
-    background: theme.bg.secondary,
+    background: theme.bg.surface,
     border: `1px solid ${theme.border.subtle}`,
     borderRadius: theme.radius.md,
     defaultPadding: '8px 12px',
   },
   premium: {
-    background: theme.bg.secondary,
+    background: theme.bg.surface,
     border: `1px solid ${theme.border.accent}`,
+    borderRadius: theme.radius.lg,
+    defaultPadding: '16px',
+  },
+  elevated: {
+    background: theme.bg.elevated,
+    border: `1px solid ${theme.border.default}`,
     borderRadius: theme.radius.lg,
     defaultPadding: '16px',
   },
@@ -51,7 +57,8 @@ export function Card({ variant = 'panel', padding, onClick, className, style, ch
         padding: padding ?? v.defaultPadding,
         overflow: variant === 'game' ? 'hidden' : undefined,
         cursor: isClickable ? 'pointer' : undefined,
-        transition: isClickable ? 'all 0.15s ease' : undefined,
+        transition: 'all 0.15s ease',
+        boxShadow: variant === 'elevated' ? theme.shadow.md : undefined,
         ...style,
       }}
     >

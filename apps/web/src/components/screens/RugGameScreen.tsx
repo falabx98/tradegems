@@ -694,7 +694,7 @@ export function RugGameScreen() {
         {round.bets.length} player{round.bets.length !== 1 ? 's' : ''}
       </span>
     </GameFooterBar>
-  ) : undefined;
+  ) : <GameFooterBar><span /></GameFooterBar>;
 
   return (
     <>

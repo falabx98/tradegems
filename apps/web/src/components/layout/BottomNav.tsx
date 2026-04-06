@@ -7,11 +7,11 @@ import { playButtonClick, hapticLight } from '../../utils/sounds';
 import { GamesSheet } from '../primitives/GamesSheet';
 
 const TABS = [
-  { id: 'lobby', label: 'Home', icon: 'grid' },
+  { id: 'lobby', label: 'Casino', icon: 'grid' },
   { id: 'games', label: 'Games', icon: 'play' },
-  { id: 'leaderboard', label: 'Ranks', icon: 'trophy' },
   { id: 'wallet', label: 'Wallet', icon: 'wallet' },
-  { id: 'my-bets', label: 'My Bets', icon: 'list' },
+  { id: 'rewards', label: 'Rewards', icon: 'gift' },
+  { id: 'settings', label: 'Profile', icon: 'gear' },
 ] as const;
 
 // Game screen IDs that should highlight the "Games" tab
@@ -42,6 +42,8 @@ export function BottomNav() {
   const getIsActive = (tabId: string) => {
     if (tabId === 'games') return isGameScreen || showGames;
     if (tabId === 'lobby') return screen === 'lobby';
+    if (tabId === 'rewards') return screen === 'rewards' || screen === 'season';
+    if (tabId === 'settings') return screen === 'settings';
     return screen === tabId;
   };
 
@@ -60,17 +62,27 @@ export function BottomNav() {
               onClick={() => handleTab(tab.id)}
               style={s.tab}
             >
+              {/* Dot indicator above icon */}
+              <div style={{
+                width: 4,
+                height: 4,
+                borderRadius: '50%',
+                background: isActive ? theme.accent.primary : 'transparent',
+                marginBottom: 4,
+                transition: 'background 0.15s ease',
+              }} />
               <NavIcon
                 name={tab.icon}
-                size={20}
-                color={isActive ? theme.accent.purple : theme.text.muted}
+                size={24}
+                color={isActive ? theme.accent.primary : theme.text.muted}
               />
               <span style={{
                 fontSize: 10,
                 fontWeight: isActive ? 600 : 500,
-                color: isActive ? theme.accent.purple : theme.text.muted,
+                color: isActive ? theme.accent.primary : theme.text.muted,
                 marginTop: 2,
                 letterSpacing: '0.02em',
+                transition: 'color 0.15s ease',
               }}>
                 {tab.label}
               </span>
@@ -93,7 +105,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-around',
-    background: theme.bg.secondary,
+    background: theme.bg.sidebar,
     borderTop: `1px solid ${theme.border.subtle}`,
     zIndex: 200,
   },

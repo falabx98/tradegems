@@ -32,6 +32,7 @@ export const SCREEN_TO_PATH: Record<string, string> = {
   'responsible-gambling': '/responsible-gambling',
   privacy: '/privacy',
   terms: '/terms',
+  faq: '/faq',
 };
 
 export const PATH_TO_SCREEN: Record<string, string> = Object.fromEntries(

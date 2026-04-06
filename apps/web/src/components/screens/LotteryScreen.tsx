@@ -18,6 +18,7 @@ import { SolIcon } from '../ui/SolIcon';
 import { Button } from '../primitives/Button';
 import { Card } from '../primitives/Card';
 import { Badge } from '../primitives/Badge';
+import { Icon } from '../primitives/Icon';
 import { EmptyState } from '../primitives/EmptyState';
 import { Skeleton } from '../primitives/Skeleton';
 import { CountUpNumber } from '../game/CountUpNumber';
@@ -442,7 +443,7 @@ export function LotteryScreen() {
       <span>Draw #{draw.drawNumber}</span>
       <span>Provably Fair · {draw.totalTickets} tickets</span>
     </GameFooterBar>
-  ) : undefined;
+  ) : <GameFooterBar><span /></GameFooterBar>;
 
   return (
     <>
@@ -473,7 +474,7 @@ function DrawCountdown({ drawDate }: { drawDate: string }) {
   const isUrgent = diff < 30 * 60 * 1000; // last 30 minutes
   return (
     <span style={{ color: isUrgent ? theme.accent.red : theme.accent.amber, fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
-      {isUrgent ? '⏰ ' : ''}{hours}h {String(mins).padStart(2, '0')}m {String(secs).padStart(2, '0')}s
+      {isUrgent && <Icon name="clock" size={12} style={{ marginRight: 4 }} />}{hours}h {String(mins).padStart(2, '0')}m {String(secs).padStart(2, '0')}s
     </span>
   );
 }
@@ -818,7 +819,7 @@ function TicketsTab({ viewDraw, viewDrawNumber, setViewDrawNumber, draw, myTicke
         <div>
           {myTickets.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '48px 16px', color: theme.text.muted, background: theme.bg.card, border: `1px solid ${theme.border.subtle}`, borderRadius: theme.radius.lg }}>
-              <div style={{ fontSize: '28px', marginBottom: '8px', opacity: 0.4 }}>🎫</div>
+              <Icon name="ticket" size={28} style={{ color: theme.text.disabled, marginBottom: 8, opacity: 0.4 }} />
               No tickets for this draw
             </div>
           ) : (
@@ -930,10 +931,10 @@ function HowToPlayTab({ isMobile }: { isMobile: boolean }) {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
   const steps = [
-    { num: '1', title: 'Choose Entry Type', desc: 'Pick Standard (0.10 SOL) for regular odds, or Power Entry (0.50 SOL) for a guaranteed GemBall match.', icon: '🎫' },
-    { num: '2', title: 'Select Entries', desc: 'Choose how many tickets you want. More tickets = more chances to win the jackpot!', icon: '🔢' },
-    { num: '3', title: 'Pick Your Numbers', desc: 'Select 5 numbers (1-36) and 1 GemBall (1-9), or use Auto-fill for random picks.', icon: '🎯' },
-    { num: '4', title: 'Confirm & Pay', desc: 'Review your tickets and confirm. Funds are deducted immediately. Good luck!', icon: '✅' },
+    { num: '1', title: 'Choose Entry Type', desc: 'Pick Standard (0.10 SOL) for regular odds, or Power Entry (0.50 SOL) for a guaranteed GemBall match.' },
+    { num: '2', title: 'Select Entries', desc: 'Choose how many tickets you want. More tickets = more chances to win the jackpot!' },
+    { num: '3', title: 'Pick Your Numbers', desc: 'Select 5 numbers (1-36) and 1 GemBall (1-9), or use Auto-fill for random picks.' },
+    { num: '4', title: 'Confirm & Pay', desc: 'Review your tickets and confirm. Funds are deducted immediately. Good luck!' },
   ];
 
   const info = [
@@ -957,7 +958,6 @@ function HowToPlayTab({ isMobile }: { isMobile: boolean }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
         {steps.map((step) => (
           <div key={step.num} style={s.howCard}>
-            <div style={{ fontSize: '26px', lineHeight: 1 }}>{step.icon}</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', alignItems: 'center' }}>
               <span style={{ color: theme.accent.purple, fontWeight: 700, fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>{step.num}. {step.title}</span>
               <span style={{ color: theme.text.muted, fontSize: '11px', lineHeight: '1.5', textAlign: 'center' }}>{step.desc}</span>
@@ -1037,28 +1037,27 @@ const s: Record<string, React.CSSProperties> = {
   // Tabs
   tabBar: {
     display: 'flex',
-    gap: '0',
-    background: theme.bg.card,
-    borderRadius: theme.radius.md,
-    padding: '3px',
-    border: `1px solid ${theme.border.subtle}`,
+    gap: '4px',
+    background: theme.bg.elevated,
+    borderRadius: '8px',
+    padding: '4px',
   },
   tab: {
     flex: 1,
-    padding: '10px 12px',
+    padding: '8px 12px',
     background: 'none',
     border: 'none',
     color: theme.text.muted,
     fontSize: '13px',
     fontWeight: 500,
     cursor: 'pointer',
-    borderRadius: theme.radius.sm,
+    borderRadius: '6px',
     transition: 'all 0.15s',
   },
   tabActive: {
-    background: theme.gradient.primary,
+    background: theme.bg.surface,
     color: '#fff',
-    fontWeight: 700,
+    fontWeight: 600,
   },
 
   // Messages

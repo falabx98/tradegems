@@ -11,8 +11,8 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
 }
 
 const SIZES = {
-  sm: { height: '34px', padding: '6px 8px', fontSize: '13px' },
-  md: { height: '40px', padding: '8px 12px', fontSize: '14px' },
+  sm: { height: '36px', padding: '8px 12px', fontSize: '13px' },
+  md: { height: '42px', padding: '12px 16px', fontSize: '14px' },
 } as const;
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -23,8 +23,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const borderColor = error
       ? theme.accent.red
       : focused
-        ? 'rgba(139, 92, 246, 0.50)'
-        : theme.border.medium;
+        ? theme.border.focus
+        : theme.border.default;
+
+    const boxShadow = focused && !error
+      ? '0 0 0 3px rgba(139, 92, 246, 0.12)'
+      : undefined;
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -40,13 +44,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
+          gap: '8px',
           height: s.height,
           padding: s.padding,
-          background: theme.bg.input,
+          background: theme.bg.base,
           border: `1px solid ${borderColor}`,
           borderRadius: theme.radius.md,
-          transition: 'border-color 0.15s ease',
+          transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+          boxShadow,
         }}>
           {icon && (
             <span style={{ display: 'flex', flexShrink: 0, color: theme.text.muted }}>
@@ -63,7 +68,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
               border: 'none',
               outline: 'none',
               fontSize: s.fontSize,
-              fontWeight: 600,
+              fontWeight: 500,
               fontFamily: mono ? 'var(--font-mono)' : 'inherit',
               color: theme.text.primary,
               padding: 0,

@@ -42,7 +42,8 @@ export function GameHUD({
             <div style={{
               ...styles.phaseDot,
               background: phaseColor,
-              }} />
+              boxShadow: `0 0 6px ${phaseColor}80`,
+            }} />
             <span style={{ ...styles.phaseText, color: phaseColor }}>
               {getPhaseLabel(phase)}
             </span>
@@ -58,7 +59,10 @@ export function GameHUD({
           <span
             style={{
               ...styles.multValue,
-              color: isProfit ? theme.game.multiplier : theme.game.divider,
+              color: isProfit ? theme.accent.green : theme.accent.red,
+              textShadow: isProfit
+                ? '0 0 24px rgba(0, 230, 118, 0.3)'
+                : '0 0 24px rgba(255, 59, 59, 0.3)',
             }}
             className="mono"
           >
@@ -73,7 +77,7 @@ export function GameHUD({
             <span
               style={{
                 ...styles.payoutValue,
-                color: isProfit ? theme.game.multiplier : theme.game.divider,
+                color: isProfit ? theme.accent.green : theme.accent.red,
               }}
               className="mono"
             >
@@ -84,14 +88,14 @@ export function GameHUD({
             <span style={styles.metaItem} className="mono">{formatSol(betAmount)}</span>
             <span style={{
               ...styles.metaItem,
-              color: riskTier === 'aggressive' ? theme.danger :
-                     riskTier === 'conservative' ? theme.success :
-                     theme.warning,
+              color: riskTier === 'aggressive' ? theme.accent.red :
+                     riskTier === 'conservative' ? theme.accent.green :
+                     theme.accent.amber,
             }}>
               {riskTier.charAt(0).toUpperCase()}
             </span>
             {shields > 0 && (
-              <span style={{ ...styles.metaItem, color: theme.game.shield }} className="mono">
+              <span style={{ ...styles.metaItem, color: theme.accent.blue }} className="mono">
                 ◆{shields}
               </span>
             )}
@@ -105,6 +109,7 @@ export function GameHUD({
           ...styles.progressFill,
           width: `${progress * 100}%`,
           background: `linear-gradient(90deg, ${phaseColor}80, ${phaseColor})`,
+          boxShadow: `0 0 8px ${phaseColor}40`,
         }} />
         {/* Phase markers */}
         <div style={{ ...styles.phaseMarker, left: '13.3%' }} />
@@ -125,6 +130,8 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     padding: '12px 16px',
+    background: 'rgba(17, 20, 39, 0.9)',
+    borderBottom: `1px solid ${theme.border.subtle}`,
     zIndex: 4,
     pointerEvents: 'none',
   },
@@ -140,15 +147,18 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '4px 10px',
     borderRadius: '12px',
     border: '1px solid transparent',
+    backdropFilter: 'blur(4px)',
   },
   phaseDot: {
-    width: '5px',
-    height: '5px',
+    width: '6px',
+    height: '6px',
     borderRadius: '50%',
+    animation: 'pulse 1.5s ease infinite',
   },
   phaseText: {
     fontSize: '12px',
     fontWeight: 700,
+    letterSpacing: '0.02em',
   },
   timer: {
     fontSize: '24px',
@@ -172,6 +182,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 900,
     lineHeight: 1,
     letterSpacing: '-1px',
+    fontFamily: "'JetBrains Mono', monospace",
   },
   topRight: {
     display: 'flex',
@@ -194,6 +205,7 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '18px',
     fontWeight: 700,
     lineHeight: 1,
+    fontFamily: "'JetBrains Mono', monospace",
   },
   metaGroup: {
     display: 'flex',

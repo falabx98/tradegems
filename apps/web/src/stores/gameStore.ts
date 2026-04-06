@@ -20,7 +20,7 @@ import { toast } from './toastStore';
 
 interface GameState {
   // Current view
-  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'prediction' | 'fairness' | 'season' | 'admin' | 'profile' | 'trading-sim' | 'lottery' | 'candleflip' | 'rug-game' | 'mines' | 'my-bets' | 'about' | 'responsible-gambling' | 'privacy' | 'terms';
+  screen: 'lobby' | 'auth' | 'setup' | 'playing' | 'result' | 'wallet' | 'history' | 'leaderboard' | 'rewards' | 'settings' | 'prediction' | 'fairness' | 'season' | 'admin' | 'profile' | 'trading-sim' | 'lottery' | 'candleflip' | 'rug-game' | 'mines' | 'my-bets' | 'about' | 'responsible-gambling' | 'privacy' | 'terms' | 'faq';
   mode: GameMode;
 
   // Round state

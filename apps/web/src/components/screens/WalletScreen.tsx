@@ -12,6 +12,7 @@ import { PageHeader } from '../ui/PageHeader';
 import { TabBar } from '../ui/TabBar';
 import { ContentNarrow } from '../primitives/ContentContainer';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { Icon } from '../primitives/Icon';
 
 interface Transaction {
   id: string;
@@ -158,13 +159,13 @@ export function WalletScreen() {
     if (['payout_credit', 'admin_adjustment', 'deposit_confirmed', 'rakeback_credit', 'bet_unlock', 'signup_bonus'].includes(type)) {
       return (
         <div style={{ ...s.txIconCircle, background: 'rgba(46, 204, 113, 0.1)', border: '1px solid rgba(46, 204, 113, 0.2)' }}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#00E701" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 15 12 9 18 15" /></svg>
+          <Icon name="arrow-up" size={14} style={{ color: '#00E701' }} />
         </div>
       );
     }
     return (
       <div style={{ ...s.txIconCircle, background: 'rgba(248, 113, 113, 0.1)', border: '1px solid rgba(248, 113, 113, 0.2)' }}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FF3333" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg>
+        <Icon name="arrow-down" size={14} style={{ color: '#FF3333' }} />
       </div>
     );
   }
@@ -280,7 +281,7 @@ export function WalletScreen() {
                 {/* Deposit guidance */}
                 <div style={{ display: 'flex', gap: theme.gap.md, marginTop: theme.gap.sm, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: theme.text.muted }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    <Icon name="clock" size={12} />
                     Confirms in ~30-60 seconds
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: theme.text.muted }}>
@@ -288,7 +289,7 @@ export function WalletScreen() {
                     Min: 0.01 SOL
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: theme.text.muted }}>
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                    <Icon name="check" size={12} />
                     Solana network only
                   </div>
                 </div>
@@ -602,7 +603,7 @@ function PromoCodeSection() {
   return (
     <div style={s.card}>
       <div style={s.section}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: theme.text.primary, marginBottom: 8 }}>🎁 Promo Code</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.text.primary, marginBottom: 8 }}>Promo Code</div>
         <div style={{ display: 'flex', gap: 8 }}>
           <input
             type="text"
@@ -678,7 +679,7 @@ function TipSection() {
   return (
     <div style={s.card}>
       <div style={s.section}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: theme.text.primary, marginBottom: 8 }}>💎 Send Tip</div>
+        <div style={{ fontSize: 13, fontWeight: 700, color: theme.text.primary, marginBottom: 8 }}>Send Tip</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           <input
             type="text"

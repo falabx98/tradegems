@@ -150,7 +150,7 @@ export function MyBetsScreen() {
         empty={!loading && !error && bets.length === 0}
         onRetry={loadBets}
         skeletonRows={5}
-        emptyIcon="🎲"
+        emptyIcon=""
         emptyTitle={filter === 'all' ? 'No bets yet' : 'No bets for this game'}
         emptySubtitle="Play a game to see your history here"
       >

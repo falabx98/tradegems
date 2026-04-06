@@ -198,6 +198,10 @@ export async function buildServer() {
   await server.register(weeklyRaceRoutes, { prefix: '/v1/races' });
   await server.register(weeklyRaceAdminRoutes, { prefix: '/v1/admin' });
 
+  // Platform stats (public)
+  const { statsRoutes } = await import('./routes/stats.routes.js');
+  await server.register(statsRoutes, { prefix: '/v1/stats' });
+
   // Sponsored balances (streamer accounts)
   const { sponsoredRoutes, sponsoredAdminRoutes } = await import('./routes/sponsored.routes.js');
   await server.register(sponsoredRoutes, { prefix: '/v1/wallet' });

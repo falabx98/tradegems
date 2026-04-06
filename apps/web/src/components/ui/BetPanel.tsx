@@ -1,6 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { theme } from '../../styles/theme';
-import { formatSol, solToLamports } from '../../utils/sol';
+import { formatSol, solToLamports, lamportsToSol } from '../../utils/sol';
 import { useAuthStore } from '../../stores/authStore';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { Button } from '../primitives/Button';
@@ -16,7 +16,8 @@ export interface BetChoice {
 }
 
 export interface BetPanelProps {
-  presets: Array<{ label: string; lamports: number }>;
+  /** @deprecated presets are no longer rendered — kept for API compat */
+  presets?: Array<{ label: string; lamports: number }>;
   selectedAmount: number;
   onAmountChange: (lamports: number) => void;
   allowCustom?: boolean;
@@ -33,14 +34,21 @@ export interface BetPanelProps {
   submitLoading?: boolean;
   submitVariant?: 'primary' | 'success' | 'danger';
   compact?: boolean;
+  /** Extra controls (mine count, etc.) injected between amount and submit */
+  children?: ReactNode;
 }
 
+// Quick-amount presets in lamports
+const QUICK_AMOUNTS = [
+  { label: '0.01', lamports: 10_000_000 },
+  { label: '0.05', lamports: 50_000_000 },
+  { label: '0.1',  lamports: 100_000_000 },
+  { label: '0.5',  lamports: 500_000_000 },
+];
+
 export function BetPanel({
-  presets,
   selectedAmount,
   onAmountChange,
-  allowCustom = true,
-  showModifiers = true,
   balance,
   feeRate = 0.05,
   minBet = 1_000_000,
@@ -53,8 +61,8 @@ export function BetPanel({
   submitLoading,
   submitVariant = 'primary',
   compact,
+  children,
 }: BetPanelProps) {
-  const [customBet, setCustomBet] = useState('');
   const { isAuthenticated } = useAuthStore();
   const go = useAppNavigate();
 
@@ -62,28 +70,55 @@ export function BetPanel({
   const totalCost = selectedAmount + fee;
   const canAfford = totalCost <= balance;
   const meetsMin = selectedAmount >= minBet;
-
-  const handleCustomBet = () => {
-    const val = parseFloat(customBet);
-    if (isNaN(val) || val <= 0) return;
-    const lamports = solToLamports(val);
-    if (lamports < minBet) return;
-    const cFee = Math.floor(lamports * feeRate);
-    if (lamports + cFee > balance) return;
-    onAmountChange(lamports);
-    setCustomBet('');
-  };
-
-  const isCustomActive = selectedAmount > 0 && !presets.some(p => p.lamports === selectedAmount);
   const disabled = submitDisabled || !canAfford || !meetsMin || submitLoading;
 
-  // Unauthenticated state
+  // Editable input value — tracks user typing
+  const [inputValue, setInputValue] = useState(formatSol(selectedAmount));
+  const [isFocused, setIsFocused] = useState(false);
+
+  const syncInput = (lamports: number) => {
+    onAmountChange(lamports);
+    setInputValue(formatSol(lamports));
+  };
+
+  const handleInputChange = (raw: string) => {
+    setInputValue(raw);
+    const val = parseFloat(raw);
+    if (!isNaN(val) && val > 0) {
+      onAmountChange(solToLamports(val));
+    }
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    setInputValue(formatSol(selectedAmount));
+  };
+
+  const handleHalf = () => {
+    const half = Math.max(minBet, Math.floor(selectedAmount / 2));
+    syncInput(half);
+  };
+
+  const handleDouble = () => {
+    const doubled = selectedAmount * 2;
+    const dFee = Math.floor(doubled * feeRate);
+    if (doubled + dFee <= balance) {
+      syncInput(doubled);
+    }
+  };
+
+  // Keep input in sync when selectedAmount changes externally
+  if (!isFocused && inputValue !== formatSol(selectedAmount)) {
+    setInputValue(formatSol(selectedAmount));
+  }
+
+  // ── Unauthenticated ──
   if (!isAuthenticated) {
     return (
       <div style={{ ...s.panel, ...(compact ? { gap: '8px' } : {}) }}>
         <div style={s.signInWrap}>
           <div style={s.signInTitle}>Sign in to play</div>
-          <div style={s.signInSub}>Connect your wallet to start betting</div>
+          <div style={s.signInSub}>Sign in to start betting</div>
           <Button variant="primary" size="lg" fullWidth onClick={() => go('auth')}>
             Sign In
           </Button>
@@ -93,133 +128,77 @@ export function BetPanel({
   }
 
   return (
-    <div style={{ ...s.panel, ...(compact ? { gap: '8px' } : {}) }}>
-      {/* Amount Section */}
+    <div style={{ ...s.panel, ...(compact ? { gap: '10px' } : {}) }}>
+
+      {/* ── Bet Amount ── */}
       <div style={s.section}>
         <div style={s.sectionHeader}>
-          <span style={s.sectionLabel}>AMOUNT</span>
-          <div style={s.balanceRow}>
-            <span style={s.balanceLabel}>Bal:</span>
-            <span className="mono" style={s.balanceValue}>
-              {formatSol(balance)} <SolIcon size="0.9em" />
-            </span>
-          </div>
+          <span style={s.sectionLabel}>BET AMOUNT</span>
+          <span className="mono" style={s.balanceValue}>
+            {formatSol(balance)} <SolIcon size="0.85em" />
+          </span>
         </div>
 
-        {/* Selected amount badge */}
-        <div style={s.selectedRow}>
-          <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px' }} />
-          <span className="mono" style={s.selectedAmount}>{formatSol(selectedAmount)}</span>
+        <div style={{
+          ...s.amountRow,
+          borderColor: isFocused ? theme.accent.primary : theme.border.default,
+          boxShadow: isFocused ? '0 0 0 3px rgba(139, 92, 246, 0.12)' : 'none',
+        }}>
+          <img src="/sol-coin.png" alt="SOL" style={{ width: '18px', height: '18px', flexShrink: 0 }} />
+          <input
+            type="number"
+            value={inputValue}
+            onChange={(e) => handleInputChange(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onBlur={handleBlur}
+            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+            className="mono"
+            step="0.01"
+            min="0"
+            style={s.amountInput}
+          />
+          <button
+            onClick={handleHalf}
+            disabled={selectedAmount <= minBet}
+            style={{ ...s.inlineBtn, opacity: selectedAmount <= minBet ? 0.3 : 1 }}
+          >
+            ½
+          </button>
+          <div style={s.divider} />
+          <button
+            onClick={handleDouble}
+            disabled={selectedAmount * 2 + Math.floor(selectedAmount * 2 * feeRate) > balance}
+            style={{ ...s.inlineBtn, opacity: selectedAmount * 2 + Math.floor(selectedAmount * 2 * feeRate) > balance ? 0.3 : 1 }}
+          >
+            2×
+          </button>
         </div>
 
-        {/* Presets */}
-        <div style={s.presetGrid}>
-          {presets.map((p) => {
-            const active = selectedAmount === p.lamports;
-            const pFee = Math.floor(p.lamports * feeRate);
-            const affordable = p.lamports + pFee <= balance;
+        {/* Quick amount selectors */}
+        <div style={s.quickRow}>
+          {QUICK_AMOUNTS.map((qa) => {
+            const isActive = selectedAmount === qa.lamports;
+            const canSelect = qa.lamports + Math.floor(qa.lamports * feeRate) <= balance;
             return (
               <button
-                key={p.lamports}
-                onClick={() => { onAmountChange(p.lamports); setCustomBet(''); }}
-                disabled={!affordable}
-                className="mono"
+                key={qa.label}
+                onClick={() => canSelect && syncInput(qa.lamports)}
+                disabled={!canSelect}
                 style={{
-                  ...s.preset,
-                  ...(active ? s.presetActive : {}),
-                  opacity: !affordable ? 0.25 : 1,
+                  ...s.quickBtn,
+                  background: isActive ? 'rgba(139, 92, 246, 0.12)' : theme.bg.elevated,
+                  borderColor: isActive ? 'rgba(139, 92, 246, 0.3)' : theme.border.default,
+                  color: isActive ? theme.accent.primary : theme.text.secondary,
+                  opacity: canSelect ? 1 : 0.35,
                 }}
               >
-                {p.label}
+                {qa.label}
               </button>
             );
           })}
         </div>
 
-        {/* Modifiers + Custom */}
-        {(showModifiers || allowCustom) && (
-          <div style={s.modRow}>
-            {showModifiers && (
-              <button
-                onClick={() => {
-                  const half = Math.max(minBet, Math.floor(selectedAmount / 2));
-                  onAmountChange(half);
-                  setCustomBet('');
-                }}
-                disabled={selectedAmount <= minBet}
-                style={{ ...s.modBtn, opacity: selectedAmount <= minBet ? 0.35 : 1 }}
-              >
-                ½
-              </button>
-            )}
-            {allowCustom && (
-              <div style={s.customWrap}>
-                <img src="/sol-coin.png" alt="SOL" style={{ width: '16px', height: '16px', flexShrink: 0 }} />
-                <input
-                  type="number"
-                  placeholder="Custom"
-                  value={customBet}
-                  onChange={(e) => setCustomBet(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') handleCustomBet(); }}
-                  className="mono"
-                  step="0.01"
-                  min="0"
-                  style={{
-                    ...s.customInput,
-                    ...(isCustomActive ? { color: theme.accent.purple } : {}),
-                  }}
-                />
-                <button
-                  onClick={handleCustomBet}
-                  disabled={!customBet || parseFloat(customBet) <= 0}
-                  style={{ ...s.customSetBtn, opacity: !customBet || parseFloat(customBet) <= 0 ? 0.35 : 1 }}
-                >
-                  Set
-                </button>
-              </div>
-            )}
-            {showModifiers && (
-              <button
-                onClick={() => {
-                  const doubled = selectedAmount * 2;
-                  const dFee = Math.floor(doubled * feeRate);
-                  if (doubled + dFee <= balance) {
-                    onAmountChange(doubled);
-                    setCustomBet('');
-                  }
-                }}
-                disabled={selectedAmount * 2 + Math.floor(selectedAmount * 2 * feeRate) > balance}
-                style={{
-                  ...s.modBtn,
-                  opacity: selectedAmount * 2 + Math.floor(selectedAmount * 2 * feeRate) > balance ? 0.35 : 1,
-                }}
-              >
-                2×
-              </button>
-            )}
-            {showModifiers && (
-              <button
-                onClick={() => {
-                  const maxLamports = Math.floor(balance / (1 + feeRate));
-                  if (maxLamports >= minBet) {
-                    onAmountChange(maxLamports);
-                    setCustomBet('');
-                  }
-                }}
-                disabled={Math.floor(balance / (1 + feeRate)) < minBet}
-                style={{
-                  ...s.modBtn,
-                  ...s.maxBtn,
-                  opacity: Math.floor(balance / (1 + feeRate)) < minBet ? 0.35 : 1,
-                }}
-              >
-                MAX
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* Fee + Total */}
+        {/* Fee */}
         <div style={s.feeLine}>
           <span>Fee ({(feeRate * 100).toFixed(0)}%)</span>
           <span className="mono" style={s.feeValue}>
@@ -229,7 +208,7 @@ export function BetPanel({
         </div>
       </div>
 
-      {/* Choices */}
+      {/* ── Choices (direction, risk tier, etc.) ── */}
       {choices && choices.length > 0 && (
         <div style={s.section}>
           <span style={s.sectionLabel}>PICK</span>
@@ -242,16 +221,14 @@ export function BetPanel({
                   onClick={() => onChoiceSelect?.(c.id)}
                   style={{
                     ...s.choiceCard,
-                    borderColor: active ? c.color : theme.border.medium,
-                    background: active ? `${c.color}10` : theme.bg.card,
+                    borderColor: active ? c.color : theme.border.default,
+                    background: active ? `${c.color}12` : theme.bg.elevated,
                   }}
                 >
                   {c.icon && <div style={{ color: c.color, display: 'flex' }}>{c.icon}</div>}
                   <span style={{ ...s.choiceLabel, color: active ? c.color : theme.text.primary }}>{c.label}</span>
                   {c.payout && <span className="mono" style={s.choicePayout}>{c.payout}</span>}
-                  {c.count !== undefined && (
-                    <span style={s.choiceCount}>{c.count}</span>
-                  )}
+                  {c.count !== undefined && <span style={s.choiceCount}>{c.count}</span>}
                 </button>
               );
             })}
@@ -259,7 +236,10 @@ export function BetPanel({
         </div>
       )}
 
-      {/* Submit */}
+      {/* ── Extra controls (injected by each game) ── */}
+      {children}
+
+      {/* ── Submit ── */}
       <Button
         variant={submitVariant}
         size="lg"
@@ -267,9 +247,10 @@ export function BetPanel({
         onClick={onSubmit}
         disabled={disabled}
         loading={submitLoading}
+        style={{ padding: '14px', borderRadius: '8px' }}
       >
         <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-          <span style={{ fontSize: '15px', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' as const }}>
+          <span style={{ fontSize: '16px', fontWeight: 700, letterSpacing: '0.3px', textTransform: 'uppercase' as const }}>
             {submitLabel}
           </span>
           <span className="mono" style={{ fontSize: '12px', fontWeight: 500, opacity: 0.7, display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -282,15 +263,16 @@ export function BetPanel({
   );
 }
 
+// ─── Styles ──────────────────────────────────────────────────
 const s: Record<string, React.CSSProperties> = {
   panel: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
-    padding: '16px',
-    background: theme.bg.secondary,
+    gap: '16px',
+    padding: '20px',
+    background: theme.bg.surface,
     border: `1px solid ${theme.border.subtle}`,
-    borderRadius: theme.radius.lg,
+    borderRadius: '12px',
   },
   section: {
     display: 'flex',
@@ -308,107 +290,70 @@ const s: Record<string, React.CSSProperties> = {
     color: theme.text.muted,
     letterSpacing: '0.8px',
   },
-  balanceRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px',
-  },
-  balanceLabel: {
-    fontSize: '11px',
-    color: theme.text.muted,
-  },
   balanceValue: {
     fontSize: '12px',
     fontWeight: 600,
     color: theme.text.secondary,
   },
-  selectedRow: {
+  // ── Amount row: input + ½ + 2× inside one bordered box ──
+  amountRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-  },
-  selectedAmount: {
-    fontSize: '14px',
-    fontWeight: 700,
-    color: theme.accent.purple,
-  },
-  presetGrid: {
-    display: 'flex',
-    flexWrap: 'wrap' as const,
-    gap: '6px',
-  },
-  preset: {
-    padding: '8px 16px',
-    fontSize: '14px',
-    fontWeight: 700,
-    fontFamily: '"JetBrains Mono", monospace',
-    color: theme.text.secondary,
-    background: theme.bg.card,
-    border: `1px solid ${theme.border.medium}`,
+    gap: '8px',
+    background: theme.bg.base,
     borderRadius: theme.radius.md,
-    cursor: 'pointer',
-    transition: 'all 0.15s ease',
+    padding: '0 12px',
+    border: '1.5px solid',
+    borderColor: theme.border.default,
+    transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
   },
-  presetActive: {
-    background: theme.gradient.primary,
-    color: '#fff',
-    borderColor: 'transparent',
-  },
-  modRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    flexWrap: 'wrap' as const,
-  },
-  modBtn: {
-    padding: '8px 10px',
-    background: theme.bg.elevated,
-    border: `1px solid ${theme.border.medium}`,
-    borderRadius: theme.radius.md,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    fontSize: '13px',
-    fontWeight: 700,
-    color: theme.accent.purple,
-    transition: 'all 0.15s ease',
-    flexShrink: 0,
-    minWidth: 0,
-  },
-  customWrap: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    background: theme.bg.input,
-    borderRadius: theme.radius.md,
-    padding: '0 8px',
-    border: `1px solid ${theme.border.medium}`,
-  },
-  customInput: {
+  amountInput: {
     flex: 1,
     background: 'transparent',
     border: 'none',
     outline: 'none',
-    fontFamily: '"JetBrains Mono", monospace',
-    fontSize: '14px',
-    fontWeight: 600,
-    color: theme.text.secondary,
-    padding: '8px 0',
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: '16px',
+    fontWeight: 700,
+    color: theme.text.primary,
+    padding: '12px 0',
     width: '60px',
     minWidth: 0,
   },
-  customSetBtn: {
-    padding: '4px 8px',
-    background: 'rgba(139, 92, 246, 0.12)',
-    border: '1px solid rgba(139, 92, 246, 0.20)',
-    borderRadius: theme.radius.sm,
+  inlineBtn: {
+    padding: '6px 10px',
+    background: 'transparent',
+    border: 'none',
     cursor: 'pointer',
     fontFamily: 'inherit',
-    fontSize: '13px',
+    fontSize: '14px',
     fontWeight: 700,
-    color: theme.accent.purple,
-    transition: 'all 0.15s ease',
+    color: theme.text.secondary,
+    transition: 'color 0.15s ease',
     flexShrink: 0,
+  },
+  divider: {
+    width: '1px',
+    height: '20px',
+    background: theme.border.default,
+    flexShrink: 0,
+  },
+  // ── Quick amount selector ──
+  quickRow: {
+    display: 'flex',
+    gap: '6px',
+  },
+  quickBtn: {
+    flex: 1,
+    padding: '6px 0',
+    fontSize: '12px',
+    fontWeight: 600,
+    fontFamily: "'JetBrains Mono', monospace",
+    border: '1px solid',
+    borderRadius: theme.radius.sm,
+    cursor: 'pointer',
+    transition: 'all 0.15s ease',
+    textAlign: 'center',
   },
   feeLine: {
     display: 'flex',
@@ -457,12 +402,6 @@ const s: Record<string, React.CSSProperties> = {
     padding: '2px 8px',
     borderRadius: theme.radius.sm,
     background: 'rgba(255,255,255,0.04)',
-  },
-  maxBtn: {
-    color: theme.accent.neonGreen,
-    borderColor: 'rgba(0, 231, 1, 0.15)',
-    background: 'rgba(0, 231, 1, 0.06)',
-    letterSpacing: '0.5px',
   },
   signInWrap: {
     display: 'flex',

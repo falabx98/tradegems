@@ -46,9 +46,13 @@ export function MultiplierPopup({ activatedNodeIds, nodes }: MultiplierPopupProp
           const isDivider = node.type === 'divider';
           const isShield = node.type === 'shield';
 
-          const color = isMultiplier ? theme.game.multiplier :
-                        isDivider ? theme.game.divider :
-                        theme.game.shield;
+          const color = isMultiplier ? theme.accent.green :
+                        isDivider ? theme.accent.red :
+                        theme.accent.blue;
+
+          const glowColor = isMultiplier ? 'rgba(0, 230, 118, 0.1)' :
+                            isDivider ? 'rgba(255, 59, 59, 0.1)' :
+                            'rgba(59, 130, 246, 0.1)';
 
           const label = isMultiplier ? `+x${node.value}` :
                         isDivider ? `-÷${node.value}` :
@@ -64,6 +68,10 @@ export function MultiplierPopup({ activatedNodeIds, nodes }: MultiplierPopupProp
               style={{
                 ...styles.popup,
                 color,
+                textShadow: `0 0 20px ${color}`,
+                background: glowColor,
+                borderRadius: '12px',
+                padding: '4px 12px',
               }}
             >
               {label}
@@ -84,14 +92,14 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '4px',
+    gap: '6px',
     pointerEvents: 'none',
     zIndex: 5,
   },
   popup: {
-    fontFamily: "inherit",
-    fontSize: '30px',
+    fontFamily: "'JetBrains Mono', monospace",
+    fontSize: '32px',
     fontWeight: 800,
-    textShadow: '0 0 12px currentColor',
+    lineHeight: 1.2,
   },
 };

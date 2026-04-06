@@ -15,6 +15,7 @@ import { HowToPlayInline } from '../game/HowToPlayInline';
 import { CasinoGameLayout, GameControlRail, GameStage, GameFooterBar } from '../game/CasinoGameLayout';
 import { Card } from '../primitives/Card';
 import { Badge } from '../primitives/Badge';
+import { Icon } from '../primitives/Icon';
 
 // Default to actual production fee (5%) so total cost never jumps upward after config loads
 let _feeRate = 0.05;
@@ -45,7 +46,7 @@ export function SoloSetupScreen() {
     if (!canAfford || !meetsMinBet) return;
     const { isAuthenticated } = useAuthStore.getState();
     if (!isAuthenticated) {
-      toast.error('Login Required', 'Please log in or connect a wallet before playing.');
+      toast.error('Login Required', 'Please log in or create an account before playing.');
       go('auth');
       return;
     }
@@ -167,21 +168,21 @@ export function SoloSetupScreen() {
         <Card variant="panel" padding={`${gap.md}px ${gap.lg}px`} style={{ marginTop: gap.md, background: 'rgba(255,255,255,0.02)' }}>
           <div style={{ display: 'flex', gap: gap.sm, flexWrap: 'wrap', marginBottom: gap.md }}>
             <div style={legendItem}>
-              <span style={{ fontSize: ts('md') }}>💎</span>
+              <Icon name="gem" size={16} style={{ color: theme.game.multiplier }} />
               <div>
                 <div style={{ fontSize: ts('sm'), fontWeight: 700, color: theme.game.multiplier }}>Gems</div>
                 <div style={{ fontSize: ts('xs'), color: theme.text.muted }}>Boost multiplier</div>
               </div>
             </div>
             <div style={legendItem}>
-              <span style={{ fontSize: ts('md') }}>💣</span>
+              <Icon name="bomb" size={16} style={{ color: theme.game.divider }} />
               <div>
                 <div style={{ fontSize: ts('sm'), fontWeight: 700, color: theme.game.divider }}>Dividers</div>
                 <div style={{ fontSize: ts('xs'), color: theme.text.muted }}>Cut multiplier</div>
               </div>
             </div>
             <div style={legendItem}>
-              <span style={{ fontSize: ts('md') }}>🛡️</span>
+              <Icon name="shield" size={16} style={{ color: theme.game.shield }} />
               <div>
                 <div style={{ fontSize: ts('sm'), fontWeight: 700, color: theme.game.shield }}>Shields</div>
                 <div style={{ fontSize: ts('xs'), color: theme.text.muted }}>Block one hit</div>

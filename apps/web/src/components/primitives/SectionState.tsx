@@ -51,7 +51,7 @@ export function SectionState({
   empty,
   onRetry,
   skeletonRows = 3,
-  emptyIcon = '📭',
+  emptyIcon = '',
   emptyTitle = 'Nothing here yet',
   emptySubtitle,
   compact,
@@ -101,7 +101,7 @@ export function SectionState({
   if (empty) {
     return (
       <div style={emptyContainer}>
-        <span style={{ fontSize: 24 }}>{emptyIcon}</span>
+        {emptyIcon && <span style={{ fontSize: 24 }}>{emptyIcon}</span>}
         <div style={{ fontSize: 13, fontWeight: 600, color: theme.text.secondary }}>
           {emptyTitle}
         </div>

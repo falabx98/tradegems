@@ -251,7 +251,7 @@ export function WinCard(props: WinCardProps) {
         {/* Buttons (outside card ref — not captured in PNG) */}
         <div style={s.buttonRow}>
           <button onClick={handleDownload} style={s.downloadBtn} disabled={downloading}>
-            {downloading ? 'Saving...' : '📥 Download PNG'}
+            {downloading ? 'Saving...' : 'Download PNG'}
           </button>
           <button onClick={onClose} style={s.closeBtn}>
             Close

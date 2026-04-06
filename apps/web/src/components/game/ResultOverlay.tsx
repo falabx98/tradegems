@@ -17,12 +17,11 @@ export interface ResultOverlayProps {
 }
 
 /**
- * Wave 1B — Shared result overlay for game canvases.
+ * Full-screen result overlay for game canvases.
  *
- * Renders as an overlay on top of the game canvas area.
- * - Fades in over 300ms
- * - Win: green-tinted semi-transparent bg
- * - Loss: red-tinted semi-transparent bg
+ * - Fades in over 300ms with backdrop blur
+ * - Win: green-tinted bg with central card
+ * - Loss: red-tinted bg with central card
  * - Actions appear after a delay (prevents accidental double-tap)
  * - Not dismissible by clicking background
  */
@@ -42,7 +41,6 @@ export function ResultOverlay({
   // Fade-in mount
   useEffect(() => {
     if (visible) {
-      // Small RAF delay so initial opacity:0 renders first, then transition fires
       const raf = requestAnimationFrame(() => setMounted(true));
       return () => cancelAnimationFrame(raf);
     }
@@ -60,9 +58,6 @@ export function ResultOverlay({
   if (!visible) return null;
 
   const isWin = variant === 'win';
-  const bgTint = isWin
-    ? 'rgba(16, 185, 129, 0.12)'
-    : 'rgba(239, 68, 68, 0.10)';
 
   return (
     <div
@@ -74,40 +69,75 @@ export function ResultOverlay({
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        background: `linear-gradient(180deg, ${bgTint} 0%, rgba(0,0,0,0.85) 100%)`,
-        backdropFilter: 'blur(4px)',
+        background: 'rgba(0, 0, 0, 0.7)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
         opacity: mounted ? 1 : 0,
         transition: 'opacity 300ms ease',
-        padding: `${theme.gap.lg}px`,
+        padding: '16px',
       }}
     >
-      {/* Main content area */}
+      {/* Central result card */}
       <div style={{
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: `${theme.gap.sm}px`,
+        gap: '8px',
+        padding: '32px',
+        background: theme.bg.surface,
+        border: `1px solid ${isWin ? 'rgba(0, 230, 118, 0.2)' : 'rgba(255, 59, 59, 0.2)'}`,
+        borderRadius: '16px',
+        boxShadow: theme.shadow.lg,
+        maxWidth: '360px',
+        width: '100%',
+        position: 'relative',
+        overflow: 'hidden',
       }}>
-        {children}
-      </div>
-
-      {/* Delayed actions */}
-      {actions && (
+        {/* Subtle glow at top */}
         <div style={{
-          marginTop: `${theme.gap.lg}px`,
+          position: 'absolute',
+          top: 0,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '200px',
+          height: '100px',
+          background: isWin
+            ? 'radial-gradient(ellipse, rgba(0, 230, 118, 0.12) 0%, transparent 70%)'
+            : 'radial-gradient(ellipse, rgba(255, 59, 59, 0.10) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
+        {/* Main content area */}
+        <div style={{
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: `${theme.gap.sm}px`,
-          width: '100%',
-          maxWidth: '280px',
-          opacity: showActions ? 1 : 0,
-          transform: showActions ? 'translateY(0)' : 'translateY(8px)',
-          transition: 'opacity 300ms ease, transform 300ms ease',
+          gap: '8px',
+          position: 'relative',
+          zIndex: 1,
         }}>
-          {actions}
+          {children}
         </div>
-      )}
+
+        {/* Delayed actions */}
+        {actions && (
+          <div style={{
+            marginTop: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            width: '100%',
+            opacity: showActions ? 1 : 0,
+            transform: showActions ? 'translateY(0)' : 'translateY(8px)',
+            transition: 'opacity 300ms ease, transform 300ms ease',
+            position: 'relative',
+            zIndex: 1,
+          }}>
+            {actions}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

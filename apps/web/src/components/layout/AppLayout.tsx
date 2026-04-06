@@ -39,12 +39,12 @@ export function AppLayout({ children, hideChrome = false }: AppLayoutProps) {
 
   return (
     <div style={styles.root}>
-      <TopBar onToggleSidebar={() => setSidebarCollapsed(v => !v)} />
+      <TopBar onToggleSidebar={() => setSidebarCollapsed(v => !v)} sidebarOpen={!sidebarCollapsed} />
       <div style={styles.body}>
         {!isMobile && <SideNav collapsed={sidebarCollapsed} />}
         <main style={{
           ...styles.main,
-          ...(isMobile ? { paddingBottom: '64px' } : {}),
+          ...(isMobile ? { paddingBottom: '80px' } : {}),
         }}>
           {children}
         </main>
@@ -59,7 +59,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
-    background: theme.bg.primary,
+    background: theme.bg.base,
     overflow: 'hidden',
   },
   body: {
@@ -70,7 +70,8 @@ const styles: Record<string, React.CSSProperties> = {
   main: {
     flex: 1,
     overflow: 'auto',
-    background: theme.bg.primary,
+    background: theme.bg.base,
+    padding: '24px',
   },
   contentWrap: {
     maxWidth: theme.layout.maxWidth,
@@ -79,7 +80,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   fullscreen: {
     height: '100vh',
-    background: theme.bg.primary,
+    background: theme.bg.base,
     overflow: 'hidden',
   },
 };

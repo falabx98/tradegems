@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { api } from '../utils/api';
 import { theme } from '../styles/theme';
+import { Icon } from './primitives/Icon';
 import { getAvatarGradient, getInitials } from '../utils/avatars';
 
 interface ActivityItem {
@@ -91,7 +92,7 @@ export function ActivityFeed() {
       <div style={styles.feedList}>
         {items.length === 0 ? (
           <div style={styles.emptyState}>
-            <div style={{ fontSize: '20px', marginBottom: '4px' }}>📡</div>
+            <Icon name="signal" size={20} style={{ marginBottom: 4, opacity: 0.5 }} />
             <span style={{ opacity: 0.6 }}>Waiting for live activity...</span>
             <div style={{ fontSize: '11px', opacity: 0.4, marginTop: '4px' }}>Bets appear here in real-time</div>
           </div>

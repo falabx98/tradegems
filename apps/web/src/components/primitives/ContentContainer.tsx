@@ -65,7 +65,7 @@ export function ContentLobby({ children, style }: ContentContainerProps) {
   const isMobile = useIsMobile();
   return (
     <div style={{
-      maxWidth: 1600,
+      maxWidth: 1200,
       margin: '0 auto',
       width: '100%',
       padding: isMobile ? '8px 12px' : '16px 24px',

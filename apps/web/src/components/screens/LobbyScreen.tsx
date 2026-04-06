@@ -1,20 +1,18 @@
 import { useEffect, useState, useRef, type CSSProperties } from 'react';
 import { useGameStore } from '../../stores/gameStore';
 import { useAuthStore } from '../../stores/authStore';
-import { useIsMobile } from '../../hooks/useIsMobile';
+import { useIsMobile, useIsTablet } from '../../hooks/useIsMobile';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { theme } from '../../styles/theme';
 import { api } from '../../utils/api';
-import { formatSol } from '../../utils/sol';
-import { LiveDot } from '../ui/LiveIndicators';
 import { SolIcon } from '../ui/SolIcon';
-import { getAvatarGradient, getInitials } from '../../utils/avatars';
 import { ContentLobby } from '../primitives/ContentContainer';
 import { Modal } from '../primitives/Modal';
 import { GameCard } from '../game/GameCard';
 import { lobbyTrack, funnelTrack, retentionTrack } from '../../utils/analytics';
 import { LobbyFooter } from '../layout/LobbyFooter';
 import { BetsPanel } from '../ui/BetsPanel';
+import { OnboardingModal } from './OnboardingModal';
 
 // ─── VIP tier helpers ───────────────────────────────────────
 
@@ -36,60 +34,67 @@ function getNextRakeback(current: string): string {
 // ─── Game definitions ───────────────────────────────────────
 
 interface GameDef {
-  id: string; route: string; title: string; subtitle: string; image: string; tags: string[];
+  id: string;
+  route: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  tags: string[];
+  defaultBadge?: 'pvp' | 'new' | null;
 }
 
 const GAMES: GameDef[] = [
-  { id: 'rug-game', route: 'rug-game', title: 'Rug Game', subtitle: 'Cash Out or Get Rugged', image: '/game-rug-game.webp', tags: ['originals', 'live', 'popular'] },
-  { id: 'mines', route: 'mines', title: 'Mines', subtitle: 'Reveal or Ruin', image: '/game-mines.png', tags: ['originals', 'quick', 'popular'] },
-  { id: 'candleflip', route: 'candleflip', title: 'Candleflip', subtitle: 'Over/Under 1.00x', image: '/game-candleflip.webp', tags: ['originals', 'quick', 'live'] },
-  { id: 'predictions', route: 'prediction', title: 'Predictions', subtitle: 'Up or Down?', image: '/game-predictions.webp', tags: ['originals', 'live'] },
-  { id: 'trading-sim', route: 'trading-sim', title: 'Trading Sim', subtitle: 'PvP Trading Arena', image: '/game-trading-sim.webp', tags: ['originals', 'pvp'] },
-  { id: 'solo', route: 'setup', title: 'Solo', subtitle: 'Trade vs. the chart', image: '/game-solo.webp', tags: ['originals', 'quick'] },
-  { id: 'lottery', route: 'lottery', title: 'Lottery', subtitle: 'Jackpot Draws', image: '/game-lottery.webp', tags: ['originals'] },
+  { id: 'rug-game', route: 'rug-game', title: 'Rug Game', subtitle: 'Crash-style multiplier', image: '/game-rug-game.webp', tags: ['skill', 'popular'] },
+  { id: 'mines', route: 'mines', title: 'Mines', subtitle: 'Grid reveal', image: '/game-mines.png', tags: ['skill', 'popular'], defaultBadge: null },
+  { id: 'candleflip', route: 'candleflip', title: 'Candleflip', subtitle: 'Over/under 1.00x', image: '/game-candleflip.webp', tags: ['quick'] },
+  { id: 'predictions', route: 'prediction', title: 'Predictions', subtitle: 'Up or down', image: '/game-predictions.webp', tags: ['quick'] },
+  { id: 'trading-sim', route: 'trading-sim', title: 'Trading Sim', subtitle: 'PvP rooms', image: '/game-trading-sim.webp', tags: ['skill', 'pvp'], defaultBadge: 'pvp' },
+  { id: 'solo', route: 'setup', title: 'Solo', subtitle: 'Trade vs chart', image: '/game-solo.webp', tags: ['skill'] },
+  { id: 'lottery', route: 'lottery', title: 'Lottery', subtitle: 'Jackpot draw', image: '/game-lottery.webp', tags: ['quick'], defaultBadge: 'new' },
 ];
+
+const SKILL_GAMES = GAMES.filter(g => g.tags.includes('skill'));
+const QUICK_GAMES = GAMES.filter(g => g.tags.includes('quick'));
 
 // ─── Promo Banner Data ──────────────────────────────────────
 
 const PROMO_BANNERS = [
   {
-    id: 'deposit', badge: '🔥 LIMITED TIME', highlight: '100%', title: 'DEPOSIT BONUS!',
-    subtitle: 'Double your first deposit up to 10 SOL. Start with 2x the power.',
+    id: 'deposit', badge: 'LIMITED TIME', highlight: '100%', title: 'DEPOSIT BONUS',
+    subtitle: 'Double your first deposit up to 10 SOL.',
     gradient: 'linear-gradient(135deg, #1a0533 0%, #2d1b69 25%, #4c1d95 55%, #7c3aed 100%)',
     glowColor: '#a78bfa', badgeBg: 'rgba(167,139,250,0.25)', badgeBorder: 'rgba(167,139,250,0.4)',
     badgeColor: '#c4b5fd', highlightColor: '#c4b5fd', accentGlow: 'rgba(167,139,250,0.4)', link: 'wallet',
   },
   {
-    id: 'jackpot', badge: '🎰 JACKPOT LIVE', highlight: '250 SOL', title: 'LOTTERY JACKPOT!',
-    subtitle: 'Next draw in 6h. Buy tickets now and win big.',
+    id: 'jackpot', badge: 'JACKPOT LIVE', highlight: '250 SOL', title: 'LOTTERY JACKPOT',
+    subtitle: 'Next draw in 6h. Tickets still open.',
     gradient: 'linear-gradient(135deg, #052e16 0%, #064e3b 25%, #047857 55%, #10b981 100%)',
     glowColor: '#34d399', badgeBg: 'rgba(52,211,153,0.25)', badgeBorder: 'rgba(52,211,153,0.4)',
     badgeColor: '#6ee7b7', highlightColor: '#6ee7b7', accentGlow: 'rgba(52,211,153,0.4)', link: 'lottery',
   },
   {
-    id: 'vip', badge: '⭐ VIP REWARDS', highlight: '10%', title: 'RAKEBACK!',
-    subtitle: 'Earn up to 10% back on every bet. 6 tiers from Bronze to Titan.',
+    id: 'vip', badge: 'VIP REWARDS', highlight: '10%', title: 'RAKEBACK',
+    subtitle: 'Up to 10% back on every bet. 6 VIP tiers.',
     gradient: 'linear-gradient(135deg, #1c0a00 0%, #78350f 25%, #b45309 55%, #f59e0b 100%)',
     glowColor: '#fbbf24', badgeBg: 'rgba(251,191,36,0.25)', badgeBorder: 'rgba(251,191,36,0.4)',
     badgeColor: '#fde68a', highlightColor: '#fde68a', accentGlow: 'rgba(251,191,36,0.4)', link: 'rewards',
   },
   {
-    id: 'referral', badge: '🆕 NEW PROGRAM', highlight: '5%', title: 'REFER & EARN!',
-    subtitle: 'Earn 5% of your friends\' wagers forever. No limits, no cap.',
+    id: 'referral', badge: 'NEW PROGRAM', highlight: '5%', title: 'REFER & EARN',
+    subtitle: '5% of your referrals\' wagers. Forever.',
     gradient: 'linear-gradient(135deg, #0c1229 0%, #1e3a5f 25%, #1d4ed8 55%, #3b82f6 100%)',
     glowColor: '#60a5fa', badgeBg: 'rgba(96,165,250,0.25)', badgeBorder: 'rgba(96,165,250,0.4)',
     badgeColor: '#bfdbfe', highlightColor: '#bfdbfe', accentGlow: 'rgba(96,165,250,0.4)', link: 'rewards',
   },
 ];
 
-// ─── Categories ─────────────────────────────────────────────
+// ─── Category tabs ──────────────────────────────────────────
 
 const CATEGORIES = [
-  { id: 'all', label: '🏠 Lobby', icon: '' },
-  { id: 'originals', label: '💎 Originals', icon: '' },
-  { id: 'quick', label: '⚡ Quick Play', icon: '' },
-  { id: 'live', label: '🔴 Live', icon: '' },
-  { id: 'pvp', label: '⚔️ PvP', icon: '' },
+  { id: 'all', label: 'All Games' },
+  { id: 'skill', label: 'Skill-Based' },
+  { id: 'quick', label: 'Quick Play' },
 ];
 
 // ─── Decorative Art Compositions ────────────────────────────
@@ -97,9 +102,9 @@ const CATEGORIES = [
 function DepositArt() {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 120, height: 120, borderRadius: '50%', background: 'linear-gradient(135deg, #14F195 0%, #9945FF 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 52, fontWeight: 900, color: '#fff', boxShadow: '0 0 60px rgba(20,241,149,0.5), 0 0 120px rgba(153,69,255,0.3)', border: '4px solid rgba(255,255,255,0.15)', zIndex: 3 }}>◎</div>
-      <div style={{ position: 'absolute', top: '18%', left: '22%', width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #14F195 0%, #9945FF 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 900, color: '#fff', boxShadow: '0 0 40px rgba(20,241,149,0.4)', border: '3px solid rgba(255,255,255,0.12)', transform: 'rotate(-12deg)', zIndex: 2, opacity: 0.85 }}>◎</div>
-      <div style={{ position: 'absolute', bottom: '18%', right: '15%', width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #14F195 0%, #9945FF 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, color: '#fff', boxShadow: '0 0 30px rgba(20,241,149,0.35)', border: '2px solid rgba(255,255,255,0.1)', transform: 'rotate(15deg)', zIndex: 2, opacity: 0.75 }}>◎</div>
+      <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 120, height: 120, borderRadius: '50%', background: 'linear-gradient(135deg, #14F195 0%, #9945FF 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 52, fontWeight: 900, color: '#fff', boxShadow: '0 0 60px rgba(20,241,149,0.5), 0 0 120px rgba(153,69,255,0.3)', border: '4px solid rgba(255,255,255,0.15)', zIndex: 3 }}>S</div>
+      <div style={{ position: 'absolute', top: '18%', left: '22%', width: 72, height: 72, borderRadius: '50%', background: 'linear-gradient(135deg, #14F195 0%, #9945FF 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 900, color: '#fff', boxShadow: '0 0 40px rgba(20,241,149,0.4)', border: '3px solid rgba(255,255,255,0.12)', transform: 'rotate(-12deg)', zIndex: 2, opacity: 0.85 }}>S</div>
+      <div style={{ position: 'absolute', bottom: '18%', right: '15%', width: 52, height: 52, borderRadius: '50%', background: 'linear-gradient(135deg, #14F195 0%, #9945FF 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, fontWeight: 900, color: '#fff', boxShadow: '0 0 30px rgba(20,241,149,0.35)', border: '2px solid rgba(255,255,255,0.1)', transform: 'rotate(15deg)', zIndex: 2, opacity: 0.75 }}>S</div>
       <div style={{ position: 'absolute', top: '28%', right: '18%', padding: '8px 18px', borderRadius: 10, background: 'linear-gradient(135deg, #7c3aed, #a78bfa)', fontSize: 24, fontWeight: 900, color: '#fff', boxShadow: '0 4px 24px rgba(124,58,237,0.6)', transform: 'rotate(6deg)', zIndex: 4, letterSpacing: -1 }}>2x</div>
       <div style={{ position: 'absolute', bottom: '28%', left: '12%', padding: '5px 12px', borderRadius: 8, background: 'linear-gradient(135deg, #6d28d9, #8b5cf6)', fontSize: 15, fontWeight: 800, color: '#e9d5ff', boxShadow: '0 3px 16px rgba(109,40,217,0.5)', transform: 'rotate(-4deg)', zIndex: 4 }}>+100%</div>
       <div style={{ position: 'absolute', top: '30%', left: '40%', width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(167,139,250,0.15) 0%, transparent 70%)', zIndex: 0 }} />
@@ -114,13 +119,13 @@ function JackpotArt() {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div style={{ position: 'absolute', top: '15%', left: '20%', width: 220, height: 220, borderRadius: '50%', background: 'radial-gradient(circle, rgba(251,191,36,0.18) 0%, transparent 70%)', zIndex: 0 }} />
-      <div style={{ position: 'absolute', top: '46%', left: '46%', transform: 'translate(-50%, -50%)', width: 120, height: 120, borderRadius: '50%', background: 'linear-gradient(135deg, #14F195 0%, #9945FF 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 46, fontWeight: 900, color: '#fff', boxShadow: '0 0 60px rgba(20,241,149,0.5), 0 0 120px rgba(153,69,255,0.25)', border: '4px solid rgba(255,255,255,0.15)', zIndex: 3 }}>◎</div>
+      <div style={{ position: 'absolute', top: '46%', left: '46%', transform: 'translate(-50%, -50%)', width: 120, height: 120, borderRadius: '50%', background: 'linear-gradient(135deg, #14F195 0%, #9945FF 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 46, fontWeight: 900, color: '#fff', boxShadow: '0 0 60px rgba(20,241,149,0.5), 0 0 120px rgba(153,69,255,0.25)', border: '4px solid rgba(255,255,255,0.15)', zIndex: 3 }}>S</div>
       <Ball n="7"  size={50} bg="linear-gradient(135deg, #fbbf24, #d97706)" top="5%"   left="38%"  z={4} shadow="0 6px 28px rgba(251,191,36,0.5)" />
       <Ball n="21" size={44} bg="linear-gradient(135deg, #a78bfa, #7c3aed)" top="18%"  right="4%"  z={4} shadow="0 6px 24px rgba(124,58,237,0.5)" />
       <Ball n="42" size={40} bg="linear-gradient(135deg, #f87171, #dc2626)" bottom="14%" right="10%" z={4} shadow="0 6px 24px rgba(239,68,68,0.5)" />
       <Ball n="13" size={38} bg="linear-gradient(135deg, #2dd4bf, #0d9488)" bottom="12%" left="18%"  z={4} shadow="0 6px 24px rgba(20,184,166,0.5)" />
       <Ball n="8"  size={34} bg="linear-gradient(135deg, #60a5fa, #2563eb)" top="15%"  left="10%"  z={2} shadow="0 6px 20px rgba(37,99,235,0.4)" />
-      <div style={{ position: 'absolute', bottom: '30%', left: '4%', width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, #14F195, #9945FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900, color: '#fff', boxShadow: '0 0 24px rgba(20,241,149,0.35)', border: '2px solid rgba(255,255,255,0.1)', zIndex: 2, opacity: 0.8 }}>◎</div>
+      <div style={{ position: 'absolute', bottom: '30%', left: '4%', width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, #14F195, #9945FF)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900, color: '#fff', boxShadow: '0 0 24px rgba(20,241,149,0.35)', border: '2px solid rgba(255,255,255,0.1)', zIndex: 2, opacity: 0.8 }}>S</div>
       <div style={{ position: 'absolute', bottom: '4%', left: '28%', padding: '6px 16px', borderRadius: 8, background: 'linear-gradient(135deg, #fbbf24, #f59e0b)', fontSize: 14, fontWeight: 900, color: '#78350f', boxShadow: '0 4px 20px rgba(251,191,36,0.5)', transform: 'rotate(-3deg)', zIndex: 5, letterSpacing: 1 }}>JACKPOT</div>
     </div>
   );
@@ -131,23 +136,49 @@ function VipArt() {
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div style={{ position: 'absolute', top: '45%', left: '48%', transform: 'translate(-50%, -50%)', zIndex: 3 }}>
         <div style={{ width: 100, height: 100, borderRadius: 20, background: 'linear-gradient(135deg, #fbbf24, #d97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 50px rgba(251,191,36,0.5), 0 8px 32px rgba(0,0,0,0.3)', border: '3px solid rgba(255,255,255,0.15)' }}>
-          <span style={{ fontSize: 56 }}>🏆</span>
+          {/* Trophy SVG instead of emoji */}
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5C7 4 7 7 7 7" />
+            <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5C17 4 17 7 17 7" />
+            <path d="M4 22h16" />
+            <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+            <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+            <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+          </svg>
         </div>
       </div>
       <div style={{ position: 'absolute', top: '12%', right: '10%', padding: '6px 16px', borderRadius: 8, background: 'linear-gradient(135deg, #a78bfa, #7c3aed)', fontSize: 14, fontWeight: 800, color: '#fff', boxShadow: '0 4px 20px rgba(124,58,237,0.5)', transform: 'rotate(6deg)', zIndex: 4 }}>DIAMOND</div>
       <div style={{ position: 'absolute', bottom: '18%', left: '18%', padding: '6px 16px', borderRadius: 8, background: 'linear-gradient(135deg, #d97706, #fbbf24)', fontSize: 14, fontWeight: 800, color: '#78350f', boxShadow: '0 4px 20px rgba(251,191,36,0.5)', transform: 'rotate(-4deg)', zIndex: 4 }}>TITAN</div>
-      <div style={{ position: 'absolute', top: '8%', left: '30%', fontSize: 32, zIndex: 2, filter: 'drop-shadow(0 3px 12px rgba(251,191,36,0.6))' }}>⭐</div>
-      <div style={{ position: 'absolute', bottom: '10%', right: '25%', fontSize: 24, zIndex: 2, filter: 'drop-shadow(0 3px 10px rgba(251,191,36,0.5))' }}>⭐</div>
+      {/* Star SVGs instead of emojis */}
+      <svg style={{ position: 'absolute', top: '8%', left: '30%', zIndex: 2, filter: 'drop-shadow(0 3px 12px rgba(251,191,36,0.6))' }} width="32" height="32" viewBox="0 0 24 24" fill="#fbbf24" stroke="none">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      </svg>
+      <svg style={{ position: 'absolute', bottom: '10%', right: '25%', zIndex: 2, filter: 'drop-shadow(0 3px 10px rgba(251,191,36,0.5))' }} width="24" height="24" viewBox="0 0 24 24" fill="#fbbf24" stroke="none">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+      </svg>
     </div>
   );
 }
 
 function ReferralArt() {
+  // Person SVG for avatar circles
+  const PersonIcon = ({ size }: { size: number }) => (
+    <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24" fill="rgba(255,255,255,0.9)" stroke="none">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
+    </svg>
+  );
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
       <div style={{ position: 'absolute', top: '42%', left: '45%', transform: 'translate(-50%, -50%)', zIndex: 3 }}>
         <div style={{ width: 100, height: 100, borderRadius: '50%', background: 'linear-gradient(135deg, #2563eb, #60a5fa)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 50px rgba(37,99,235,0.5), 0 8px 32px rgba(0,0,0,0.3)', border: '3px solid rgba(255,255,255,0.15)' }}>
-          <span style={{ fontSize: 48 }}>🤝</span>
+          {/* Handshake / link SVG instead of emoji */}
+          <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+          </svg>
         </div>
       </div>
       {[
@@ -156,8 +187,8 @@ function ReferralArt() {
         { bottom: '15%', left: '12%', size: 40, color: '#f43f5e' },
         { bottom: '20%', right: '18%', size: 44, color: '#10b981' },
       ].map((a: any, i) => (
-        <div key={i} style={{ position: 'absolute', top: a.top, left: a.left, right: a.right, bottom: a.bottom, width: a.size, height: a.size, borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: a.size * 0.5, boxShadow: `0 4px 20px ${a.color}55`, border: '2px solid rgba(255,255,255,0.12)', zIndex: 2 }}>
-          <span>👤</span>
+        <div key={i} style={{ position: 'absolute', top: a.top, left: a.left, right: a.right, bottom: a.bottom, width: a.size, height: a.size, borderRadius: '50%', background: a.color, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 4px 20px ${a.color}55`, border: '2px solid rgba(255,255,255,0.12)', zIndex: 2 }}>
+          <PersonIcon size={a.size} />
         </div>
       ))}
       <div style={{ position: 'absolute', top: '58%', right: '6%', padding: '8px 18px', borderRadius: 10, background: 'linear-gradient(135deg, #2563eb, #60a5fa)', fontSize: 22, fontWeight: 900, color: '#fff', boxShadow: '0 4px 24px rgba(37,99,235,0.6)', transform: 'rotate(4deg)', zIndex: 4 }}>5%</div>
@@ -174,7 +205,7 @@ function PromoBanner({ banner }: { banner: typeof PROMO_BANNERS[0] }) {
   const Art = ART_MAP[banner.id];
   return (
     <div style={{
-      position: 'relative', borderRadius: 16, overflow: 'hidden', background: banner.gradient,
+      position: 'relative', borderRadius: 12, overflow: 'hidden', background: banner.gradient,
       height: 280, flex: '1 1 0', minWidth: 0,
       cursor: 'pointer', transition: 'transform 0.2s ease, box-shadow 0.2s ease',
     }}
@@ -222,7 +253,7 @@ function PromoBannerCarousel({ go }: { go: (s: string) => void }) {
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', scrollbarWidth: 'none' as any, scrollSnapType: 'x mandatory', padding: '2px 0' }}>
           {PROMO_BANNERS.map((b, i) => (
             <div key={i} onClick={() => go(b.link)} style={{
-              position: 'relative', borderRadius: 16, overflow: 'hidden', background: b.gradient,
+              position: 'relative', borderRadius: 12, overflow: 'hidden', background: b.gradient,
               minWidth: '85vw', minHeight: 180, scrollSnapAlign: 'start' as const, cursor: 'pointer', padding: '20px 20px',
               display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4,
             }}>
@@ -238,13 +269,12 @@ function PromoBannerCarousel({ go }: { go: (s: string) => void }) {
     );
   }
 
-  // Show 3 equal banners, rotating which 3 of 4 are visible
   const visible = [0, 1, 2].map(offset => PROMO_BANNERS[(active + offset) % PROMO_BANNERS.length]);
 
   return (
     <div style={{ width: '100%' }}>
       <div style={{ display: 'flex', gap: 12, height: 280 }}>
-        {visible.map((b, i) => (
+        {visible.map((b) => (
           <div key={b.id} onClick={() => go(b.link)} style={{ flex: '1 1 0', minWidth: 0 }}>
             <PromoBanner banner={b} />
           </div>
@@ -264,9 +294,60 @@ function PromoBannerCarousel({ go }: { go: (s: string) => void }) {
   );
 }
 
-// ─── Category Bar ───────────────────────────────────────────
+// ─── Recent Wins Ticker (single auto-scrolling line) ────────
 
-function CategoryBar({ active, onChange, searchQuery, onSearchChange }: {
+function RecentWinsTicker({ wins }: { wins: Array<{ id: string; username: string; game: string; multiplier: number; profit: number }> }) {
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = stripRef.current;
+    if (!el || wins.length === 0) return;
+    let raf: number;
+    let pos = 0;
+    const speed = 0.4; // px per frame
+    const tick = () => {
+      pos += speed;
+      // When first set of items scrolls off, reset seamlessly
+      if (pos >= el.scrollWidth / 2) pos = 0;
+      el.style.transform = `translateX(-${pos}px)`;
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [wins]);
+
+  if (wins.length === 0) return null;
+
+  // Duplicate wins for seamless looping
+  const items = [...wins, ...wins];
+
+  return (
+    <div style={{
+      overflow: 'hidden',
+      height: 34,
+      display: 'flex',
+      alignItems: 'center',
+      background: 'rgba(255,255,255,0.02)',
+      borderRadius: 6,
+    }}>
+      <div ref={stripRef} style={{ display: 'flex', alignItems: 'center', gap: 24, whiteSpace: 'nowrap', willChange: 'transform' }}>
+        {items.map((w, i) => (
+          <span key={`${w.id}-${i}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, flexShrink: 0 }}>
+            <span style={{ fontWeight: 600, color: theme.text.muted }}>{w.username}</span>
+            <span className="mono" style={{ fontWeight: 700, color: theme.accent.green }}>{w.multiplier.toFixed(2)}x</span>
+            <span className="mono" style={{ fontWeight: 600, color: theme.text.secondary }}>+{(w.profit / 1e9).toFixed(3)}</span>
+            <SolIcon size="0.8em" />
+            <span style={{ color: 'rgba(255,255,255,0.08)' }}>|</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Category Tab Bar ───────────────────────────────────────
+
+function CategoryTabBar({ active, onChange, searchQuery, onSearchChange }: {
   active: string; onChange: (id: string) => void; searchQuery: string; onSearchChange: (q: string) => void;
 }) {
   const isMobile = useIsMobile();
@@ -274,138 +355,150 @@ function CategoryBar({ active, onChange, searchQuery, onSearchChange }: {
     <div style={{
       display: 'flex',
       alignItems: 'center',
-      gap: 8,
-      padding: `${theme.gap.sm}px ${theme.gap.md}px`,
-      background: 'rgba(255,255,255,0.02)',
+      gap: 0,
+      background: theme.bg.elevated,
       borderRadius: theme.radius.lg,
-      border: `1px solid ${theme.border.subtle}`,
+      padding: '4px',
       overflowX: 'auto',
       scrollbarWidth: 'none' as any,
     }}>
-      {CATEGORIES.map(cat => (
-        <button
-          key={cat.id}
-          onClick={() => onChange(cat.id)}
-          style={{
-            padding: '6px 14px',
-            fontSize: 12,
-            fontWeight: 600,
-            borderRadius: 8,
-            border: 'none',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
-            whiteSpace: 'nowrap',
-            flexShrink: 0,
-            transition: 'all 0.15s ease',
-            background: active === cat.id ? '#1f2937' : 'transparent',
-            color: active === cat.id ? '#fff' : theme.text.muted,
-          }}
-        >
-          {cat.label}
-        </button>
-      ))}
-      {/* Search */}
+      {CATEGORIES.map(cat => {
+        const isActive = active === cat.id;
+        return (
+          <button
+            key={cat.id}
+            onClick={() => onChange(cat.id)}
+            style={{
+              position: 'relative',
+              padding: '10px 20px',
+              fontSize: 13,
+              fontWeight: isActive ? 600 : 500,
+              borderRadius: theme.radius.md,
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              whiteSpace: 'nowrap',
+              flexShrink: 0,
+              transition: 'all 0.15s ease',
+              background: isActive ? theme.bg.surface : 'transparent',
+              color: isActive ? '#fff' : theme.text.muted,
+            }}
+          >
+            {cat.label}
+          </button>
+        );
+      })}
       {!isMobile && (
-        <div style={{ marginLeft: 'auto', position: 'relative', flexShrink: 0 }}>
+        <div style={{ marginLeft: 'auto', position: 'relative', flexShrink: 0, padding: '0 4px' }}>
           <input
             type="text"
             placeholder="Search games..."
             value={searchQuery}
             onChange={e => onSearchChange(e.target.value)}
             style={{
-              padding: '6px 12px 6px 30px',
-              fontSize: 12,
-              background: 'rgba(255,255,255,0.04)',
-              border: `1px solid ${theme.border.subtle}`,
-              borderRadius: 8,
+              padding: '8px 12px 8px 32px',
+              fontSize: 13,
+              background: theme.bg.base,
+              border: `1px solid ${theme.border.default}`,
+              borderRadius: theme.radius.md,
               color: theme.text.primary,
               fontFamily: 'inherit',
               outline: 'none',
-              width: 160,
+              width: 180,
+              transition: 'border-color 0.15s ease',
             }}
           />
-          <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: theme.text.muted }}>🔍</span>
+          <svg style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={theme.text.muted} strokeWidth="2" strokeLinecap="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
         </div>
       )}
     </div>
   );
 }
 
-// ─── Game Rail with Scroll Arrows ───────────────────────────
+// ─── Section Header ─────────────────────────────────────────
 
-function GameRail({ title, games, go, isGameLive, getCardLiveData, hotGames, isNewUser }: {
-  title: string; games: GameDef[]; go: (s: string) => void;
-  isGameLive: (id: string) => boolean; getCardLiveData: (id: string) => any;
-  hotGames: Set<string>; isNewUser: boolean;
+function SectionHeader({ title, count }: { title: string; count: number }) {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 12,
+    }}>
+      <span style={{
+        fontSize: 16,
+        fontWeight: 700,
+        color: theme.text.primary,
+        lineHeight: 1.2,
+      }}>
+        {title}
+      </span>
+      <span style={{
+        fontSize: 11,
+        fontWeight: 600,
+        color: theme.text.muted,
+        background: theme.bg.elevated,
+        padding: '2px 8px',
+        borderRadius: theme.radius.full,
+        border: `1px solid ${theme.border.subtle}`,
+      }}>
+        {count}
+      </span>
+    </div>
+  );
+}
+
+// ─── Game Grid ──────────────────────────────────────────────
+
+function GameGrid({ games, go, isGameLive, getCardLiveData, hotGames, isNewUser, section }: {
+  games: GameDef[];
+  go: (s: string) => void;
+  isGameLive: (id: string) => boolean;
+  getCardLiveData: (id: string) => any;
+  hotGames: Set<string>;
+  isNewUser: boolean;
+  section: string;
 }) {
   const isMobile = useIsMobile();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-
-  const checkScroll = () => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 10);
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
-  };
-
-  useEffect(() => { checkScroll(); }, [games]);
-
-  const scroll = (dir: 'left' | 'right') => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const amount = (isMobile ? 140 : 170) * 3;
-    el.scrollBy({ left: dir === 'left' ? -amount : amount, behavior: 'smooth' });
-    setTimeout(checkScroll, 400);
-  };
+  const isTablet = useIsTablet();
 
   if (games.length === 0) return null;
 
   return (
-    <div style={{ position: 'relative' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: theme.gap.sm }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: theme.text.primary }}>{title}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 11, fontWeight: 500, color: theme.text.muted }}>View all</span>
-          {!isMobile && (
-            <>
-              <button onClick={() => scroll('left')} style={{ ...arrowBtn, opacity: canScrollLeft ? 1 : 0.2 }} disabled={!canScrollLeft}>‹</button>
-              <button onClick={() => scroll('right')} style={{ ...arrowBtn, opacity: canScrollRight ? 1 : 0.2 }} disabled={!canScrollRight}>›</button>
-            </>
-          )}
-        </div>
-      </div>
-      <div ref={scrollRef} onScroll={checkScroll} style={{
-        display: 'flex',
-        gap: isMobile ? 8 : 10,
-        overflowX: 'auto',
-        scrollbarWidth: 'none' as any,
-        padding: '2px 0',
-      }}>
-        {games.map((game) => {
-          const live = isGameLive(game.id);
-          const cardLive = getCardLiveData(game.id);
-          const recommended = isNewUser && game.id === 'mines';
-          return (
-            <div key={game.id} style={{ flexShrink: 0, width: isMobile ? 140 : 170 }}>
-              <GameCard
-                gameId={game.id}
-                title={game.title}
-                subtitle={game.subtitle}
-                image={game.image}
-                onClick={() => { lobbyTrack.gameCardClick(game.id, `rail:${title}`); go(game.route as any); }}
-                isLive={live}
-                isHot={hotGames.has(game.id)}
-                isRecommended={recommended}
-                liveData={cardLive.liveData}
-                liveDataColor={cardLive.liveDataColor}
-                liveExtra={cardLive.liveExtra}
-              />
-            </div>
-          );
-        })}
-      </div>
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : isTablet ? 'repeat(4, 1fr)' : 'repeat(5, 1fr)',
+      gap: isMobile ? 8 : 12,
+    }}>
+      {games.map((game) => {
+        const live = isGameLive(game.id);
+        const cardLive = getCardLiveData(game.id);
+        const recommended = isNewUser && game.id === 'mines';
+
+        let badge: 'live' | 'hot' | 'pvp' | 'new' | null = null;
+        if (live) badge = 'live';
+        else if (hotGames.has(game.id)) badge = 'hot';
+        else if (game.defaultBadge) badge = game.defaultBadge;
+        else if (recommended) badge = 'new';
+
+        return (
+          <GameCard
+            key={game.id}
+            gameId={game.id}
+            title={game.title}
+            subtitle={game.subtitle}
+            image={game.image}
+            badge={badge}
+            onClick={() => { lobbyTrack.gameCardClick(game.id, `grid:${section}`); go(game.route as any); }}
+            liveData={cardLive.liveData}
+            liveDataColor={cardLive.liveDataColor}
+            liveExtra={cardLive.liveExtra}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -428,7 +521,6 @@ export function LobbyScreen() {
   }, []);
 
   // Live data
-  const [liveStats, setLiveStats] = useState({ online: 0, volume: '0', topWin: '1.0x' });
   const [rugRecent, setRugRecent] = useState<any[]>([]);
   const [candleRecent, setCandleRecent] = useState<any[]>([]);
   const [tradingRooms, setTradingRooms] = useState<any[]>([]);
@@ -455,17 +547,10 @@ export function LobbyScreen() {
 
   const fetchStatsAndWins = async () => {
     try {
-      const [profitRes, multRes, onlineRes, feedRes] = await Promise.all([
-        api.getLeaderboard('profit', 'daily').catch(() => ({ data: [] })) as any,
-        api.getLeaderboard('multiplier', 'daily').catch(() => ({ data: [] })) as any,
-        api.getOnlineCount().catch(() => ({ onlineCount: 0 })),
+      const [feedRes] = await Promise.all([
         api.getActivityFeed(15).catch(() => ({ data: [] })),
       ]);
-      const profitData = profitRes.data || [];
-      const multData = multRes.data || [];
-      const totalVol = profitData.reduce((sum: number, e: any) => sum + Math.abs(Number(e.score || 0)), 0);
-      const topMult = multData.reduce((max: number, e: any) => Math.max(max, Number(e.score || 0)), 0);
-      setLiveStats({ online: onlineRes.onlineCount || profitData.length || 0, volume: formatSol(totalVol), topWin: topMult > 1 ? `${topMult.toFixed(1)}x` : '1.0x' });
+
       const GAME_LABELS: Record<string, string> = { prediction_result: 'Predictions', solo_result: 'Solo', rug_result: 'Rug Game', candleflip_result: 'Candleflip', mines_result: 'Mines', lottery_result: 'Lottery', trading_sim_result: 'Trading Arena' };
       const feedItems = (feedRes as any).data || [];
       const wins = feedItems.filter((i: any) => i.payload?.payout > i.payload?.betAmount).slice(0, 10).map((i: any) => ({
@@ -511,194 +596,142 @@ export function LobbyScreen() {
   }
 
   const isNewUser = isAuthenticated && profile.roundsPlayed < 5;
-  const { gap } = theme;
 
   // Filtering
   const searchFiltered = searchQuery
     ? GAMES.filter(g => g.title.toLowerCase().includes(searchQuery.toLowerCase()))
     : null;
 
-  const categoryFiltered = activeCategory !== 'all'
-    ? GAMES.filter(g => g.tags.includes(activeCategory))
-    : null;
+  const categoryFiltered = activeCategory === 'skill'
+    ? SKILL_GAMES
+    : activeCategory === 'quick'
+      ? QUICK_GAMES
+      : null;
 
-  const isFilterActive = !!searchFiltered || !!categoryFiltered;
-  const filteredGames = searchFiltered || categoryFiltered || GAMES;
-
-  const quickPlayGames = GAMES.filter(g => g.tags.includes('quick'));
-  const liveNowGames = GAMES.filter(g => isGameLive(g.id));
+  const isSearching = !!searchFiltered;
+  const filteredGames = searchFiltered || categoryFiltered;
 
   return (
     <div>
-    <ContentLobby style={{ display: 'flex', flexDirection: 'column', gap: gap.lg, paddingTop: gap.sm, paddingBottom: 0 }}>
+    <ContentLobby style={{ display: 'flex', flexDirection: 'column', paddingTop: 0, paddingBottom: 0 }}>
 
       {/* ═══ 1. PROMO BANNER CAROUSEL ═══ */}
-      <PromoBannerCarousel go={go} />
+      <div style={{ marginBottom: 12 }}>
+        <PromoBannerCarousel go={go} />
+      </div>
 
-      {/* ═══ 2. LIVE STATS BAR ═══ */}
-      {(liveStats.online > 0 || recentWins.length > 0) && (
-        <div style={liveBar}>
-          {liveStats.online > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <LiveDot size={5} color={theme.accent.green} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: theme.text.muted }}>{liveStats.online} online</span>
-            </div>
-          )}
-          {liveStats.volume !== '0' && (
-            <span style={{ fontSize: 11, color: theme.text.muted }}>24h: <span className="mono" style={{ color: theme.text.secondary, fontWeight: 700 }}>{liveStats.volume} <SolIcon size="0.9em" /></span></span>
-          )}
-          {liveStats.topWin !== '1.0x' && (
-            <span style={{ fontSize: 11, color: theme.text.muted }}>Top: <span className="mono" style={{ color: theme.accent.amber, fontWeight: 700 }}>{liveStats.topWin}</span></span>
-          )}
+      {/* ═══ 2. RECENT WINS TICKER (single line) ═══ */}
+      <div style={{ marginBottom: 8 }}>
+        <RecentWinsTicker wins={recentWins} />
+      </div>
+
+      {/* ═══ 3. CATEGORY TAB BAR ═══ */}
+      <div style={{ marginBottom: 16 }}>
+        <CategoryTabBar
+          active={activeCategory}
+          onChange={(id) => { setActiveCategory(id); setSearchQuery(''); lobbyTrack.categoryClick(id); }}
+          searchQuery={searchQuery}
+          onSearchChange={(q) => { setSearchQuery(q); if (q) setActiveCategory('all'); }}
+        />
+      </div>
+
+      {/* ═══ 4. RETURN HOOKS (if any) ═══ */}
+      {isAuthenticated && profile.roundsPlayed >= 5 && (
+        <div style={{ marginBottom: 12 }}>
+          <ReturnHooksStrip />
         </div>
       )}
 
-      {/* ═══ 3. RECENT WINS STRIP ═══ */}
-      {recentWins.length > 0 && (
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-            <LiveDot size={6} color={theme.accent.green} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: theme.text.muted, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Recent Wins</span>
-          </div>
-          <div style={winsStrip}>
-            {recentWins.map((w, i) => {
-              const isBigWin = w.multiplier >= 10 || w.profit >= 1_000_000_000;
-              return (
-                <div key={`${w.id}-${i}`} style={{ ...winChip, ...(isBigWin ? { borderColor: 'rgba(255,215,0,0.35)', background: 'rgba(255,215,0,0.04)', boxShadow: '0 0 12px rgba(255,215,0,0.08)' } : {}) }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', flexShrink: 0, background: getAvatarGradient(null, w.username), display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '7px', fontWeight: 700, color: '#fff' }}>{getInitials(w.username)}</div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: theme.text.secondary, maxWidth: 70, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.username}</span>
-                    <span style={{ fontSize: 9, fontWeight: 500, color: isBigWin ? '#FFD700' : theme.text.muted }}>{isBigWin ? 'BIG WIN' : w.game}</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
-                    <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: theme.accent.neonGreen }}>{w.multiplier.toFixed(2)}x</span>
-                    <span className="mono" style={{ fontSize: 9, fontWeight: 600, color: theme.accent.neonGreen, opacity: 0.7 }}>+{(w.profit / 1e9).toFixed(3)} <SolIcon size="0.9em" /></span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+      {/* ═══ 5. GAME SECTIONS ═══ */}
+      {isSearching ? (
+        <div style={{ marginBottom: 24 }}>
+          <SectionHeader title={`Results for "${searchQuery}"`} count={filteredGames!.length} />
+          <GameGrid games={filteredGames!} go={go} isGameLive={isGameLive} getCardLiveData={getCardLiveData} hotGames={hotGames} isNewUser={isNewUser} section="search" />
         </div>
-      )}
-
-      {/* ═══ 4. CATEGORY BAR ═══ */}
-      <CategoryBar
-        active={activeCategory}
-        onChange={(id) => { setActiveCategory(id); setSearchQuery(''); lobbyTrack.categoryClick(id); }}
-        searchQuery={searchQuery}
-        onSearchChange={(q) => { setSearchQuery(q); if (q) setActiveCategory('all'); }}
-      />
-
-      {/* ═══ 5. RETURN HOOKS (if any) ═══ */}
-      {isAuthenticated && profile.roundsPlayed >= 5 && <ReturnHooksStrip />}
-
-      {/* ═══ 6. NEW USER WELCOME ═══ */}
-      {isAuthenticated && profile.roundsPlayed === 0 && profile.balance > 0 && (
-        <div style={{ padding: `${gap.md}px ${gap.lg}px`, background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)', borderRadius: 12, display: 'flex', alignItems: 'center', gap: gap.md }}>
-          <span style={{ fontSize: 24 }}>🎮</span>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: theme.text.primary }}>Ready to play?</div>
-            <div style={{ fontSize: 12, color: theme.text.secondary, marginTop: 2 }}>
-              Start with <span style={{ color: theme.accent.purple, fontWeight: 600, cursor: 'pointer' }} onClick={() => { lobbyTrack.welcomeBannerClick(); go('mines'); }}>Mines</span> — it's the easiest way to get started
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══ 7. GAME BROWSING ═══ */}
-      {isFilterActive ? (
-        /* Filtered grid view */
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: gap.md }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: theme.text.primary }}>
-              {searchQuery ? `Results for "${searchQuery}"` : activeCategory === 'all' ? 'All Games' : CATEGORIES.find(c => c.id === activeCategory)?.label || 'Games'}
-            </span>
-            <span style={{ fontSize: 11, fontWeight: 500, color: theme.text.muted }}>{filteredGames.length}</span>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: isMobile ? 8 : 12 }}>
-            {filteredGames.map((game) => (
-              <GameCard key={game.id} gameId={game.id} title={game.title} subtitle={game.subtitle} image={game.image}
-                onClick={() => { lobbyTrack.gameCardClick(game.id, `grid:${activeCategory}`); go(game.route as any); }}
-                isLive={isGameLive(game.id)} isHot={hotGames.has(game.id)} isRecommended={isNewUser && game.id === 'mines'}
-                {...getCardLiveData(game.id)}
-              />
-            ))}
-          </div>
+      ) : activeCategory !== 'all' && filteredGames ? (
+        <div style={{ marginBottom: 24 }}>
+          <SectionHeader title={CATEGORIES.find(c => c.id === activeCategory)?.label || 'Games'} count={filteredGames.length} />
+          <GameGrid games={filteredGames} go={go} isGameLive={isGameLive} getCardLiveData={getCardLiveData} hotGames={hotGames} isNewUser={isNewUser} section={activeCategory} />
         </div>
       ) : (
-        /* Rail-first browsing */
         <>
-          <GameRail title="💎 TradeGems Originals" games={GAMES} go={go} isGameLive={isGameLive} getCardLiveData={getCardLiveData} hotGames={hotGames} isNewUser={isNewUser} />
-          <GameRail title="⚡ Quick Play" games={quickPlayGames} go={go} isGameLive={isGameLive} getCardLiveData={getCardLiveData} hotGames={hotGames} isNewUser={isNewUser} />
-          {liveNowGames.length > 0 && (
-            <GameRail title="🔴 Live Now" games={liveNowGames} go={go} isGameLive={isGameLive} getCardLiveData={getCardLiveData} hotGames={hotGames} isNewUser={isNewUser} />
-          )}
+          <div style={{ marginBottom: 20 }}>
+            <SectionHeader title="Skill-Based Games" count={SKILL_GAMES.length} />
+            <GameGrid games={SKILL_GAMES} go={go} isGameLive={isGameLive} getCardLiveData={getCardLiveData} hotGames={hotGames} isNewUser={isNewUser} section="skill" />
+          </div>
+          <div style={{ marginBottom: 24 }}>
+            <SectionHeader title="Quick Play" count={QUICK_GAMES.length} />
+            <GameGrid games={QUICK_GAMES} go={go} isGameLive={isGameLive} getCardLiveData={getCardLiveData} hotGames={hotGames} isNewUser={isNewUser} section="quick" />
+          </div>
         </>
       )}
 
-      {/* ═══ 8. PROGRESSION ═══ */}
+      {/* ═══ 6. PROGRESSION ═══ */}
       {isAuthenticated && (
-        <div style={{ ...progressionCard, background: `linear-gradient(145deg, ${TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze}22 0%, ${TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze}0A 35%, ${theme.bg.secondary} 100%)`, borderColor: `${TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze}30` }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: gap.md }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: '50%', background: `${TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze}22`, border: `1px solid ${TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze}44`, color: TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze, fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>{profile.level}</span>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', textTransform: 'capitalize' }}>{profile.vipTier} Tier</div>
-                <div style={{ fontSize: 10, fontWeight: 500, color: theme.text.muted }}>Level {profile.level}</div>
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ ...progressionCard, background: `linear-gradient(145deg, ${TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze}22 0%, ${TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze}0A 35%, ${theme.bg.surface} 100%)`, borderColor: `${TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze}30` }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 28, height: 28, borderRadius: '50%', background: `${TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze}22`, border: `1px solid ${TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze}44`, color: TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze, fontSize: 12, fontWeight: 800, fontFamily: "'JetBrains Mono', monospace" }}>{profile.level}</span>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', textTransform: 'capitalize' }}>{profile.vipTier} Tier</div>
+                  <div style={{ fontSize: 10, fontWeight: 500, color: theme.text.muted }}>Level {profile.level}</div>
+                </div>
+              </div>
+              <div onClick={() => go('rewards' as any)} style={{ fontSize: 10, fontWeight: 600, color: theme.accent.primary, cursor: 'pointer', padding: '4px 8px', background: 'rgba(139,92,246,0.08)', borderRadius: 20, border: '1px solid rgba(139,92,246,0.15)' }}>Rewards</div>
+            </div>
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: theme.text.muted }}>XP Progress</span>
+                <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: theme.text.secondary }}>{profile.progressionLoaded ? `${profile.xp} / ${profile.xpToNext}` : '...'}</span>
+              </div>
+              <div style={progressBarOuter}>
+                <div style={{ ...progressBarInner, width: `${profile.xpToNext > 0 ? Math.min(100, (profile.xp / profile.xpToNext) * 100) : 0}%`, background: TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze }} />
               </div>
             </div>
-            <div onClick={() => go('rewards' as any)} style={{ fontSize: 10, fontWeight: 600, color: theme.accent.purple, cursor: 'pointer', padding: '4px 8px', background: 'rgba(139,92,246,0.08)', borderRadius: 20, border: '1px solid rgba(139,92,246,0.15)' }}>Rewards</div>
-          </div>
-          <div style={{ marginBottom: gap.md }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-              <span style={{ fontSize: 10, fontWeight: 600, color: theme.text.muted }}>XP Progress</span>
-              <span className="mono" style={{ fontSize: 10, fontWeight: 700, color: theme.text.secondary }}>{profile.progressionLoaded ? `${profile.xp} / ${profile.xpToNext}` : '...'}</span>
-            </div>
-            <div style={progressBarOuter}>
-              <div style={{ ...progressBarInner, width: `${profile.xpToNext > 0 ? Math.min(100, (profile.xp / profile.xpToNext) * 100) : 0}%`, background: TIER_COLORS[profile.vipTier] || TIER_COLORS.bronze }} />
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: gap.md }}>
-            <div style={{ flex: 1, textAlign: 'center', padding: '6px', background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 500, color: theme.text.muted, marginBottom: 2 }}>Rakeback</div>
-              <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: theme.accent.neonGreen }}>{profile.progressionLoaded ? `${((profile.rakebackRate) * 100).toFixed(0)}%` : '...'}</div>
-            </div>
-            <div style={{ flex: 1, textAlign: 'center', padding: '6px', background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 500, color: theme.text.muted, marginBottom: 2 }}>Next Tier</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: theme.text.secondary, textTransform: 'capitalize' }}>{getNextTier(profile.vipTier)}</div>
-            </div>
-            <div style={{ flex: 1, textAlign: 'center', padding: '6px', background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
-              <div style={{ fontSize: 10, fontWeight: 500, color: theme.text.muted, marginBottom: 2 }}>Next Rakeback</div>
-              <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: theme.accent.amber }}>{getNextRakeback(profile.vipTier)}%</div>
+            <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ flex: 1, textAlign: 'center', padding: '6px', background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 500, color: theme.text.muted, marginBottom: 2 }}>Rakeback</div>
+                <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: theme.accent.green }}>{profile.progressionLoaded ? `${((profile.rakebackRate) * 100).toFixed(0)}%` : '...'}</div>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center', padding: '6px', background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 500, color: theme.text.muted, marginBottom: 2 }}>Next Tier</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: theme.text.secondary, textTransform: 'capitalize' }}>{getNextTier(profile.vipTier)}</div>
+              </div>
+              <div style={{ flex: 1, textAlign: 'center', padding: '6px', background: 'rgba(255,255,255,0.02)', borderRadius: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 500, color: theme.text.muted, marginBottom: 2 }}>Next Rakeback</div>
+                <div className="mono" style={{ fontSize: 12, fontWeight: 700, color: theme.accent.amber }}>{getNextRakeback(profile.vipTier)}%</div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ═══ 9. DAILY MISSIONS ═══ */}
-      {isAuthenticated && <DailyMissionsCard />}
+      {/* ═══ 7. DAILY MISSIONS ═══ */}
+      {isAuthenticated && (
+        <div style={{ marginBottom: 16 }}>
+          <DailyMissionsCard />
+        </div>
+      )}
 
-      {/* ═══ 10. BETS PANEL (tabbed: Latest / My Bets / High Rollers / Leaderboard) ═══ */}
-      <BetsPanel publicBets={publicBets} />
-
-      {/* ═══ 11. TRUST FOOTER ═══ */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: isMobile ? gap.md : gap.xl, padding: `${gap.lg}px 0`, borderTop: `1px solid ${theme.border.subtle}`, marginTop: gap.md }}>
-        <span style={{ fontSize: 11, color: theme.text.muted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }} onClick={() => go('fairness')}>🛡️ Provably Fair</span>
-        <span style={{ fontSize: 11, color: theme.text.muted, display: 'flex', alignItems: 'center', gap: 4 }}>⚡ Instant Settlement</span>
-        <span style={{ fontSize: 11, color: theme.text.muted, display: 'flex', alignItems: 'center', gap: 4 }}>◎ Solana Powered</span>
-        <span style={{ fontSize: 11, color: theme.text.muted, cursor: 'pointer' }} onClick={() => go('about')}>About · FAQ</span>
+      {/* ═══ 8. BETS PANEL ═══ */}
+      <div style={{ marginBottom: 0 }}>
+        <BetsPanel publicBets={publicBets} />
       </div>
 
       {/* Auth prompt modal */}
-      <Modal open={showAuthPrompt} onClose={() => setShowAuthPrompt(false)} title="Sign in to play" size="sm">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: gap.md, alignItems: 'center', textAlign: 'center' }}>
-          <span style={{ fontSize: 13, color: theme.text.secondary, lineHeight: 1.5 }}>Create an account or sign in to start playing.</span>
-          <button style={{ width: '100%', padding: '12px', background: theme.gradient.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44 }} onClick={() => { setShowAuthPrompt(false); go('auth'); }}>Sign in / Register</button>
-          <button style={{ background: 'none', border: 'none', color: theme.text.muted, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: 6 }} onClick={() => setShowAuthPrompt(false)}>Maybe later</button>
+      <Modal open={showAuthPrompt} onClose={() => setShowAuthPrompt(false)} title="Sign Up" size="sm">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', textAlign: 'center' }}>
+          <span style={{ fontSize: 13, color: theme.text.secondary, lineHeight: 1.5 }}>Create an account to start playing.</span>
+          <button style={{ width: '100%', padding: '12px', background: theme.accent.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', minHeight: 44 }} onClick={() => { setShowAuthPrompt(false); go('auth'); }}>Create Account</button>
+          <button style={{ background: 'none', border: 'none', color: theme.text.muted, fontSize: 12, cursor: 'pointer', fontFamily: 'inherit', padding: 6 }} onClick={() => setShowAuthPrompt(false)}>Later</button>
         </div>
       </Modal>
     </ContentLobby>
     <LobbyFooter />
+
+    {/* Onboarding modal — shows once on first login */}
+    {isAuthenticated && <OnboardingModal onNavigate={go} />}
     </div>
   );
 }
@@ -710,11 +743,11 @@ function ReturnHooksStrip() {
   const [hooks, setHooks] = useState<Array<{ type: string; icon: string; title: string; subtitle: string }>>([]);
   useEffect(() => { api.getReturnHooks().then(res => setHooks(res.hooks || [])).catch(() => {}); }, []);
   if (hooks.length === 0) return null;
-  const HOOK_COLORS: Record<string, string> = { streak_active: '#FF6B35', streak_at_risk: '#EF4444', streak_lost: theme.text.muted, near_level_up: theme.accent.purple };
+  const HOOK_COLORS: Record<string, string> = { streak_active: '#FF6B35', streak_at_risk: '#EF4444', streak_lost: theme.text.muted, near_level_up: theme.accent.primary };
   return (
     <div style={{ display: 'flex', gap: 8, overflowX: 'auto', scrollbarWidth: 'none' as any, padding: '2px 0' }}>
       {hooks.map((hook, i) => (
-        <div key={`${hook.type}-${i}`} style={{ flexShrink: 0, padding: '8px 12px', background: `${HOOK_COLORS[hook.type] || theme.accent.purple}0A`, border: `1px solid ${HOOK_COLORS[hook.type] || theme.accent.purple}20`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8, minWidth: isMobile ? 200 : 240 }}>
+        <div key={`${hook.type}-${i}`} style={{ flexShrink: 0, padding: '8px 12px', background: `${HOOK_COLORS[hook.type] || theme.accent.primary}0A`, border: `1px solid ${HOOK_COLORS[hook.type] || theme.accent.primary}20`, borderRadius: 12, display: 'flex', alignItems: 'center', gap: 8, minWidth: isMobile ? 200 : 240 }}>
           <span style={{ fontSize: 18 }}>{hook.icon}</span>
           <div>
             <div style={{ fontSize: 12, fontWeight: 700, color: theme.text.primary }}>{hook.title}</div>
@@ -729,7 +762,6 @@ function ReturnHooksStrip() {
 // ─── Daily Missions Card ─────────────────────────────────────
 
 function DailyMissionsCard() {
-  const isMobile = useIsMobile();
   const [missions, setMissions] = useState<any[]>([]);
   const [claiming, setClaiming] = useState<string | null>(null);
   const syncProfile = useGameStore((s) => s.syncProfile);
@@ -743,31 +775,36 @@ function DailyMissionsCard() {
   if (missions.length === 0) return null;
   const completed = missions.filter(m => m.completed).length;
   return (
-    <div style={{ background: theme.bg.secondary, borderRadius: 12, border: `1px solid ${theme.border.subtle}`, padding: '12px' }}>
+    <div style={{ background: theme.bg.surface, borderRadius: 12, border: `1px solid ${theme.border.subtle}`, padding: '12px' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 16 }}>🎯</span>
+          {/* Target SVG instead of emoji */}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={theme.accent.primary} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <circle cx="12" cy="12" r="6" />
+            <circle cx="12" cy="12" r="2" />
+          </svg>
           <span style={{ fontSize: 13, fontWeight: 700, color: theme.text.primary }}>Daily Missions</span>
         </div>
-        <span style={{ fontSize: 11, fontWeight: 600, color: completed === missions.length ? theme.accent.neonGreen : theme.text.muted }}>{completed}/{missions.length}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: completed === missions.length ? theme.accent.green : theme.text.muted }}>{completed}/{missions.length}</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {missions.map(m => {
           const pct = Math.min(m.progress / m.target, 1);
           return (
-            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: m.completed ? 'rgba(0,231,1,0.03)' : theme.bg.tertiary, borderRadius: 8, border: `1px solid ${m.completed ? 'rgba(0,231,1,0.12)' : theme.border.subtle}` }}>
+            <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', background: m.completed ? 'rgba(0,230,118,0.03)' : theme.bg.elevated, borderRadius: 8, border: `1px solid ${m.completed ? 'rgba(0,230,118,0.12)' : theme.border.subtle}` }}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: m.completed ? theme.accent.neonGreen : theme.text.primary, marginBottom: 2 }}>{m.title}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: m.completed ? theme.accent.green : theme.text.primary, marginBottom: 2 }}>{m.title}</div>
                 <div style={{ fontSize: 11, color: theme.text.muted, marginBottom: 4 }}>{m.description}</div>
                 <div style={{ height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${pct * 100}%`, borderRadius: 2, background: m.completed ? theme.accent.neonGreen : theme.accent.purple, transition: 'width 0.3s ease' }} />
+                  <div style={{ height: '100%', width: `${pct * 100}%`, borderRadius: 2, background: m.completed ? theme.accent.green : theme.accent.primary, transition: 'width 0.3s ease' }} />
                 </div>
                 <div style={{ fontSize: 10, color: theme.text.muted, marginTop: 2 }} className="mono">{m.progress}/{m.target}</div>
               </div>
               <div style={{ flexShrink: 0, textAlign: 'center' }}>
-                {m.claimed ? <span style={{ fontSize: 11, fontWeight: 600, color: theme.accent.neonGreen }}>✓</span>
-                  : m.completed ? <button onClick={() => handleClaim(m.id)} disabled={claiming === m.id} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, background: theme.accent.neonGreen, color: '#000', border: 'none', borderRadius: 6, cursor: 'pointer' }}>{claiming === m.id ? '...' : `+${m.xpReward} XP`}</button>
-                  : <span className="mono" style={{ fontSize: 11, fontWeight: 600, color: theme.accent.purple }}>{m.xpReward} XP</span>}
+                {m.claimed ? <span style={{ fontSize: 11, fontWeight: 600, color: theme.accent.green }}>✓</span>
+                  : m.completed ? <button onClick={() => handleClaim(m.id)} disabled={claiming === m.id} style={{ padding: '4px 10px', fontSize: 11, fontWeight: 700, background: theme.accent.green, color: theme.text.inverse, border: 'none', borderRadius: 6, cursor: 'pointer' }}>{claiming === m.id ? '...' : `+${m.xpReward} XP`}</button>
+                  : <span className="mono" style={{ fontSize: 11, fontWeight: 600, color: theme.accent.primary }}>{m.xpReward} XP</span>}
               </div>
             </div>
           );
@@ -779,75 +816,8 @@ function DailyMissionsCard() {
 
 // ─── Styles ─────────────────────────────────────────────────
 
-const bannerCard: CSSProperties = {
-  position: 'relative',
-  borderRadius: 12,
-  padding: '20px 24px',
-  cursor: 'pointer',
-  display: 'flex',
-  flexDirection: 'column',
-  justifyContent: 'flex-end',
-  overflow: 'hidden',
-  transition: 'transform 0.2s ease',
-};
-
-const bannerBadge: CSSProperties = {
-  display: 'inline-block',
-  padding: '3px 8px',
-  fontSize: 10,
-  fontWeight: 700,
-  color: '#fff',
-  background: 'rgba(0,0,0,0.3)',
-  borderRadius: 6,
-  marginBottom: 8,
-  alignSelf: 'flex-start',
-  backdropFilter: 'blur(4px)',
-};
-
-const arrowBtn: CSSProperties = {
-  width: 24,
-  height: 24,
-  borderRadius: '50%',
-  border: `1px solid ${theme.border.subtle}`,
-  background: 'rgba(255,255,255,0.04)',
-  color: theme.text.secondary,
-  fontSize: 16,
-  fontWeight: 700,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  fontFamily: 'inherit',
-  transition: 'opacity 0.15s ease',
-};
-
-const liveBar: CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: theme.gap.lg,
-  padding: `${theme.gap.sm}px ${theme.gap.md}px`,
-  background: theme.bg.secondary, borderRadius: 8, border: `1px solid ${theme.border.subtle}`,
-};
-
-const winsStrip: CSSProperties = {
-  display: 'flex', gap: 8, overflowX: 'auto', padding: '2px 0', scrollbarWidth: 'none' as any,
-};
-
-const winChip: CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8,
-  padding: '8px 12px', background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`, borderRadius: 8, flexShrink: 0,
-};
-
-const betsContainer: CSSProperties = {
-  display: 'flex', flexDirection: 'column', gap: 1,
-  background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`, borderRadius: 12, overflow: 'hidden',
-};
-
-const betRow: CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8,
-  padding: '8px 12px', background: theme.bg.primary, transition: 'background 0.15s ease',
-};
-
 const progressionCard: CSSProperties = {
-  padding: '16px', background: theme.bg.secondary, border: `1px solid ${theme.border.subtle}`, borderRadius: 12,
+  padding: '16px', background: theme.bg.surface, border: `1px solid ${theme.border.subtle}`, borderRadius: 12,
 };
 
 const progressBarOuter: CSSProperties = {

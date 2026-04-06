@@ -478,6 +478,10 @@ export const api = {
   getOnlineCount: () =>
     apiFetch<{ onlineCount: number }>('/v1/chat/online'),
 
+  // Platform stats (public, cached)
+  getPlatformStats: () =>
+    apiFetch<{ totalWagered: number; totalPaidOut: number; gamesPlayed: number }>('/v1/stats/platform'),
+
   // Lottery (Powerball-style)
   getLotteryCurrentDraw: () =>
     apiFetch<any>('/v1/lottery/current'),

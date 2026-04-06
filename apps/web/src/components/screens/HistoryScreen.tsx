@@ -8,6 +8,7 @@ import { useGameStore } from '../../stores/gameStore';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { ContentGame } from '../primitives/ContentContainer';
 import { Badge } from '../primitives/Badge';
+import { Icon } from '../primitives/Icon';
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -187,7 +188,7 @@ export function HistoryScreen() {
           </div>
         ) : filtered.length === 0 ? (
           <div style={{ padding: `${gap.xl * 2}px ${gap.lg}px`, textAlign: 'center' }}>
-            <div style={{ fontSize: 32, marginBottom: gap.sm }}>🎲</div>
+            <Icon name="dice" size={32} style={{ color: theme.text.disabled, marginBottom: gap.sm, opacity: 0.5 }} />
             <div style={{ fontSize: ts('md'), fontWeight: 700, color: theme.text.secondary }}>
               {allBets.length === 0 ? 'No bets yet' : 'No matching bets'}
             </div>

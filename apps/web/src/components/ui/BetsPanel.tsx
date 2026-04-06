@@ -6,6 +6,7 @@ import { api } from '../../utils/api';
 import { formatSol } from '../../utils/sol';
 import { SolIcon } from './SolIcon';
 import { getAvatarGradient, getInitials } from '../../utils/avatars';
+import { Icon } from '../primitives/Icon';
 
 type Tab = 'latest' | 'mine' | 'highrollers' | 'race';
 
@@ -47,49 +48,156 @@ interface Bet {
   createdAt?: string;
 }
 
+// ─── Live Activity Indicator ────────────────────────────────
+
+function LiveIndicator() {
+  return (
+    <div style={{
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6,
+      padding: '3px 10px',
+      borderRadius: theme.radius.full,
+      background: 'rgba(0, 230, 118, 0.08)',
+      border: '1px solid rgba(0, 230, 118, 0.15)',
+    }}>
+      <span style={{
+        width: 6,
+        height: 6,
+        borderRadius: '50%',
+        background: theme.accent.green,
+        boxShadow: `0 0 6px ${theme.accent.green}`,
+        animation: 'pulse 1.5s ease infinite',
+      }} />
+      <span style={{
+        fontSize: 11,
+        fontWeight: 600,
+        color: theme.accent.green,
+        letterSpacing: '0.02em',
+      }}>
+        Live
+      </span>
+    </div>
+  );
+}
+
 // ─── Bet Row ─────────────────────────────────────────────────
 
-function BetRow({ bet, showUser, isMobile }: { bet: Bet; showUser: boolean; isMobile: boolean }) {
+function BetRow({ bet, showUser, isMobile, isEven }: { bet: Bet; showUser: boolean; isMobile: boolean; isEven: boolean }) {
   const gc = GAME_COLORS[bet.game] || theme.text.muted;
   const profit = bet.payout - bet.betAmount;
 
   if (isMobile) {
+    // Mobile: Game + Multiplier + Payout
     return (
-      <div style={row}>
-        {showUser && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-            <div style={{ ...avatar, background: getAvatarGradient(null, bet.username) }}>{getInitials(bet.username)}</div>
-            <span style={{ fontSize: 11, fontWeight: 600, color: theme.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bet.username}</span>
-          </div>
-        )}
-        <span style={{ fontSize: 10, fontWeight: 600, color: gc, padding: '1px 5px', borderRadius: 4, background: `${gc}12`, whiteSpace: 'nowrap', flexShrink: 0 }}>{bet.game}</span>
-        <span className="mono" style={{ fontSize: 11, fontWeight: 700, color: bet.isWin ? theme.accent.neonGreen : theme.accent.red, flexShrink: 0, textAlign: 'right', minWidth: 60 }}>
-          {bet.isWin ? '+' : '-'}{formatSol(Math.abs(profit))} <SolIcon size="0.8em" />
+      <div style={{
+        ...row,
+        background: isEven ? theme.bg.base : theme.bg.surface,
+      }}
+        onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = theme.bg.elevated; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isEven ? theme.bg.base : theme.bg.surface; }}
+      >
+        <span style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: gc,
+          padding: '2px 6px',
+          borderRadius: 4,
+          background: `${gc}12`,
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+        }}>
+          {bet.game}
+        </span>
+        <span className="mono" style={{
+          fontSize: 13,
+          fontWeight: 700,
+          color: bet.multiplier >= 1 ? theme.accent.green : theme.accent.red,
+          flex: 1,
+          textAlign: 'right',
+        }}>
+          {bet.multiplier.toFixed(2)}x
+        </span>
+        <span className="mono" style={{
+          fontSize: 13,
+          fontWeight: 700,
+          color: profit >= 0 ? theme.accent.green : theme.accent.red,
+          textAlign: 'right',
+          minWidth: 70,
+          flexShrink: 0,
+        }}>
+          {profit >= 0 ? '+' : ''}{formatSol(profit)} <SolIcon size="0.8em" />
         </span>
       </div>
     );
   }
 
   return (
-    <div style={row}>
+    <div style={{
+      ...row,
+      background: isEven ? theme.bg.base : theme.bg.surface,
+    }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = theme.bg.elevated; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = isEven ? theme.bg.base : theme.bg.surface; }}
+    >
+      {/* Game */}
+      <div style={{ ...cell, flex: '1 1 0' }}>
+        <span style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: gc,
+          padding: '2px 6px',
+          borderRadius: 4,
+          background: `${gc}12`,
+        }}>
+          {bet.game}
+        </span>
+      </div>
+      {/* Player */}
       {showUser && (
-        <div style={{ ...cell, flex: '1.5 1 0' }}>
-          <div style={{ ...avatar, background: getAvatarGradient(null, bet.username) }}>{getInitials(bet.username)}</div>
-          <span style={{ fontSize: 12, fontWeight: 600, color: theme.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bet.username}</span>
+        <div style={{ ...cell, flex: '1.2 1 0' }}>
+          <div style={{ ...avatarStyle, background: getAvatarGradient(null, bet.username) }}>
+            {getInitials(bet.username)}
+          </div>
+          <span style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: theme.text.secondary,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {bet.username}
+          </span>
         </div>
       )}
-      <div style={{ ...cell, flex: '1 1 0' }}>
-        <span style={{ fontSize: 10, fontWeight: 600, color: gc, padding: '2px 6px', borderRadius: 4, background: `${gc}12` }}>{bet.game}</span>
-      </div>
+      {/* Bet Amount */}
       <div style={{ ...cell, flex: '1 1 0', justifyContent: 'flex-end' }}>
-        <span className="mono" style={{ fontSize: 12, fontWeight: 600, color: theme.text.secondary }}>{formatSol(bet.betAmount)} <SolIcon size="0.8em" /></span>
+        <span className="mono" style={{
+          fontSize: 13,
+          fontWeight: 600,
+          color: theme.text.secondary,
+        }}>
+          {formatSol(bet.betAmount)} <SolIcon size="0.8em" />
+        </span>
       </div>
+      {/* Multiplier */}
       <div style={{ ...cell, flex: '0.8 1 0', justifyContent: 'flex-end' }}>
-        <span style={{ fontSize: 11, marginRight: 4 }}>{bet.isWin ? '✓' : '✗'}</span>
-        <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: bet.isWin ? theme.accent.neonGreen : theme.text.muted }}>{bet.multiplier.toFixed(2)}x</span>
+        <span className="mono" style={{
+          fontSize: 13,
+          fontWeight: 700,
+          color: bet.multiplier >= 1 ? theme.accent.green : theme.accent.red,
+        }}>
+          {bet.multiplier.toFixed(2)}x
+        </span>
       </div>
+      {/* Payout */}
       <div style={{ ...cell, flex: '1 1 0', justifyContent: 'flex-end' }}>
-        <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: profit >= 0 ? theme.accent.neonGreen : theme.accent.red }}>
+        <span className="mono" style={{
+          fontSize: 13,
+          fontWeight: 700,
+          color: profit >= 0 ? theme.accent.green : theme.accent.red,
+        }}>
           {profit >= 0 ? '+' : ''}{formatSol(profit)} <SolIcon size="0.8em" />
         </span>
       </div>
@@ -102,18 +210,18 @@ function BetRow({ bet, showUser, isMobile }: { bet: Bet; showUser: boolean; isMo
 function TableHeader({ showUser, isMobile }: { showUser: boolean; isMobile: boolean }) {
   if (isMobile) {
     return (
-      <div style={{ ...row, borderBottom: `1px solid ${theme.border.subtle}`, minHeight: 32 }}>
-        {showUser && <span style={{ ...headerCell, flex: 1 }}>User</span>}
-        <span style={headerCell}>Game</span>
-        <span style={{ ...headerCell, textAlign: 'right', minWidth: 60 }}>Payout</span>
+      <div style={headerRow}>
+        <span style={{ ...headerCell, flex: 1 }}>Game</span>
+        <span style={{ ...headerCell, flex: 1, textAlign: 'right' }}>Multi</span>
+        <span style={{ ...headerCell, textAlign: 'right', minWidth: 70 }}>Payout</span>
       </div>
     );
   }
   return (
-    <div style={{ ...row, borderBottom: `1px solid ${theme.border.subtle}`, minHeight: 32 }}>
-      {showUser && <span style={{ ...headerCell, flex: '1.5 1 0' }}>User</span>}
+    <div style={headerRow}>
       <span style={{ ...headerCell, flex: '1 1 0' }}>Game</span>
-      <span style={{ ...headerCell, flex: '1 1 0', textAlign: 'right' }}>Bet Amount</span>
+      {showUser && <span style={{ ...headerCell, flex: '1.2 1 0' }}>Player</span>}
+      <span style={{ ...headerCell, flex: '1 1 0', textAlign: 'right' }}>Bet</span>
       <span style={{ ...headerCell, flex: '0.8 1 0', textAlign: 'right' }}>Multiplier</span>
       <span style={{ ...headerCell, flex: '1 1 0', textAlign: 'right' }}>Payout</span>
     </div>
@@ -131,7 +239,6 @@ function formatCountdown(ms: number): string {
   return `${d}d ${h}h ${m}m ${s}s`;
 }
 
-const RANK_MEDALS = ['', '1st', '2nd', '3rd'];
 const RANK_COLORS = ['', '#FFD700', '#C0C0C0', '#CD7F32'];
 
 function WeeklyRaceTab({ isMobile }: { isMobile: boolean }) {
@@ -155,7 +262,6 @@ function WeeklyRaceTab({ isMobile }: { isMobile: boolean }) {
     }
   }, [isAuthenticated]);
 
-  // Countdown timer
   useEffect(() => {
     if (!endTimeRef.current) return;
     const tick = () => {
@@ -175,20 +281,20 @@ function WeeklyRaceTab({ isMobile }: { isMobile: boolean }) {
     );
   }
 
-  const { prizePool, leaderboard, prizeDistribution } = raceData;
+  const { prizePool, leaderboard } = raceData;
 
   return (
-    <div style={{ padding: '0 12px' }}>
+    <div style={{ padding: '0 0' }}>
       {/* Banner */}
       <div style={{
         display: 'flex', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between',
-        padding: isMobile ? '10px 12px' : '12px 16px', margin: '8px 0',
+        padding: isMobile ? '12px 16px' : '14px 16px', margin: '0',
         background: 'linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(59,130,246,0.08) 100%)',
-        borderRadius: 12, border: '1px solid rgba(139,92,246,0.2)',
+        borderBottom: `1px solid ${theme.border.subtle}`,
         flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 8 : 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 20 }}>🏆</span>
+          <Icon name="trophy" size={20} style={{ color: '#fbbf24' }} />
           <div>
             <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>Weekly Race</div>
             <div style={{ fontSize: 11, color: theme.text.muted, marginTop: 1 }}>Compete for prizes by wagering volume</div>
@@ -197,7 +303,7 @@ function WeeklyRaceTab({ isMobile }: { isMobile: boolean }) {
         <div style={{ display: 'flex', gap: isMobile ? 16 : 24, alignItems: 'center' }}>
           <div style={{ textAlign: isMobile ? 'left' : 'center' }}>
             <div style={{ fontSize: 10, color: theme.text.muted, textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.05em' }}>Prize Pool</div>
-            <div className="mono" style={{ fontSize: 16, fontWeight: 800, color: theme.accent.neonGreen, marginTop: 2 }}>
+            <div className="mono" style={{ fontSize: 16, fontWeight: 800, color: theme.accent.green, marginTop: 2 }}>
               <SolIcon size="0.8em" /> {formatSol(prizePool)}
             </div>
           </div>
@@ -211,7 +317,7 @@ function WeeklyRaceTab({ isMobile }: { isMobile: boolean }) {
       </div>
 
       {/* Leaderboard Header */}
-      <div style={{ ...row, borderBottom: `1px solid ${theme.border.subtle}`, minHeight: 32 }}>
+      <div style={{ ...headerRow, padding: '8px 16px' }}>
         <span style={{ ...headerCell, width: 40, flexShrink: 0, textAlign: 'center' }}>#</span>
         <span style={{ ...headerCell, flex: 1 }}>User</span>
         {!isMobile && <span style={{ ...headerCell, flex: 1, textAlign: 'right' }}>Wagered</span>}
@@ -222,7 +328,7 @@ function WeeklyRaceTab({ isMobile }: { isMobile: boolean }) {
       {leaderboard.length === 0 ? (
         <div style={{ padding: '24px 16px', textAlign: 'center', fontSize: 12, color: theme.text.muted }}>No participants yet this week</div>
       ) : (
-        leaderboard.slice(0, 20).map((entry: any) => {
+        leaderboard.slice(0, 20).map((entry: any, i: number) => {
           const isMe = isAuthenticated && myRank?.rank === entry.rank && myRank?.wagered === entry.wagered;
           const rankColor = entry.rank <= 3 ? RANK_COLORS[entry.rank] : theme.text.muted;
           const prize = entry.prize || 0;
@@ -230,17 +336,18 @@ function WeeklyRaceTab({ isMobile }: { isMobile: boolean }) {
           return (
             <div key={entry.userId} style={{
               ...row,
-              background: isMe ? 'rgba(139,92,246,0.08)' : undefined,
-              borderLeft: isMe ? '2px solid rgba(139,92,246,0.5)' : '2px solid transparent',
+              padding: '8px 16px',
+              background: isMe ? 'rgba(139,92,246,0.08)' : i % 2 === 0 ? theme.bg.base : theme.bg.surface,
+              borderLeft: isMe ? `3px solid ${theme.accent.primary}` : '3px solid transparent',
             }}>
               <span style={{
                 width: 40, flexShrink: 0, fontSize: entry.rank <= 3 ? 14 : 12,
                 fontWeight: 800, color: rankColor, textAlign: 'center',
               }}>
-                {entry.rank <= 3 ? ['', '🥇', '🥈', '🥉'][entry.rank] : entry.rank}
+                {entry.rank <= 3 ? entry.rank : entry.rank}
               </span>
               <div style={{ ...cell, flex: 1 }}>
-                <div style={{ ...avatar, background: getAvatarGradient(entry.avatarUrl, entry.username) }}>
+                <div style={{ ...avatarStyle, background: getAvatarGradient(entry.avatarUrl, entry.username) }}>
                   {getInitials(entry.username)}
                 </div>
                 <span style={{ fontSize: 12, fontWeight: 600, color: isMe ? '#fff' : theme.text.secondary, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -255,7 +362,7 @@ function WeeklyRaceTab({ isMobile }: { isMobile: boolean }) {
                 </div>
               )}
               <div style={{ ...cell, flex: isMobile ? undefined : 1, justifyContent: 'flex-end', minWidth: isMobile ? 70 : undefined }}>
-                <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: prize > 0 ? theme.accent.neonGreen : theme.text.muted }}>
+                <span className="mono" style={{ fontSize: 12, fontWeight: 700, color: prize > 0 ? theme.accent.green : theme.text.muted }}>
                   {prize > 0 ? <>{formatSol(prize)} <SolIcon size="0.8em" /></> : '—'}
                 </span>
               </div>
@@ -267,8 +374,8 @@ function WeeklyRaceTab({ isMobile }: { isMobile: boolean }) {
       {/* My rank indicator (if not in top 20) */}
       {isAuthenticated && myRank?.rank && myRank.rank > 20 && (
         <div style={{
-          padding: '10px 12px', margin: '4px 0 8px', borderRadius: 8,
-          background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.15)',
+          padding: '10px 16px', margin: '0', borderTop: `1px solid ${theme.border.subtle}`,
+          background: 'rgba(139,92,246,0.06)',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
           <span style={{ fontSize: 12, color: theme.text.muted }}>
@@ -314,32 +421,68 @@ export function BetsPanel({ publicBets }: { publicBets: Bet[] }) {
   const displayBets = tab === 'latest' ? publicBets : tab === 'mine' ? myBets : highRollers;
   const visibleBets = displayBets.slice(0, rowCount);
   const showBetsTable = tab !== 'race';
+  const hasLiveActivity = tab === 'latest' && publicBets.length > 0;
 
   return (
-    <div style={{ background: theme.bg.secondary, borderRadius: 16, border: `1px solid ${theme.border.subtle}`, overflow: 'hidden' }}>
+    <div style={{
+      background: theme.bg.surface,
+      borderRadius: '12px',
+      border: `1px solid ${theme.border.subtle}`,
+      overflow: 'hidden',
+    }}>
       {/* Tab bar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderBottom: `1px solid ${theme.border.subtle}`, overflowX: 'auto', scrollbarWidth: 'none' as any }}>
-        <div style={{ display: 'flex', gap: 4 }}>
-          {TABS.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                padding: '6px 12px', fontSize: 12, fontWeight: 600, borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
-                background: tab === t.id ? 'rgba(255,255,255,0.08)' : 'transparent',
-                color: tab === t.id ? '#fff' : theme.text.muted,
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {t.id === 'race' ? '🏆 ' : ''}{t.label}
-            </button>
-          ))}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '4px 12px',
+        background: theme.bg.elevated,
+        borderBottom: `1px solid ${theme.border.subtle}`,
+        overflowX: 'auto',
+        scrollbarWidth: 'none' as any,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {TABS.map(t => {
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  padding: '6px 12px',
+                  fontSize: 12,
+                  fontWeight: isActive ? 600 : 500,
+                  borderRadius: theme.radius.md,
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  whiteSpace: 'nowrap',
+                  background: isActive ? theme.bg.surface : 'transparent',
+                  color: isActive ? '#fff' : theme.text.muted,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {t.id === 'race' && <Icon name="trophy" size={14} style={{ color: '#fbbf24', marginRight: 4, verticalAlign: 'middle' }} />}{t.label}
+              </button>
+            );
+          })}
+          {/* Live indicator */}
+          {hasLiveActivity && <LiveIndicator />}
         </div>
         {showBetsTable && (
           <select
             value={rowCount}
             onChange={e => setRowCount(Number(e.target.value))}
-            style={{ background: 'rgba(255,255,255,0.04)', border: `1px solid ${theme.border.subtle}`, borderRadius: 6, padding: '4px 8px', fontSize: 11, color: theme.text.muted, cursor: 'pointer', fontFamily: 'inherit' }}
+            style={{
+              background: theme.bg.base,
+              border: `1px solid ${theme.border.default}`,
+              borderRadius: 6,
+              padding: '4px 8px',
+              fontSize: 13,
+              color: theme.text.secondary,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
           >
             <option value={10}>10</option>
             <option value={25}>25</option>
@@ -349,22 +492,23 @@ export function BetsPanel({ publicBets }: { publicBets: Bet[] }) {
       </div>
 
       {/* Content */}
-      <div style={{ padding: '4px 0' }}>
-        {tab === 'race' ? (
-          <WeeklyRaceTab isMobile={isMobile} />
-        ) : tab === 'mine' && !isAuthenticated ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: theme.text.muted }}>Log in to see your bets</div>
-        ) : visibleBets.length === 0 ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: theme.text.muted }}>No bets yet</div>
-        ) : (
-          <div style={{ padding: '0 12px' }}>
-            <TableHeader showUser={tab !== 'mine'} isMobile={isMobile} />
-            {visibleBets.map((bet, i) => (
-              <BetRow key={`${bet.id}-${i}`} bet={bet} showUser={tab !== 'mine'} isMobile={isMobile} />
-            ))}
-          </div>
-        )}
-      </div>
+      {tab === 'race' ? (
+        <WeeklyRaceTab isMobile={isMobile} />
+      ) : tab === 'mine' && !isAuthenticated ? (
+        <div style={{ padding: '32px 16px', textAlign: 'center', fontSize: 13, color: theme.text.muted }}>Log in to see your bets</div>
+      ) : visibleBets.length === 0 ? (
+        <div style={{ padding: '24px 16px', textAlign: 'center' }}>
+          <Icon name="dice" size={24} style={{ color: theme.text.disabled, marginBottom: 6, opacity: 0.6 }} />
+          <div style={{ fontSize: 13, color: theme.text.muted }}>No bets yet</div>
+        </div>
+      ) : (
+        <div>
+          <TableHeader showUser={tab !== 'mine'} isMobile={isMobile} />
+          {visibleBets.map((bet, i) => (
+            <BetRow key={`${bet.id}-${i}`} bet={bet} showUser={tab !== 'mine'} isMobile={isMobile} isEven={i % 2 === 0} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -375,9 +519,20 @@ const row: CSSProperties = {
   display: 'flex',
   alignItems: 'center',
   gap: 8,
-  padding: '8px 4px',
+  padding: '10px 16px',
   minHeight: 44,
-  borderBottom: '1px solid rgba(255,255,255,0.03)',
+  transition: 'background 0.1s ease',
+  cursor: 'default',
+};
+
+const headerRow: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '12px 16px',
+  background: theme.bg.elevated,
+  borderBottom: `1px solid ${theme.border.subtle}`,
+  minHeight: 36,
 };
 
 const cell: CSSProperties = {
@@ -388,14 +543,13 @@ const cell: CSSProperties = {
 };
 
 const headerCell: CSSProperties = {
-  fontSize: 10,
+  fontSize: 12,
   fontWeight: 600,
   color: theme.text.muted,
-  textTransform: 'uppercase',
-  letterSpacing: '0.06em',
+  letterSpacing: '0.02em',
 };
 
-const avatar: CSSProperties = {
+const avatarStyle: CSSProperties = {
   width: 24,
   height: 24,
   borderRadius: '50%',

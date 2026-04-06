@@ -87,8 +87,8 @@ export function SideNav({ collapsed = false }: SideNavProps) {
         {isActive && <div style={s.activeIndicator} />}
         <NavIcon
           name={item.icon}
-          size={collapsed ? 20 : 18}
-          color={isActive ? theme.accent.purple : theme.text.secondary}
+          size={22}
+          color={isActive ? '#FFFFFF' : theme.text.secondary}
         />
         {!collapsed && (
           <span style={{
@@ -115,8 +115,6 @@ export function SideNav({ collapsed = false }: SideNavProps) {
 
   return (
     <nav style={{ ...s.nav, width: navWidth }}>
-      {/* No search bar — removed in v5 */}
-
       <div style={s.scrollArea}>
         {/* Main */}
         <div style={s.section}>
@@ -147,7 +145,7 @@ export function SideNav({ collapsed = false }: SideNavProps) {
             title="Admin"
           >
             {activeId === 'admin' && <div style={{ ...s.activeIndicator, background: theme.accent.red }} />}
-            <NavIcon name="shield" size={collapsed ? 20 : 18} color={theme.accent.red} />
+            <NavIcon name="shield" size={22} color={theme.accent.red} />
             {!collapsed && (
               <span style={{ ...s.navLabel, color: activeId === 'admin' ? theme.accent.red : theme.text.secondary }}>
                 Admin
@@ -166,7 +164,7 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    background: theme.bg.secondary,
+    background: theme.bg.sidebar,
     borderRight: `1px solid ${theme.border.subtle}`,
     flexShrink: 0,
     overflow: 'hidden',
@@ -178,35 +176,35 @@ const s: Record<string, React.CSSProperties> = {
     flex: 1,
     overflowY: 'auto',
     overflowX: 'hidden',
-    padding: `${theme.gap.sm}px 0`,
+    padding: '12px 0',
   },
   section: {
     display: 'flex',
     flexDirection: 'column',
     gap: 1,
-    padding: `0 ${theme.gap.sm}px`,
-    marginBottom: theme.gap.xs,
+    padding: '0 8px',
+    marginBottom: 4,
   },
   sectionTitle: {
-    fontSize: theme.textSize.xs.mobile,
+    fontSize: 11,
     fontWeight: 600,
     textTransform: 'uppercase' as const,
     letterSpacing: '0.8px',
     color: theme.text.muted,
-    padding: `${theme.gap.md}px ${theme.gap.md}px ${theme.gap.sm}px`,
+    padding: '12px 12px 8px',
   },
   sectionDivider: {
     height: '1px',
     background: theme.border.subtle,
-    margin: '6px 8px',
+    margin: '8px 8px',
   },
   navItem: {
     position: 'relative' as const,
     display: 'flex',
     flexDirection: 'row' as const,
     alignItems: 'center',
-    gap: theme.gap.md,
-    padding: `${theme.gap.sm}px ${theme.gap.md}px`,
+    gap: 12,
+    padding: '12px 12px',
     background: 'transparent',
     border: 'none',
     borderRadius: theme.radius.md,
@@ -216,31 +214,31 @@ const s: Record<string, React.CSSProperties> = {
     width: '100%',
     textAlign: 'left' as const,
     overflow: 'hidden',
-    minHeight: 36,
+    minHeight: 40,
   },
   navItemCollapsed: {
     justifyContent: 'center',
-    padding: '10px',
+    padding: '12px',
     gap: '0',
   },
   navItemActive: {
-    background: 'rgba(139, 92, 246, 0.06)',
+    background: 'rgba(139, 92, 246, 0.12)',
   },
   navItemHover: {
-    background: 'rgba(255, 255, 255, 0.03)',
+    background: 'rgba(255, 255, 255, 0.04)',
   },
   activeIndicator: {
     position: 'absolute' as const,
     left: 0,
     top: '50%',
     transform: 'translateY(-50%)',
-    width: '2px',
-    height: '18px',
+    width: '3px',
+    height: '20px',
     borderRadius: '0 3px 3px 0',
-    background: theme.accent.purple,
+    background: theme.accent.primary,
   },
   navLabel: {
-    fontSize: theme.textSize.sm.mobile,
+    fontSize: 13,
     fontWeight: 400,
     letterSpacing: '0.2px',
     lineHeight: 1.3,
@@ -252,11 +250,11 @@ const s: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 1,
-    padding: `0 ${theme.gap.sm}px ${theme.gap.md}px`,
+    padding: '0 8px 12px',
   },
   divider: {
     height: 1,
     background: theme.border.subtle,
-    margin: `${theme.gap.xs}px ${theme.gap.sm}px ${theme.gap.sm}px`,
+    margin: '4px 8px 8px',
   },
 };

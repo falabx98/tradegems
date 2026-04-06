@@ -17,8 +17,9 @@ export function TabBar({ tabs, active, onChange }: TabBarProps) {
             onClick={() => onChange(tab.id)}
             style={{
               ...s.tab,
-              color: isActive ? theme.text.primary : theme.text.muted,
-              borderBottomColor: isActive ? theme.accent.purple : 'transparent',
+              background: isActive ? theme.bg.surface : 'transparent',
+              color: isActive ? '#fff' : theme.text.muted,
+              fontWeight: isActive ? 600 : 500,
             }}
           >
             {tab.label}
@@ -33,18 +34,20 @@ const s: Record<string, React.CSSProperties> = {
   bar: {
     display: 'flex',
     gap: '4px',
-    borderBottom: `1px solid ${theme.border.subtle}`,
+    background: theme.bg.elevated,
+    borderRadius: '8px',
+    padding: '4px',
     marginBottom: '16px',
     overflow: 'auto',
   },
   tab: {
-    padding: '10px 16px',
+    padding: '8px 16px',
     fontSize: '13px',
-    fontWeight: 600,
+    fontWeight: 500,
     fontFamily: 'inherit',
     background: 'transparent',
     border: 'none',
-    borderBottom: '2px solid transparent',
+    borderRadius: '6px',
     cursor: 'pointer',
     transition: 'all 0.15s ease',
     whiteSpace: 'nowrap' as const,

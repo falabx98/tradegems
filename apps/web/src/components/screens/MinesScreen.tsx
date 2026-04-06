@@ -452,7 +452,7 @@ export function MinesScreen() {
     >
       {/* Header inside stage on desktop */}
       {!isMobile && (
-        <div style={{ maxWidth: 680, margin: `0 auto ${gap.xs}px auto` }}>
+        <div style={{ padding: `0 ${gap.sm}px` }}>
           <GameHeader
             title="Mines"
             subtitle="Reveal or Ruin"

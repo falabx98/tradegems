@@ -8,6 +8,7 @@ import { theme } from '../../styles/theme';
 import { formatSol } from '../../utils/sol';
 import { isPhotoAvatar, getAvatarGradient, getInitials } from '../../utils/avatars';
 import { SolIcon } from '../ui/SolIcon';
+import { Icon } from '../primitives/Icon';
 
 // ─── VIP tier colors ────────────────────────────────────────
 const TIER_COLORS: Record<string, string> = {
@@ -20,9 +21,10 @@ const TIER_COLORS: Record<string, string> = {
 
 interface TopBarProps {
   onToggleSidebar?: () => void;
+  sidebarOpen?: boolean;
 }
 
-export function TopBar({ onToggleSidebar }: TopBarProps) {
+export function TopBar({ onToggleSidebar, sidebarOpen = false }: TopBarProps) {
   const profile = useGameStore((s) => s.profile);
   const go = useAppNavigate();
   const { isAuthenticated } = useAuthStore();
@@ -41,16 +43,28 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
       {/* Left: hamburger + logo */}
       <div style={s.left}>
         {onToggleSidebar && !isMobile && (
-          <button style={s.hamburger} onClick={onToggleSidebar}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round">
-              <line x1="3" y1="6" x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
+          <button style={s.hamburger} onClick={onToggleSidebar} aria-label="Toggle sidebar">
+            <div style={{ width: 18, height: 14, position: 'relative' }}>
+              <span style={{
+                ...s.menuLine,
+                top: sidebarOpen ? 6 : 0,
+                transform: sidebarOpen ? 'rotate(45deg)' : 'rotate(0deg)',
+              }} />
+              <span style={{
+                ...s.menuLine,
+                top: 6,
+                opacity: sidebarOpen ? 0 : 1,
+              }} />
+              <span style={{
+                ...s.menuLine,
+                top: sidebarOpen ? 6 : 12,
+                transform: sidebarOpen ? 'rotate(-45deg)' : 'rotate(0deg)',
+              }} />
+            </div>
           </button>
         )}
         <div style={s.logoGroup} onClick={() => go('lobby')}>
-          <img src={isMobile ? '/logo.png' : '/logo-big-screens.png'} alt="TradeGems" style={{ ...s.logoImg, height: isMobile ? '38px' : '50px' }} />
+          <img src={isMobile ? '/logo.png' : '/logo-big-screens.png'} alt="TradeGems" style={{ ...s.logoImg, height: isMobile ? '36px' : '44px' }} />
         </div>
       </div>
 
@@ -58,7 +72,7 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
       <div style={s.right}>
         {isAuthenticated ? (
           <>
-            {/* XP Level Pill — always visible */}
+            {/* XP Level Pill */}
             <div style={s.xpPill} onClick={() => go('rewards' as any)}>
               <span style={{
                 ...s.levelBadge,
@@ -103,13 +117,15 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
 
             {/* Deposit button */}
             <button style={s.depositBtn} onClick={() => go('wallet')}>
-              {isMobile ? (
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-              ) : 'Deposit'}
+              {isMobile ? <Icon name="arrow-up" size={16} /> : 'Deposit'}
             </button>
+
+            {/* Wallet button (desktop only) */}
+            {!isMobile && (
+              <button style={s.walletBtn} onClick={() => go('wallet')}>
+                Wallet
+              </button>
+            )}
 
             {/* Profile avatar */}
             <div style={s.avatar} onClick={() => go('settings')}>
@@ -132,8 +148,11 @@ export function TopBar({ onToggleSidebar }: TopBarProps) {
                 100% Deposit Bonus
               </div>
             )}
-            <button style={s.loginBtn} onClick={() => go('auth')}>
-              LOGIN
+            <button style={s.logInBtn} onClick={() => go('auth')}>
+              Log In
+            </button>
+            <button style={s.signUpBtn} onClick={() => go('auth')}>
+              Sign Up
             </button>
           </>
         )}
@@ -148,8 +167,8 @@ const s: Record<string, CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'space-between',
     height: theme.layout.headerHeight,
-    padding: `0 ${theme.gap.lg}px`,
-    background: theme.bg.secondary,
+    padding: '0 16px',
+    background: theme.bg.sidebar,
     borderBottom: `1px solid ${theme.border.subtle}`,
     flexShrink: 0,
     position: 'sticky',
@@ -159,7 +178,7 @@ const s: Record<string, CSSProperties> = {
   left: {
     display: 'flex',
     alignItems: 'center',
-    gap: theme.gap.md,
+    gap: 12,
   },
   hamburger: {
     display: 'flex',
@@ -171,8 +190,19 @@ const s: Record<string, CSSProperties> = {
     border: 'none',
     borderRadius: theme.radius.md,
     cursor: 'pointer',
-    minWidth: '40px',
-    minHeight: '40px',
+    transition: 'background 0.15s ease',
+    minWidth: '36px',
+    minHeight: '36px',
+  },
+  menuLine: {
+    position: 'absolute' as const,
+    left: 0,
+    width: '100%',
+    height: 2,
+    background: theme.text.secondary,
+    borderRadius: 1,
+    transition: 'all 200ms ease',
+    transformOrigin: 'center',
   },
   logoGroup: {
     display: 'flex',
@@ -180,14 +210,14 @@ const s: Record<string, CSSProperties> = {
     cursor: 'pointer',
   },
   logoImg: {
-    height: '40px',
+    height: '44px',
     width: 'auto',
     objectFit: 'contain' as const,
   },
   right: {
     display: 'flex',
     alignItems: 'center',
-    gap: theme.gap.sm,
+    gap: 8,
   },
   // ─── XP bar ─────────────────────────
   xpPill: {
@@ -195,7 +225,7 @@ const s: Record<string, CSSProperties> = {
     alignItems: 'center',
     gap: 6,
     padding: '4px 8px',
-    background: theme.bg.primary,
+    background: theme.bg.base,
     borderRadius: theme.radius.full,
     border: `1px solid ${theme.border.subtle}`,
     cursor: 'pointer',
@@ -216,7 +246,7 @@ const s: Record<string, CSSProperties> = {
     fontFamily: "'JetBrains Mono', monospace",
   },
   xpBarOuter: {
-    width: 40,
+    width: 60,
     height: 4,
     borderRadius: 2,
     background: 'rgba(255,255,255,0.06)',
@@ -233,56 +263,91 @@ const s: Record<string, CSSProperties> = {
   balancePill: {
     display: 'flex',
     alignItems: 'center',
-    gap: theme.gap.sm,
-    padding: `${theme.gap.xs}px ${theme.gap.md}px`,
-    background: theme.bg.primary,
+    gap: 8,
+    padding: '6px 12px',
+    background: theme.bg.base,
     borderRadius: theme.radius.full,
-    border: `1px solid ${theme.border.medium}`,
+    border: `1px solid ${theme.border.default}`,
     cursor: 'pointer',
     transition: 'border-color 0.15s ease',
-    minHeight: 40,
+    minHeight: 38,
   },
   solIcon: {
     width: '16px',
     height: '16px',
   },
   balanceValue: {
-    fontSize: theme.textSize.md.mobile,
+    fontSize: 16,
     fontWeight: 700,
     color: '#FFFFFF',
+    fontFamily: "'JetBrains Mono', monospace",
   },
   depositBtn: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '6px',
-    padding: '7px 16px',
+    padding: '8px 18px',
     fontSize: '13px',
     fontWeight: 700,
-    color: theme.text.inverse,
-    background: theme.accent.neonGreen,
+    color: '#FFFFFF',
+    background: theme.accent.primary,
     border: 'none',
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     cursor: 'pointer',
     fontFamily: 'inherit',
-    letterSpacing: '0.5px',
-    minHeight: '40px',
-    minWidth: '40px',
+    letterSpacing: '0.3px',
+    minHeight: '38px',
+    minWidth: '38px',
+    transition: 'background 0.15s ease',
   },
-  loginBtn: {
+  walletBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    padding: '8px 16px',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: theme.text.secondary,
+    background: theme.bg.elevated,
+    border: `1px solid ${theme.border.default}`,
+    borderRadius: theme.radius.md,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    minHeight: '38px',
+    transition: 'all 0.15s ease',
+  },
+  logInBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '8px 16px',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: theme.text.secondary,
+    background: 'transparent',
+    border: `1px solid ${theme.border.default}`,
+    borderRadius: theme.radius.md,
+    cursor: 'pointer',
+    fontFamily: 'inherit',
+    minHeight: '38px',
+    transition: 'all 0.15s ease',
+  },
+  signUpBtn: {
     display: 'flex',
     alignItems: 'center',
     padding: '8px 20px',
     fontSize: '13px',
     fontWeight: 700,
     color: '#fff',
-    background: theme.gradient.primary,
+    background: theme.accent.primary,
     border: 'none',
-    borderRadius: theme.radius.full,
+    borderRadius: theme.radius.md,
     cursor: 'pointer',
     fontFamily: 'inherit',
-    letterSpacing: '0.5px',
-    minHeight: '40px',
+    letterSpacing: '0.3px',
+    minHeight: '38px',
+    transition: 'background 0.15s ease',
   },
   bonusPill: {
     display: 'flex',
@@ -298,29 +363,29 @@ const s: Record<string, CSSProperties> = {
     whiteSpace: 'nowrap' as const,
   },
   avatar: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: '50%',
     cursor: 'pointer',
     overflow: 'hidden',
     flexShrink: 0,
-    border: `2px solid ${theme.border.medium}`,
+    border: `2px solid ${theme.border.default}`,
     transition: 'border-color 0.15s ease',
-    minWidth: 40,
-    minHeight: 40,
+    minWidth: 34,
+    minHeight: 34,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarImg: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: '50%',
     objectFit: 'cover' as const,
   },
   avatarFallback: {
-    width: 36,
-    height: 36,
+    width: 34,
+    height: 34,
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',

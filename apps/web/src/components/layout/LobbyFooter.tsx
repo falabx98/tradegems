@@ -70,16 +70,16 @@ export function LobbyFooter() {
     <footer style={{
       ...footerBase,
       // Break out of <main> padding to go full-width edge-to-edge
-      marginLeft: -24,
-      marginRight: -24,
+      marginLeft: isMobile ? -8 : -24,
+      marginRight: isMobile ? -8 : -24,
       marginBottom: isMobile ? -80 : -24, // mobile has 80px paddingBottom for BottomNav
       paddingBottom: isMobile ? 80 : 0,   // re-add space so content isn't hidden behind BottomNav
-      width: 'calc(100% + 48px)',
+      width: isMobile ? 'calc(100% + 16px)' : 'calc(100% + 48px)',
     }}>
       <div style={{
         maxWidth: 1200,
         margin: '0 auto',
-        padding: isMobile ? '40px 16px 24px' : '48px 24px 32px',
+        padding: isMobile ? '32px 12px 24px' : '48px 24px 32px',
       }}>
         {/* ─── 4-Column Grid ─── */}
         <div style={{

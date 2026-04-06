@@ -44,7 +44,7 @@ export function AppLayout({ children, hideChrome = false }: AppLayoutProps) {
         {!isMobile && <SideNav collapsed={sidebarCollapsed} />}
         <main style={{
           ...styles.main,
-          ...(isMobile ? { paddingBottom: '80px' } : {}),
+          ...(isMobile ? { padding: '8px 6px', paddingBottom: '80px' } : {}),
         }}>
           {children}
         </main>

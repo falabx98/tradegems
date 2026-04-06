@@ -13,7 +13,7 @@ export function ContentNarrow({ children, style }: ContentContainerProps) {
       maxWidth: theme.layout.narrowWidth,
       margin: '0 auto',
       width: '100%',
-      padding: isMobile ? '8px 10px' : '20px 24px',
+      padding: isMobile ? '4px 2px' : '20px 24px',
       ...style,
     }}>
       {children}
@@ -28,7 +28,7 @@ export function ContentWide({ children, style }: ContentContainerProps) {
       maxWidth: theme.layout.maxWidth,
       margin: '0 auto',
       width: '100%',
-      padding: isMobile ? '12px' : '20px 24px',
+      padding: isMobile ? '8px 2px' : '20px 24px',
       ...style,
     }}>
       {children}
@@ -48,7 +48,7 @@ export function ContentGame({ children, style }: ContentContainerProps) {
       maxWidth: theme.layout.gameWidth,
       margin: '0 auto',
       width: '100%',
-      padding: isMobile ? '8px 12px' : '16px 24px',
+      padding: isMobile ? '4px 2px' : '16px 24px',
       ...style,
     }}>
       {children}
@@ -59,7 +59,7 @@ export function ContentGame({ children, style }: ContentContainerProps) {
 /**
  * Lobby container — wider than game screens for casino browsing feel.
  * 1440px max-width with 32px side padding on desktop.
- * Mobile: full-width with 12px padding.
+ * Mobile: full-width with 6px padding.
  */
 export function ContentLobby({ children, style }: ContentContainerProps) {
   const isMobile = useIsMobile();
@@ -68,7 +68,7 @@ export function ContentLobby({ children, style }: ContentContainerProps) {
       maxWidth: 1200,
       margin: '0 auto',
       width: '100%',
-      padding: isMobile ? '8px 12px' : '16px 24px',
+      padding: isMobile ? '4px 2px' : '16px 24px',
       ...style,
     }}>
       {children}

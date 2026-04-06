@@ -64,7 +64,7 @@ export function TopBar({ onToggleSidebar, sidebarOpen = false }: TopBarProps) {
           </button>
         )}
         <div style={s.logoGroup} onClick={() => go('lobby')}>
-          <img src={isMobile ? '/logo.png' : '/logo-big-screens.png'} alt="TradeGems" style={{ ...s.logoImg, height: isMobile ? '36px' : '44px' }} />
+          <img src={isMobile ? '/mobile-logo.png' : '/logo-big-screens.png'} alt="TradeGems" style={{ ...s.logoImg, height: isMobile ? '36px' : '44px' }} />
         </div>
       </div>
 

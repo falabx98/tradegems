@@ -228,10 +228,11 @@ export class SponsoredService {
       SELECT
         sb.*,
         u.username,
-        u.avatar_url,
+        p.avatar_url,
         COALESCE(b.available_amount, 0) + COALESCE(b.locked_amount, 0) AS current_balance
       FROM sponsored_balances sb
       JOIN users u ON u.id = sb.user_id
+      LEFT JOIN user_profiles p ON p.user_id = sb.user_id
       LEFT JOIN balances b ON b.user_id = sb.user_id AND b.asset = 'SOL'
       ORDER BY sb.created_at DESC
     `) as unknown as any[];

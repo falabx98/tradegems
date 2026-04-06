@@ -76,13 +76,13 @@ export async function leaderboardRoutes(server: FastifyInstance) {
           u.username,
           u.level,
           u.vip_tier,
-          COALESCE(up.avatar_url, u.avatar_url) as avatar_url,
+          up.avatar_url,
           ${scoreExpr} as score,
           COUNT(*) as rounds
         FROM all_games g
         JOIN users u ON u.id = g.user_id
         LEFT JOIN user_profiles up ON u.id = up.user_id
-        GROUP BY u.id, u.username, u.level, u.vip_tier, up.avatar_url, u.avatar_url
+        GROUP BY u.id, u.username, u.level, u.vip_tier, up.avatar_url
         ORDER BY ${orderExpr} DESC
         LIMIT ${parsedLimit}
       `));

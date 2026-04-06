@@ -140,12 +140,13 @@ export class WeeklyRaceService {
       SELECT
         e.user_id,
         u.username,
-        u.avatar_url,
+        p.avatar_url,
         e.total_wagered_lamports,
         e.bet_count,
         e.last_bet_at
       FROM weekly_race_entries e
       JOIN users u ON u.id = e.user_id
+      LEFT JOIN user_profiles p ON p.user_id = e.user_id
       WHERE e.race_id = ${race.id}
       ORDER BY e.total_wagered_lamports DESC, e.last_bet_at ASC
       LIMIT ${limit}
@@ -374,11 +375,12 @@ export class WeeklyRaceService {
       SELECT
         e.user_id,
         u.username,
-        u.avatar_url,
+        p.avatar_url,
         e.total_wagered_lamports,
         e.bet_count
       FROM weekly_race_entries e
       JOIN users u ON u.id = e.user_id
+      LEFT JOIN user_profiles p ON p.user_id = e.user_id
       WHERE e.race_id = ${raceId}
       ORDER BY e.total_wagered_lamports DESC, e.last_bet_at ASC
       LIMIT 50

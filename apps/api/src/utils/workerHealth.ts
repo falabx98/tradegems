@@ -27,6 +27,7 @@ export const WORKER_NAMES = [
   'rug-round-manager',
   'candleflip-round-manager',
   'weekly-race',
+  'data-retention',
 ] as const;
 
 export type WorkerName = typeof WORKER_NAMES[number];

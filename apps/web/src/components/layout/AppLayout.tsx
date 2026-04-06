@@ -69,7 +69,8 @@ const styles: Record<string, React.CSSProperties> = {
   },
   main: {
     flex: 1,
-    overflow: 'auto',
+    overflowX: 'hidden',
+    overflowY: 'auto',
     background: theme.bg.base,
     padding: '24px',
   },

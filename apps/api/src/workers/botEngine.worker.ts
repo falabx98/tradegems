@@ -49,14 +49,14 @@ let lastRugGameAt = 0;
 let lastSimMaintenanceAt = 0;
 let lastLotteryAt = 0;
 
-// Randomized cooldowns (ms)
-let soloCooldown = randomBetween(5000, 15000);
-let chatCooldown = randomBetween(10000, 30000);
-let predictionCooldown = randomBetween(15000, 45000);
+// Randomized cooldowns (ms) — throttled to reduce DB write volume
+let soloCooldown = randomBetween(15000, 45000);
+let chatCooldown = randomBetween(30000, 90000);
+let predictionCooldown = randomBetween(30000, 90000);
 const onlineCooldown = 60000;
-let candleflipCooldown = randomBetween(15000, 30000);
-let rugGameCooldown = randomBetween(10000, 20000);
-let lotteryCooldown = randomBetween(30000, 90000);
+let candleflipCooldown = randomBetween(30000, 60000);
+let rugGameCooldown = randomBetween(20000, 45000);
+let lotteryCooldown = randomBetween(60000, 180000);
 
 // ─── Chat Messages Pool (120+ messages) ─────────────────────
 
@@ -692,9 +692,9 @@ async function engineTick(): Promise<void> {
   // Solo plays (cooldown 5-15s)
   if (now - lastSoloPlayAt >= soloCooldown) {
     lastSoloPlayAt = now;
-    soloCooldown = randomBetween(5000, 15000);
+    soloCooldown = randomBetween(15000, 45000);
 
-    const count = randomBetween(1, 3);
+    const count = randomBetween(1, 2);
     const selectedBots = pickRandomN(botUsers, count);
     for (const bot of selectedBots) {
       simulateSoloPlay(bot).catch(e => console.warn('[BotEngine] SoloPlay failed:', e.message));
@@ -704,7 +704,7 @@ async function engineTick(): Promise<void> {
   // Predictions (cooldown 15-45s)
   if (now - lastPredictionAt >= predictionCooldown) {
     lastPredictionAt = now;
-    predictionCooldown = randomBetween(15000, 45000);
+    predictionCooldown = randomBetween(30000, 90000);
 
     const bot = pickRandom(botUsers);
     simulatePrediction(bot).catch(e => console.warn('[BotEngine] Prediction failed:', e.message));
@@ -713,7 +713,7 @@ async function engineTick(): Promise<void> {
   // Candleflip — bots join public rounds (cooldown 8-15s)
   if (now - lastCandleflipAt >= candleflipCooldown) {
     lastCandleflipAt = now;
-    candleflipCooldown = randomBetween(8000, 15000);
+    candleflipCooldown = randomBetween(30000, 60000);
 
     const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);
@@ -725,7 +725,7 @@ async function engineTick(): Promise<void> {
   // Rug Game — bots join public rounds (cooldown 6-12s)
   if (now - lastRugGameAt >= rugGameCooldown) {
     lastRugGameAt = now;
-    rugGameCooldown = randomBetween(6000, 12000);
+    rugGameCooldown = randomBetween(20000, 45000);
 
     const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);
@@ -737,7 +737,7 @@ async function engineTick(): Promise<void> {
   // Lottery — bots buy tickets (cooldown 30-90s)
   if (now - lastLotteryAt >= lotteryCooldown) {
     lastLotteryAt = now;
-    lotteryCooldown = randomBetween(30000, 90000);
+    lotteryCooldown = randomBetween(60000, 180000);
 
     const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);

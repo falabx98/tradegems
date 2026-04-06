@@ -38,6 +38,7 @@ import { startCandleflipRoundManager } from './modules/round-manager/candleflipR
 import { startSweepWorker } from './workers/sweepWorker.js';
 import { startOrphanCleanupWorker } from './workers/orphanCleanup.worker.js';
 import { startWeeklyRaceWorker } from './workers/weeklyRace.worker.js';
+import { startDataRetentionWorker, emergencyCleanup } from './workers/dataRetention.worker.js';
 import { weeklyRaceRoutes, weeklyRaceAdminRoutes } from './routes/weeklyRace.routes.js';
 
 
@@ -254,6 +255,9 @@ export async function buildServer() {
     server.log.info(`[Startup] NODE_ENV: ${process.env.NODE_ENV}`);
   } catch (e) { server.log.error(e, 'Startup config check failed'); }
 
+  // Emergency cleanup: free disk space before starting any workers
+  try { await emergencyCleanup(); } catch (e) { server.log.error(e, 'Emergency cleanup failed (non-fatal)'); }
+
   // Start round managers (with error handling)
   try { startRugRoundManager(); } catch (e) { server.log.error(e, 'Failed to start rug round manager'); }
   try { startCandleflipRoundManager(); } catch (e) { server.log.error(e, 'Failed to start candleflip round manager'); }
@@ -267,6 +271,7 @@ export async function buildServer() {
   try { startSweepWorker(); } catch (e) { server.log.error(e, 'Failed to start sweep worker'); }
   try { startOrphanCleanupWorker(); } catch (e) { server.log.error(e, 'Failed to start orphan cleanup worker'); }
   try { startWeeklyRaceWorker(); } catch (e) { server.log.error(e, 'Failed to start weekly race worker'); }
+  try { startDataRetentionWorker(); } catch (e) { server.log.error(e, 'Failed to start data retention worker'); }
 
   // Start worker health supervisor
   try {

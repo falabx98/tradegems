@@ -244,6 +244,8 @@ export async function buildServer() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `);
+    // Ensure acknowledged column exists (added for ops dashboard)
+    await db.execute(sql`ALTER TABLE ops_alerts ADD COLUMN IF NOT EXISTS acknowledged BOOLEAN NOT NULL DEFAULT false`);
     // Withdrawal queue: ensure 'queued' and 'cancelled' statuses are supported
     // (no enum constraint in current schema — text column is flexible)
     // Add index for queue worker performance

@@ -49,14 +49,14 @@ let lastRugGameAt = 0;
 let lastSimMaintenanceAt = 0;
 let lastLotteryAt = 0;
 
-// Randomized cooldowns (ms) — throttled to reduce DB write volume
-let soloCooldown = randomBetween(15000, 45000);
-let chatCooldown = randomBetween(30000, 90000);
-let predictionCooldown = randomBetween(30000, 90000);
+// Randomized cooldowns (ms) — increased activity for lively feel
+let soloCooldown = randomBetween(5000, 15000);
+let chatCooldown = randomBetween(5000, 15000);
+let predictionCooldown = randomBetween(5000, 15000);
 const onlineCooldown = 60000;
-let candleflipCooldown = randomBetween(30000, 60000);
-let rugGameCooldown = randomBetween(20000, 45000);
-let lotteryCooldown = randomBetween(60000, 180000);
+let candleflipCooldown = randomBetween(5000, 15000);
+let rugGameCooldown = randomBetween(5000, 15000);
+let lotteryCooldown = randomBetween(15000, 45000);
 
 // ─── Chat Messages Pool (120+ messages) ─────────────────────
 
@@ -692,7 +692,7 @@ async function engineTick(): Promise<void> {
   // Solo plays (cooldown 5-15s)
   if (now - lastSoloPlayAt >= soloCooldown) {
     lastSoloPlayAt = now;
-    soloCooldown = randomBetween(15000, 45000);
+    soloCooldown = randomBetween(5000, 15000);
 
     const count = randomBetween(1, 2);
     const selectedBots = pickRandomN(botUsers, count);
@@ -701,19 +701,28 @@ async function engineTick(): Promise<void> {
     }
   }
 
-  // Predictions (cooldown 15-45s)
+  // Chat messages (cooldown 5-15s)
+  if (now - lastChatAt >= chatCooldown) {
+    lastChatAt = now;
+    chatCooldown = randomBetween(5000, 15000);
+
+    const bot = pickRandom(botUsers);
+    simulateChatMessage(bot).catch(e => console.warn('[BotEngine] Chat failed:', e.message));
+  }
+
+  // Predictions (cooldown 5-15s)
   if (now - lastPredictionAt >= predictionCooldown) {
     lastPredictionAt = now;
-    predictionCooldown = randomBetween(30000, 90000);
+    predictionCooldown = randomBetween(5000, 15000);
 
     const bot = pickRandom(botUsers);
     simulatePrediction(bot).catch(e => console.warn('[BotEngine] Prediction failed:', e.message));
   }
 
-  // Candleflip — bots join public rounds (cooldown 8-15s)
+  // Candleflip — bots join public rounds (cooldown 5-15s)
   if (now - lastCandleflipAt >= candleflipCooldown) {
     lastCandleflipAt = now;
-    candleflipCooldown = randomBetween(30000, 60000);
+    candleflipCooldown = randomBetween(5000, 15000);
 
     const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);
@@ -722,10 +731,10 @@ async function engineTick(): Promise<void> {
     }
   }
 
-  // Rug Game — bots join public rounds (cooldown 6-12s)
+  // Rug Game — bots join public rounds (cooldown 5-15s)
   if (now - lastRugGameAt >= rugGameCooldown) {
     lastRugGameAt = now;
-    rugGameCooldown = randomBetween(20000, 45000);
+    rugGameCooldown = randomBetween(5000, 15000);
 
     const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);
@@ -734,10 +743,10 @@ async function engineTick(): Promise<void> {
     }
   }
 
-  // Lottery — bots buy tickets (cooldown 30-90s)
+  // Lottery — bots buy tickets (cooldown 15-45s)
   if (now - lastLotteryAt >= lotteryCooldown) {
     lastLotteryAt = now;
-    lotteryCooldown = randomBetween(60000, 180000);
+    lotteryCooldown = randomBetween(15000, 45000);
 
     const count = randomBetween(1, 3);
     const selectedBots = pickRandomN(botUsers, count);

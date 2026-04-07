@@ -1444,12 +1444,30 @@ export async function adminRoutes(server: FastifyInstance) {
     const { id } = parseParams(uuidParams, request.params);
     const actor = getAuthUser(request);
 
-    await db.execute(sql`
-      UPDATE ops_alerts SET acknowledged = true, acknowledged_by = ${actor.userId}, acknowledged_at = ${new Date().toISOString()}
-      WHERE id = ${id}
-    `);
+    try {
+      await db.execute(sql`
+        UPDATE ops_alerts SET acknowledged = true, acknowledged_by = ${actor.userId}, acknowledged_at = ${new Date().toISOString()}
+        WHERE id = ${id}
+      `);
+    } catch {
+      // Fallback if acknowledged_by/acknowledged_at columns don't exist yet
+      await db.execute(sql`
+        UPDATE ops_alerts SET acknowledged = true WHERE id = ${id}
+      `);
+    }
 
     return { success: true };
+  });
+
+  // Bulk acknowledge alerts by category
+  server.post('/ops/alerts/acknowledge-bulk', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request) => {
+    const body = request.body as { category?: string; before?: string };
+    let query = sql`UPDATE ops_alerts SET acknowledged = true WHERE acknowledged = false`;
+    if (body.category) query = sql`${query} AND category = ${body.category}`;
+    if (body.before) query = sql`${query} AND created_at < ${body.before}`;
+    const result = await db.execute(query);
+    const count = (result as any).rowCount ?? (result as any).count ?? 0;
+    return { success: true, acknowledged: count };
   });
 
   // ═══════════════════════════════════════════════════════════

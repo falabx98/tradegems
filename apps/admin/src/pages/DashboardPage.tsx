@@ -29,6 +29,13 @@ interface TimeseriesPoint {
   value: number;
 }
 
+interface QuickStats {
+  treasuryState: string;
+  killSwitchActive: boolean;
+  unackedAlerts: number;
+  pendingWithdrawalCount: number;
+}
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const [kpis, setKpis] = useState<KpiData | null>(null);
@@ -37,6 +44,7 @@ export function DashboardPage() {
   const [revenueData, setRevenueData] = useState<TimeseriesPoint[]>([]);
   const [pendingWithdrawals, setPendingWithdrawals] = useState(0);
   const [openRiskFlags, setOpenRiskFlags] = useState(0);
+  const [quickStats, setQuickStats] = useState<QuickStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,7 +54,7 @@ export function DashboardPage() {
   async function loadDashboard() {
     setLoading(true);
     try {
-      const [statsRes, roundsRes, volRes, revRes, withRes, riskRes] = await Promise.all([
+      const [statsRes, roundsRes, volRes, revRes, withRes, riskRes, healthRes, opsRes] = await Promise.all([
         adminApi.getDashboardStats().catch(() => ({
           roundsToday: 0, betVolumeToday: 0, activeUsers: 0,
           revenue24h: 0, houseEdge: 0, totalUsers: 0,
@@ -56,6 +64,8 @@ export function DashboardPage() {
         adminApi.getTimeseries('revenue', '7d').catch(() => ({ data: [] })),
         adminApi.getWithdrawals({ status: 'pending_review', limit: 1 }).catch(() => ({ data: [], total: 0 })),
         adminApi.getRiskFlags({ resolved: false, limit: 1 }).catch(() => ({ data: [], total: 0 })),
+        adminApi.getTreasuryHealth().catch(() => null),
+        adminApi.getOpsHealth().catch(() => null),
       ]);
       setKpis(statsRes as KpiData);
       setRecentRounds((roundsRes as { data: RecentRound[] }).data);
@@ -65,6 +75,16 @@ export function DashboardPage() {
       setPendingWithdrawals(withData.total ?? withData.data.length);
       const riskData = riskRes as { data: unknown[]; total?: number };
       setOpenRiskFlags(riskData.total ?? riskData.data.length);
+
+      // Quick stats
+      const hs = healthRes as any;
+      const os = opsRes as any;
+      setQuickStats({
+        treasuryState: hs?.health?.circuitBreakerState || 'unknown',
+        killSwitchActive: hs?.health?.killSwitchActive || false,
+        unackedAlerts: os?.alerts?.unacknowledged ?? 0,
+        pendingWithdrawalCount: hs?.health?.pendingWithdrawalCount ?? 0,
+      });
     } catch {
       // silent
     }
@@ -109,8 +129,39 @@ export function DashboardPage() {
     value: d.value,
   }));
 
+  const stateColor = (s: string) =>
+    s === 'healthy' ? theme.success : s === 'warning' ? theme.warning : s === 'critical' || s === 'maintenance' ? theme.danger : theme.text.muted;
+
   return (
     <div style={styles.page}>
+      {/* Quick Stats */}
+      {quickStats && (
+        <div style={styles.quickRow}>
+          <button style={{ ...styles.quickCard, borderColor: stateColor(quickStats.treasuryState) + '60' }} onClick={() => navigate('/treasury')}>
+            <span style={{ fontSize: '1.1rem' }}>🏦</span>
+            <span style={styles.quickLabel}>Treasury</span>
+            <span style={{ ...styles.quickValue, color: stateColor(quickStats.treasuryState) }}>
+              {quickStats.treasuryState.toUpperCase()}
+            </span>
+            {quickStats.killSwitchActive && <span style={styles.killBadge}>KILL</span>}
+          </button>
+          <button style={{ ...styles.quickCard, borderColor: quickStats.unackedAlerts > 0 ? theme.danger + '60' : theme.border.medium }} onClick={() => navigate('/ops-alerts')}>
+            <span style={{ fontSize: '1.1rem' }}>🔔</span>
+            <span style={styles.quickLabel}>Unacked Alerts</span>
+            <span style={{ ...styles.quickValue, color: quickStats.unackedAlerts > 0 ? theme.danger : theme.success }}>
+              {quickStats.unackedAlerts}
+            </span>
+          </button>
+          <button style={{ ...styles.quickCard, borderColor: quickStats.pendingWithdrawalCount > 0 ? theme.warning + '60' : theme.border.medium }} onClick={() => navigate('/treasury')}>
+            <span style={{ fontSize: '1.1rem' }}>⏳</span>
+            <span style={styles.quickLabel}>Pending W/D</span>
+            <span style={{ ...styles.quickValue, color: quickStats.pendingWithdrawalCount > 0 ? theme.warning : theme.success }}>
+              {quickStats.pendingWithdrawalCount}
+            </span>
+          </button>
+        </div>
+      )}
+
       {/* KPIs */}
       <div style={styles.kpiGrid}>
         <StatCard label="Active Users" value={kpis?.activeUsers ?? 0} icon="👥" color={theme.accent.cyan} />
@@ -179,6 +230,19 @@ const styles: Record<string, CSSProperties> = {
   alertDot: { width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0 },
   alertText: { flex: 1, color: theme.text.primary, fontSize: theme.fontSize.sm },
   alertArrow: { color: theme.text.muted, fontSize: theme.fontSize.md },
+  quickRow: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' },
+  quickCard: {
+    display: 'flex', alignItems: 'center', gap: '10px',
+    padding: '12px 16px', background: theme.bg.card,
+    border: `1px solid ${theme.border.medium}`, borderRadius: theme.radius.lg,
+    cursor: 'pointer', textAlign: 'left' as const,
+  },
+  quickLabel: { fontSize: theme.fontSize.xs, color: theme.text.muted, fontWeight: 500 },
+  quickValue: { fontSize: theme.fontSize.md, fontWeight: 700, marginLeft: 'auto' },
+  killBadge: {
+    fontSize: '0.6rem', fontWeight: 800, color: '#fff', background: theme.danger,
+    borderRadius: theme.radius.sm, padding: '1px 5px', letterSpacing: '1px',
+  },
   chartsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' },
   section: { display: 'flex', flexDirection: 'column', gap: '12px' },
   sectionTitle: { fontSize: theme.fontSize.lg, fontWeight: 600, color: theme.text.primary, margin: 0 },

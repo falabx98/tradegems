@@ -1,6 +1,7 @@
-import type { CSSProperties } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { theme } from '../styles/theme';
+import { adminApi } from '../utils/api';
 
 interface SidebarProps {
   onLogout: () => void;
@@ -20,12 +21,26 @@ const navItems: { path: string; label: string; icon: string }[] = [
   { path: '/chat', label: 'Chat', icon: '💬' },
   { path: '/deposit-wallets', label: 'Wallets', icon: '🏧' },
   { path: '/referrals', label: 'Referrals', icon: '🔗' },
+  { path: '/ops-alerts', label: 'Ops Alerts', icon: '🔔' },
   { path: '/settings', label: 'Settings', icon: '⚙️' },
 ];
 
 export function Sidebar({ onLogout }: SidebarProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [unackedAlerts, setUnackedAlerts] = useState(0);
+
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      adminApi.getOpsHealth().then((res: any) => {
+        if (active) setUnackedAlerts(res?.alerts?.unacknowledged ?? 0);
+      }).catch(() => {});
+    };
+    load();
+    const iv = setInterval(load, 30_000);
+    return () => { active = false; clearInterval(iv); };
+  }, []);
 
   const isActive = (path: string) => {
     if (path === '/') return location.pathname === '/';
@@ -55,7 +70,10 @@ export function Sidebar({ onLogout }: SidebarProps) {
             onClick={() => navigate(path)}
           >
             <span>{icon}</span>
-            <span>{label}</span>
+            <span style={{ flex: 1 }}>{label}</span>
+            {path === '/ops-alerts' && unackedAlerts > 0 && (
+              <span style={styles.alertBadge}>{unackedAlerts > 99 ? '99+' : unackedAlerts}</span>
+            )}
           </button>
         ))}
       </nav>
@@ -133,6 +151,12 @@ const styles: Record<string, CSSProperties> = {
   bottom: {
     padding: '12px 16px',
     borderTop: `1px solid ${theme.border.subtle}`,
+  },
+  alertBadge: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    minWidth: '20px', height: '20px', padding: '0 5px',
+    borderRadius: '10px', background: theme.danger, color: '#fff',
+    fontSize: '0.65rem', fontWeight: 700, lineHeight: 1,
   },
   logoutBtn: {
     width: '100%',

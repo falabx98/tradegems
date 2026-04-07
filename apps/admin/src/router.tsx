@@ -17,6 +17,7 @@ import { ChatPage } from './pages/ChatPage';
 import { DepositWalletsPage } from './pages/DepositWalletsPage';
 import { ReferralsPage } from './pages/ReferralsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { OpsAlertsPage } from './pages/OpsAlertsPage';
 
 export const router = createBrowserRouter([
   {
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
           { path: 'chat', element: <ChatPage /> },
           { path: 'deposit-wallets', element: <DepositWalletsPage /> },
           { path: 'referrals', element: <ReferralsPage /> },
+          { path: 'ops-alerts', element: <OpsAlertsPage /> },
           { path: 'settings', element: <SettingsPage /> },
         ],
       },

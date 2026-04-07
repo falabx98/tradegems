@@ -292,4 +292,78 @@ export const adminApi = {
 
   getReferralStats: () =>
     apiFetch('/v1/admin/referrals/stats'),
+
+  // ─── Treasury Health & Circuit Breaker ─────────────
+  getTreasuryHealth: () =>
+    apiFetch<{
+      health: {
+        onChainBalanceLamports: number;
+        totalPendingWithdrawals: number;
+        pendingWithdrawalCount: number;
+        reserveRatio: number;
+        availableLiquidity: number;
+        circuitBreakerState: string;
+        circuitBreakerEnabled: boolean;
+        killSwitchActive: boolean;
+        lastCheckedAt: string;
+      };
+      withdrawalBreakdown: { rows?: Array<{ status: string; cnt: string; total: string }> };
+      rtp: Array<{ game: string; rtp: number }>;
+      config: {
+        withdrawalDelayHours: number;
+        warningThreshold: number;
+        criticalThreshold: number;
+        bufferPercent: number;
+        betReduction: number;
+        circuitBreakerEnabled: boolean;
+      };
+    }>('/v1/admin/treasury/health'),
+
+  getCircuitBreakerStatus: () =>
+    apiFetch<{ circuitBreakerEnabled: boolean; killSwitchActive: boolean; effectiveState: string }>(
+      '/v1/admin/circuit-breaker/status',
+    ),
+
+  toggleCircuitBreaker: (enabled: boolean) =>
+    apiFetch<{ killSwitchActive: boolean; effectiveState: string; message: string }>(
+      '/v1/admin/circuit-breaker/toggle',
+      { method: 'POST', body: JSON.stringify({ enabled }) },
+    ),
+
+  // ─── Withdrawal Actions ────────────────────────────
+  forceProcessWithdrawal: (id: string) =>
+    apiFetch<{ success: boolean; txHash?: string }>(`/v1/admin/treasury/withdrawals/${id}/force-process`, {
+      method: 'POST',
+    }),
+
+  cancelWithdrawal: (id: string, reason?: string) =>
+    apiFetch<{ success: boolean }>(`/v1/admin/treasury/withdrawals/${id}/cancel`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  // ─── Ops Alerts ────────────────────────────────────
+  getOpsAlerts: (params: { severity?: string; category?: string; acknowledged?: string; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.severity) q.set('severity', params.severity);
+    if (params.category) q.set('category', params.category);
+    if (params.acknowledged) q.set('acknowledged', params.acknowledged);
+    if (params.limit) q.set('limit', String(params.limit));
+    return apiFetch<{ data: Array<{ id: string; severity: string; category: string; message: string; userId?: string; game?: string; metadata?: unknown; acknowledged: boolean; acknowledgedBy?: string; acknowledgedAt?: string; createdAt: string }> }>(
+      `/v1/admin/ops/alerts?${q}`,
+    );
+  },
+
+  acknowledgeAlert: (data: { id?: string; category?: string; before?: string }) =>
+    apiFetch<{ success: boolean; acknowledged: number }>('/v1/admin/ops/alerts/acknowledge', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getOpsHealth: () =>
+    apiFetch<{
+      alerts: { total: number; unacknowledged: number; bySeverity: Record<string, number> };
+      gameFlags: Record<string, boolean>;
+      recentAlerts: Array<{ id: string; severity: string; category: string; message: string; createdAt: string }>;
+    }>('/v1/admin/ops/health'),
 };

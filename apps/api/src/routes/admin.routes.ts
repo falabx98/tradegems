@@ -676,6 +676,113 @@ export async function adminRoutes(server: FastifyInstance) {
     return { success: true };
   });
 
+  // POST /v1/admin/treasury/withdrawals/:id/force-process — Force process a pending/delayed withdrawal on-chain
+  server.post('/treasury/withdrawals/:id/force-process', {
+    config: { rateLimit: RATE_LIMIT_WRITE },
+    preHandler: [requireRole('admin', 'superadmin')],
+  }, async (request, reply) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const actor = getAuthUser(request);
+
+    const { WithdrawalService } = await import('../modules/solana/withdrawal.service.js');
+    const withdrawalService = new WithdrawalService();
+
+    // Verify withdrawal exists and is in processable state
+    const [withdrawal] = await db.select().from(withdrawals).where(eq(withdrawals.id, id));
+    if (!withdrawal) {
+      reply.code(404);
+      return { error: 'Withdrawal not found' };
+    }
+    if (!['pending', 'delayed', 'pending_review'].includes(withdrawal.status)) {
+      reply.code(400);
+      return { error: `Cannot force-process withdrawal with status '${withdrawal.status}'` };
+    }
+
+    // Mark as pending first (so processPendingWithdrawal accepts it)
+    if (withdrawal.status !== 'pending') {
+      await db.update(withdrawals).set({ status: 'pending' }).where(eq(withdrawals.id, id));
+    }
+
+    const result = await withdrawalService.processPendingWithdrawal(id);
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'withdrawal_force_processed',
+      targetType: 'withdrawal',
+      targetId: id,
+      payload: { result, originalStatus: withdrawal.status },
+      ipAddress: request.ip,
+    });
+
+    const { recordOpsAlert } = await import('../utils/opsAlert.js');
+    recordOpsAlert({
+      severity: 'warning',
+      category: 'treasury',
+      message: `Withdrawal ${id} force-processed by admin ${actor.userId}. Result: ${result.success ? 'success' : 'failed'}`,
+      userId: withdrawal.userId,
+      metadata: { withdrawalId: id, result, actor: actor.userId },
+    }).catch(() => {});
+
+    if (!result.success) {
+      // Restore original status if processing failed
+      await db.update(withdrawals).set({ status: withdrawal.status }).where(eq(withdrawals.id, id));
+      reply.code(500);
+      return { error: result.error || 'On-chain processing failed' };
+    }
+
+    return { success: true, txHash: result.txHash };
+  });
+
+  // POST /v1/admin/treasury/withdrawals/:id/cancel — Admin cancel a pending/delayed withdrawal
+  server.post('/treasury/withdrawals/:id/cancel', {
+    config: { rateLimit: RATE_LIMIT_WRITE },
+    preHandler: [requireRole('admin', 'superadmin')],
+  }, async (request, reply) => {
+    const { id } = parseParams(uuidParams, request.params);
+    const actor = getAuthUser(request);
+    const { reason } = (request.body as { reason?: string }) || {};
+
+    const [withdrawal] = await db.select().from(withdrawals).where(eq(withdrawals.id, id));
+    if (!withdrawal) {
+      reply.code(404);
+      return { error: 'Withdrawal not found' };
+    }
+    if (!['pending', 'delayed', 'pending_review'].includes(withdrawal.status)) {
+      reply.code(400);
+      return { error: `Cannot cancel withdrawal with status '${withdrawal.status}'` };
+    }
+
+    const { WithdrawalService } = await import('../modules/solana/withdrawal.service.js');
+    const withdrawalService = new WithdrawalService();
+
+    try {
+      await withdrawalService.cancelPendingWithdrawal(withdrawal.userId, id);
+    } catch (err: any) {
+      reply.code(400);
+      return { error: err.message || 'Cancel failed' };
+    }
+
+    await db.insert(adminAuditLogs).values({
+      actorUserId: actor.userId,
+      actionType: 'withdrawal_cancelled_by_admin',
+      targetType: 'withdrawal',
+      targetId: id,
+      payload: { reason, originalStatus: withdrawal.status, userId: withdrawal.userId },
+      ipAddress: request.ip,
+    });
+
+    const { recordOpsAlert } = await import('../utils/opsAlert.js');
+    recordOpsAlert({
+      severity: 'warning',
+      category: 'treasury',
+      message: `Withdrawal ${id} cancelled by admin ${actor.userId}. Reason: ${reason || 'no reason'}`,
+      userId: withdrawal.userId,
+      metadata: { withdrawalId: id, reason, actor: actor.userId },
+    }).catch(() => {});
+
+    return { success: true };
+  });
+
   // ═══════════════════════════════════════════════════════════
   //  ROUNDS
   // ═══════════════════════════════════════════════════════════

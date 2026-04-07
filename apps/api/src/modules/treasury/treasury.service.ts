@@ -67,13 +67,14 @@ export class TreasuryService {
     }
 
     // ── Aggregate deposit/withdrawal totals ──
-    const [aggregates] = await this.db.execute(sql`
+    const aggResult = await this.db.execute(sql`
       SELECT
         COALESCE((SELECT SUM(amount) FROM deposits WHERE status = 'confirmed'), 0) as total_deposited,
         COALESCE((SELECT SUM(amount) FROM withdrawals WHERE status IN ('confirmed', 'completed')), 0) as total_withdrawn,
         COALESCE((SELECT SUM(amount) FROM withdrawals WHERE status IN ('pending', 'processing', 'pending_review')), 0) as pending_withdrawals,
         COALESCE((SELECT COUNT(*) FROM withdrawals WHERE status IN ('pending', 'processing', 'pending_review')), 0) as pending_count
-    `) as any[];
+    `);
+    const aggregates = (aggResult as any).rows?.[0] ?? (aggResult as any)[0] ?? {};
 
     const totalDeposited = Number(aggregates?.total_deposited ?? 0);
     const totalWithdrawn = Number(aggregates?.total_withdrawn ?? 0);

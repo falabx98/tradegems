@@ -26,22 +26,24 @@ export async function transparencyRoutes(server: FastifyInstance) {
    */
   server.get('/', { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } }, async () => {
     // Aggregate platform-wide stats
-    const [stats] = await db.execute(sql`
+    const statsResult = await db.execute(sql`
       SELECT
         COALESCE(SUM(total_wagered), 0) as total_wagered,
         COALESCE(SUM(total_won), 0) as total_paid_out,
         COALESCE(SUM(rounds_played), 0) as games_played
       FROM user_profiles
-    `) as any[];
+    `);
+    const stats = (statsResult as any).rows?.[0] ?? (statsResult as any)[0] ?? {};
 
     // Average withdrawal processing time (last 30 days, completed only)
-    const [withdrawalStats] = await db.execute(sql`
+    const wdResult = await db.execute(sql`
       SELECT
         COALESCE(AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) / 3600), 0) as avg_hours
       FROM withdrawals
       WHERE status IN ('completed', 'confirmed')
         AND completed_at >= ${new Date(Date.now() - 30 * 24 * 3600 * 1000)}
-    `) as any[];
+    `);
+    const withdrawalStats = (wdResult as any).rows?.[0] ?? (wdResult as any)[0] ?? {};
 
     // Platform status from treasury (just the status string)
     const treasuryStatus = await treasuryService.getTreasuryStatus();
@@ -56,11 +58,12 @@ export async function transparencyRoutes(server: FastifyInstance) {
     // Approximated from ops_alerts — if no circuit_breaker alerts, uptime ~100%
     let uptime = 99.9;
     try {
-      const [alertCount] = await db.execute(sql`
+      const alertResult = await db.execute(sql`
         SELECT COUNT(*) as cnt FROM ops_alerts
         WHERE category = 'circuit_breaker'
           AND created_at >= ${new Date(Date.now() - 7 * 24 * 3600 * 1000)}
-      `) as any[];
+      `);
+      const alertCount = (alertResult as any).rows?.[0] ?? (alertResult as any)[0] ?? {};
       const alerts = Number(alertCount?.cnt ?? 0);
       // Each alert ~= 5 min of degraded service (rough estimate)
       const degradedMinutes = alerts * 5;

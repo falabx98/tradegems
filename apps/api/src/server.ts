@@ -61,8 +61,10 @@ export async function buildServer() {
   const coreOrigins = [
     'https://tradegems.gg',
     'https://www.tradegems.gg',
+    'https://admin.tradegems.gg',
     ...(env.NODE_ENV !== 'production' ? [
       'http://localhost:5173',
+      'http://localhost:5174',
       'http://localhost:3000',
     ] : []),
   ];

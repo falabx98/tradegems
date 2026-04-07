@@ -17,7 +17,11 @@ export type AlertCategory =
   | 'disabled_game_attempt'
   | 'payout_outlier'
   | 'endpoint_failure'
-  | 'treasury';
+  | 'treasury'
+  | 'circuit_breaker'
+  | 'withdrawal_delayed'
+  | 'withdrawal_failed'
+  | 'low_reserve_ratio';
 
 interface OpsAlertInput {
   severity: AlertSeverity;

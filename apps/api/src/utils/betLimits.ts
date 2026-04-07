@@ -9,6 +9,7 @@ import { getDb } from '../config/database.js';
 import { env } from '../config/env.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { recordOpsAlert } from './opsAlert.js';
+import { getCircuitBreakerState } from './treasuryMonitor.js';
 
 // ─── Game-specific limits lookup ────────────────────────────
 
@@ -41,7 +42,8 @@ function getGameLimits(game: HouseGame): GameLimits {
  * Call this in every house-game route BEFORE lockFunds.
  *
  * Checks:
- * 1. betAmount does not exceed the game's max bet
+ * 0. Circuit breaker — reject all bets if critical, reduce limits if warning
+ * 1. betAmount does not exceed the game's max bet (adjusted by circuit breaker)
  * 2. potentialMaxPayout does not exceed the game's max payout (if provided)
  *
  * Logs rejected bets to ops_alerts for monitoring.
@@ -54,6 +56,12 @@ export function validateGameBetLimits(
   potentialMaxPayout?: number,
 ): void {
   const limits = getGameLimits(game);
+
+  // 0. Circuit breaker check (sync — reads from cached state)
+  // Note: actual state update is async via treasuryMonitor, but the cached
+  // value in Redis is read synchronously by getCircuitBreakerState().
+  // We do this check non-blocking — if Redis fails, limits are unchanged.
+  checkCircuitBreakerSync(game, userId, betAmount, limits);
 
   // 1. Max bet check
   if (betAmount > limits.maxBet) {
@@ -162,4 +170,91 @@ export async function validateBetLimits(
       `This bet would exceed your maximum exposure limit. You have ${(currentLocked / 1e9).toFixed(4)} SOL locked. Maximum allowed: ${(env.MAX_USER_LOCKED_LAMPORTS / 1e9).toFixed(2)} SOL.`,
     );
   }
+}
+
+// ─── Circuit breaker integration ───────────────────────────
+
+/**
+ * Cached circuit breaker state — updated every ~2 min by treasuryMonitor.
+ * Local in-memory mirror to avoid Redis call on every bet validation.
+ *
+ * States: 'healthy' | 'warning' | 'critical' | 'maintenance'
+ *  - healthy:     full limits
+ *  - warning:     max bets reduced by CIRCUIT_BREAKER_BET_REDUCTION (50%)
+ *  - critical:    house games paused, only Trading Sim allowed
+ *  - maintenance: ALL paused except Trading Sim
+ */
+let _cbStateCache: { state: string; updatedAt: number } = { state: 'healthy', updatedAt: 0 };
+const CB_CACHE_TTL_MS = 10_000; // Refresh from Redis every 10s
+
+function checkCircuitBreakerSync(
+  game: HouseGame,
+  userId: string,
+  betAmount: number,
+  limits: GameLimits,
+): void {
+  const now = Date.now();
+
+  // Refresh from Redis in background if stale
+  if (now - _cbStateCache.updatedAt > CB_CACHE_TTL_MS) {
+    getCircuitBreakerState().then(state => {
+      _cbStateCache = { state, updatedAt: Date.now() };
+    }).catch(() => {});
+  }
+
+  const state = _cbStateCache.state;
+
+  // Critical or Maintenance: block all house-game bets
+  // (Trading Sim is NOT a HouseGame — it uses a different validation path)
+  if (state === 'critical' || state === 'maintenance') {
+    recordOpsAlert({
+      severity: 'critical',
+      category: 'circuit_breaker',
+      message: `${game} bet rejected: circuit breaker ${state.toUpperCase()}`,
+      userId,
+      game,
+      metadata: { betAmount },
+    }).catch(() => {});
+
+    const msg = state === 'maintenance'
+      ? 'Platform is in maintenance mode. Only Trading Sim is available. Your balance is safe.'
+      : 'Limited capacity — only Trading Sim is available right now. Please try again later.';
+
+    throw new AppError(503, 'GAMES_PAUSED', msg);
+  }
+
+  // Warning: enforce reduced limits
+  if (state === 'warning') {
+    const reducedMaxBet = Math.floor(limits.maxBet * env.CIRCUIT_BREAKER_BET_REDUCTION);
+    if (betAmount > reducedMaxBet) {
+      throw new AppError(
+        400,
+        'BET_EXCEEDS_REDUCED_CAP',
+        `High demand — maximum bet is temporarily reduced to ${(reducedMaxBet / 1e9).toFixed(2)} SOL. Please reduce your bet amount.`,
+      );
+    }
+  }
+}
+
+/**
+ * Get the effective max bet for a game (accounting for circuit breaker).
+ * Used by frontend to show current limits.
+ */
+export function getEffectiveGameLimits(game: HouseGame): GameLimits & { circuitBreakerState: string } {
+  const limits = getGameLimits(game);
+  const state = _cbStateCache.state;
+
+  if (state === 'warning') {
+    return {
+      maxBet: Math.floor(limits.maxBet * env.CIRCUIT_BREAKER_BET_REDUCTION),
+      maxPayout: limits.maxPayout,
+      circuitBreakerState: state,
+    };
+  }
+
+  if (state === 'critical' || state === 'maintenance') {
+    return { maxBet: 0, maxPayout: 0, circuitBreakerState: state };
+  }
+
+  return { ...limits, circuitBreakerState: state };
 }

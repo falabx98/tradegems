@@ -52,6 +52,15 @@ const envSchema = z.object({
   // Candleflip guardrails
   CANDLEFLIP_MAX_BET_LAMPORTS: z.coerce.number().default(500_000_000),       // 0.5 SOL
   CANDLEFLIP_MAX_PAYOUT_LAMPORTS: z.coerce.number().default(50_000_000_000), // 50 SOL
+
+  // Treasury monitoring & withdrawal queue
+  WITHDRAWAL_DELAY_HOURS: z.coerce.number().min(0).default(24),                        // 24h delay before processing
+  WITHDRAWAL_WORKER_INTERVAL_MS: z.coerce.number().default(300_000),                   // Process queue every 5 min
+  WITHDRAWAL_BUFFER_PERCENT: z.coerce.number().min(0).max(100).default(10),            // Reserve 10% buffer beyond pending withdrawals
+  TREASURY_LIQUIDITY_HEALTHY_LAMPORTS: z.coerce.number().default(20_000_000_000),      // 20 SOL — healthy
+  TREASURY_LIQUIDITY_WARNING_LAMPORTS: z.coerce.number().default(5_000_000_000),       // 5 SOL — warning: reduce max bets 50%
+  TREASURY_LIQUIDITY_CRITICAL_LAMPORTS: z.coerce.number().default(1_000_000_000),      // 1 SOL — critical: pause house games, Trading Sim only
+  CIRCUIT_BREAKER_BET_REDUCTION: z.coerce.number().min(0).max(1).default(0.5),         // Reduce max bets to 50% at warning level
 });
 
 const parsed = envSchema.safeParse(process.env);

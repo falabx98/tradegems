@@ -7,8 +7,9 @@ import { PublicKey, LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { env } from '../config/env.js';
 import { createWorkerReporter, withWorkerRecovery } from '../utils/workerHealth.js';
 import { recordOpsAlert } from '../utils/opsAlert.js';
+import { evaluateTreasuryHealth } from '../utils/treasuryMonitor.js';
 
-// Treasury alert thresholds (in SOL)
+// Treasury alert thresholds (in SOL) — legacy, kept for sweep-level alerts
 const TREASURY_LOW = Number(process.env.TREASURY_LOW_THRESHOLD || 10);
 const TREASURY_CRITICAL = Number(process.env.TREASURY_CRITICAL_THRESHOLD || 2);
 const TREASURY_HIGH = Number(process.env.TREASURY_HIGH_THRESHOLD || 1000);
@@ -46,6 +47,13 @@ async function checkTreasuryBalance() {
     const address = getTreasuryAddress();
     const balanceLamports = await connection.getBalance(new PublicKey(address));
     const balanceSol = balanceLamports / LAMPORTS_PER_SOL;
+
+    // Update treasury health & circuit breaker state
+    try {
+      await evaluateTreasuryHealth(balanceLamports);
+    } catch (err: any) {
+      console.error('[SweepWorker] Treasury health evaluation failed:', err.message);
+    }
 
     let newState: typeof lastTreasuryAlertState = 'normal';
     if (balanceSol <= TREASURY_CRITICAL) newState = 'critical';

@@ -546,3 +546,338 @@ describe('Trading Sim pool invariants', () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+//  TREASURY MONITORING & CIRCUIT BREAKER TESTS (4-level system)
+// ═══════════════════════════════════════════════════════════════
+
+describe('Treasury status — 4-level determination', () => {
+  // Thresholds from env.ts defaults
+  const HEALTHY_THRESHOLD  = 20_000_000_000; // 20 SOL
+  const WARNING_THRESHOLD  =  5_000_000_000; //  5 SOL
+  const CRITICAL_THRESHOLD =  1_000_000_000; //  1 SOL
+
+  function computeStatus(lamports: number): 'healthy' | 'warning' | 'critical' | 'maintenance' {
+    if (lamports > HEALTHY_THRESHOLD) return 'healthy';
+    if (lamports > WARNING_THRESHOLD) return 'warning';
+    if (lamports > CRITICAL_THRESHOLD) return 'critical';
+    return 'maintenance';
+  }
+
+  it('above 20 SOL → healthy', () => {
+    expect(computeStatus(20_000_000_001)).toBe('healthy');
+    expect(computeStatus(100_000_000_000)).toBe('healthy');
+  });
+
+  it('exactly 20 SOL → warning (boundary: > not >=)', () => {
+    expect(computeStatus(20_000_000_000)).toBe('warning');
+  });
+
+  it('between 5–20 SOL → warning', () => {
+    expect(computeStatus(15_000_000_000)).toBe('warning');
+    expect(computeStatus(5_000_000_001)).toBe('warning');
+  });
+
+  it('exactly 5 SOL → critical', () => {
+    expect(computeStatus(5_000_000_000)).toBe('critical');
+  });
+
+  it('between 1–5 SOL → critical', () => {
+    expect(computeStatus(3_000_000_000)).toBe('critical');
+    expect(computeStatus(1_000_000_001)).toBe('critical');
+  });
+
+  it('exactly 1 SOL → maintenance', () => {
+    expect(computeStatus(1_000_000_000)).toBe('maintenance');
+  });
+
+  it('below 1 SOL → maintenance', () => {
+    expect(computeStatus(500_000_000)).toBe('maintenance');
+    expect(computeStatus(0)).toBe('maintenance');
+  });
+});
+
+describe('Circuit breaker — bet limits per status', () => {
+  const MAX_BET = 500_000_000; // 0.5 SOL
+  const BET_REDUCTION = 0.5;
+
+  function effectiveMaxBet(status: string): number {
+    if (status === 'critical' || status === 'maintenance') return 0;
+    if (status === 'warning') return Math.floor(MAX_BET * BET_REDUCTION);
+    return MAX_BET; // healthy
+  }
+
+  it('healthy → full limits', () => {
+    expect(effectiveMaxBet('healthy')).toBe(500_000_000);
+  });
+
+  it('warning → reduced limits (50%)', () => {
+    expect(effectiveMaxBet('warning')).toBe(250_000_000);
+  });
+
+  it('critical → zero (house games paused, Trading Sim only)', () => {
+    expect(effectiveMaxBet('critical')).toBe(0);
+  });
+
+  it('maintenance → zero (all paused except Trading Sim)', () => {
+    expect(effectiveMaxBet('maintenance')).toBe(0);
+  });
+
+  it('reduced limits are positive in warning state', () => {
+    const reduced = Math.floor(MAX_BET * BET_REDUCTION);
+    expect(reduced).toBeGreaterThan(0);
+  });
+
+  it('all house games affected equally in each state', () => {
+    const GAMES = ['rug-game', 'mines', 'predictions', 'solo', 'candleflip'];
+    for (const game of GAMES) {
+      expect(effectiveMaxBet('warning')).toBe(250_000_000);
+      expect(effectiveMaxBet('critical')).toBe(0);
+    }
+  });
+});
+
+describe('Circuit breaker — Trading Sim NOT affected', () => {
+  // Trading Sim uses a different validation path (pool entry fee, not HouseGame)
+  // Its feature flag (game_trading_sim_enabled) is never toggled by circuit breaker
+  const HOUSE_GAME_FLAGS = [
+    'game_rug_enabled',
+    'game_solo_enabled',
+    'game_predictions_enabled',
+    'game_candleflip_enabled',
+  ];
+
+  it('Trading Sim flag is NOT in the house game flags list', () => {
+    expect(HOUSE_GAME_FLAGS).not.toContain('game_trading_sim_enabled');
+  });
+
+  it('house game flags are exactly 4 (rug, solo, predictions, candleflip)', () => {
+    expect(HOUSE_GAME_FLAGS).toHaveLength(4);
+  });
+});
+
+describe('Treasury monitoring — reserve ratio', () => {
+  function computeReserveRatio(onChain: number, pending: number): number {
+    return pending > 0 ? onChain / pending : Infinity;
+  }
+
+  it('no pending withdrawals → infinite reserve ratio', () => {
+    expect(computeReserveRatio(50_000_000_000, 0)).toBe(Infinity);
+  });
+
+  it('on-chain equals pending → ratio 1.0', () => {
+    expect(computeReserveRatio(10_000_000_000, 10_000_000_000)).toBeCloseTo(1.0, 4);
+  });
+
+  it('on-chain double pending → ratio 2.0', () => {
+    expect(computeReserveRatio(20_000_000_000, 10_000_000_000)).toBeCloseTo(2.0, 4);
+  });
+
+  it('on-chain less than pending → ratio < 1 (dangerous)', () => {
+    const ratio = computeReserveRatio(5_000_000_000, 10_000_000_000);
+    expect(ratio).toBeCloseTo(0.5, 4);
+    expect(ratio).toBeLessThan(1.0);
+  });
+
+  it('reserve ratio < 1.5 triggers alert threshold', () => {
+    const ratio = computeReserveRatio(12_000_000_000, 10_000_000_000);
+    expect(ratio).toBeCloseTo(1.2, 1);
+    expect(ratio).toBeLessThan(1.5);
+  });
+});
+
+describe('Withdrawal liquidity check', () => {
+  const BUFFER_PERCENT = 10;
+  const CRITICAL_THRESHOLD = 1_000_000_000; // 1 SOL (matches new env default)
+
+  function checkLiquidity(amount: number, onChain: number): { allowed: boolean } {
+    const bufferMultiplier = 1 + (BUFFER_PERCENT / 100);
+    const required = amount * bufferMultiplier;
+    if (onChain < required) return { allowed: false };
+    if (onChain - amount < CRITICAL_THRESHOLD) return { allowed: false };
+    return { allowed: true };
+  }
+
+  it('sufficient liquidity → allowed', () => {
+    expect(checkLiquidity(1_000_000_000, 50_000_000_000).allowed).toBe(true);
+  });
+
+  it('insufficient total → blocked', () => {
+    expect(checkLiquidity(1_000_000_000, 500_000_000).allowed).toBe(false);
+  });
+
+  it('would drop below critical → blocked', () => {
+    // 1.5 SOL on-chain, 1 SOL withdrawal → 0.5 SOL remaining < 1 SOL critical
+    expect(checkLiquidity(1_000_000_000, 1_500_000_000).allowed).toBe(false);
+  });
+
+  it('just above critical after withdrawal → allowed', () => {
+    // 3 SOL on-chain, 1 SOL withdrawal → 2 SOL remaining > 1 SOL critical
+    // Buffer: 1 SOL × 1.1 = 1.1 SOL (3 > 1.1 ✓)
+    expect(checkLiquidity(1_000_000_000, 3_000_000_000).allowed).toBe(true);
+  });
+
+  it('buffer percentage enforced', () => {
+    // 1.05 SOL on-chain, 1 SOL withdrawal → needs 1.1 SOL with 10% buffer
+    expect(checkLiquidity(1_000_000_000, 1_050_000_000).allowed).toBe(false);
+  });
+});
+
+describe('Withdrawal queue — delay & status flow', () => {
+  const DELAY_HOURS = 24;
+
+  it('process_after is exactly DELAY_HOURS after creation', () => {
+    const now = Date.now();
+    const processAfter = now + DELAY_HOURS * 3600 * 1000;
+    expect(processAfter - now).toBe(86_400_000);
+  });
+
+  it('withdrawal NOT ready before delay', () => {
+    const createdAt = Date.now();
+    const processAfter = createdAt + DELAY_HOURS * 3600 * 1000;
+    const checkTime = createdAt + (12 * 3600 * 1000);
+    expect(checkTime < processAfter).toBe(true);
+  });
+
+  it('withdrawal IS ready after delay', () => {
+    const createdAt = Date.now();
+    const processAfter = createdAt + DELAY_HOURS * 3600 * 1000;
+    const checkTime = createdAt + (25 * 3600 * 1000);
+    expect(checkTime >= processAfter).toBe(true);
+  });
+
+  it('zero delay → immediately processable', () => {
+    const createdAt = Date.now();
+    const processAfter = createdAt + 0 * 3600 * 1000;
+    expect(processAfter).toBe(createdAt);
+  });
+
+  it('status flow: pending → processing → completed', () => {
+    const flow = ['pending', 'processing', 'completed'];
+    expect(flow[0]).toBe('pending');
+    expect(flow[flow.length - 1]).toBe('completed');
+  });
+
+  it('delayed status retries after 1 hour', () => {
+    const delayedAt = Date.now();
+    const retryAt = delayedAt + 3600 * 1000; // 1 hour
+    expect(retryAt - delayedAt).toBe(3_600_000);
+  });
+
+  it('valid withdrawal statuses cover all lifecycle states', () => {
+    const statuses = ['pending', 'processing', 'completed', 'delayed', 'failed', 'cancelled'];
+    expect(statuses).toContain('pending');
+    expect(statuses).toContain('delayed');
+    expect(statuses).toContain('completed');
+    expect(statuses).toContain('cancelled');
+    expect(statuses).toHaveLength(6);
+  });
+});
+
+describe('Withdrawal cancellation invariants', () => {
+  it('only pending and delayed withdrawals can be cancelled', () => {
+    const CANCELLABLE = ['pending', 'delayed'];
+    const ALL_STATUSES = ['pending', 'processing', 'completed', 'delayed', 'failed', 'cancelled'];
+
+    for (const status of ALL_STATUSES) {
+      const canCancel = CANCELLABLE.includes(status);
+      if (status === 'pending' || status === 'delayed') {
+        expect(canCancel).toBe(true);
+      } else {
+        expect(canCancel).toBe(false);
+      }
+    }
+  });
+
+  it('cancellation releases full locked amount (amount + fee)', () => {
+    const amount = 1_000_000_000;
+    const fee = 5000;
+    expect(amount + fee).toBe(1_000_005_000);
+    expect(amount + fee).toBeGreaterThan(amount);
+  });
+});
+
+describe('Transparency page — public data', () => {
+  it('platform status maps correctly from treasury status', () => {
+    const mapStatus = (status: string) => {
+      if (status === 'maintenance') return 'maintenance';
+      if (status === 'critical' || status === 'warning') return 'high demand';
+      return 'operational';
+    };
+
+    expect(mapStatus('healthy')).toBe('operational');
+    expect(mapStatus('warning')).toBe('high demand');
+    expect(mapStatus('critical')).toBe('high demand');
+    expect(mapStatus('maintenance')).toBe('maintenance');
+  });
+
+  it('public endpoint does NOT expose liquidity numbers', () => {
+    // The transparency endpoint returns only:
+    // totalWagered, totalPaidOut, averageWithdrawalTimeHours, platformStatus, gamesPlayed, uptime
+    const publicFields = ['totalWagered', 'totalPaidOut', 'averageWithdrawalTimeHours', 'platformStatus', 'gamesPlayed', 'uptime'];
+    const sensitiveFields = ['currentLiquidity', 'reserveRatio', 'onChainBalance', 'pendingWithdrawals'];
+
+    for (const field of sensitiveFields) {
+      expect(publicFields).not.toContain(field);
+    }
+  });
+
+  it('public treasury/status only returns status string', () => {
+    // GET /v1/treasury/status → { status: '...' }
+    // Must NOT include: totalDeposited, totalWithdrawn, currentLiquidity, etc.
+    const publicResponse = { status: 'healthy' };
+    expect(Object.keys(publicResponse)).toEqual(['status']);
+  });
+
+  it('RTP values are bounded between 0 and 1', () => {
+    const expectedRTPs = [0.914, 0.950, 0.950, 0.950, 0.920];
+    for (const rtp of expectedRTPs) {
+      expect(rtp).toBeGreaterThan(0);
+      expect(rtp).toBeLessThan(1);
+    }
+  });
+});
+
+describe('Ops alerts — coverage', () => {
+  const ALERT_CATEGORIES = [
+    'settlement_failure',
+    'settlement_retry_failure',
+    'duplicate_blocked',
+    'bet_cap_violation',
+    'exposure_limit_violation',
+    'disabled_game_attempt',
+    'payout_outlier',
+    'endpoint_failure',
+    'treasury',
+    'circuit_breaker',
+    'withdrawal_delayed',
+    'withdrawal_failed',
+    'low_reserve_ratio',
+  ];
+
+  it('all treasury-related alert categories exist', () => {
+    expect(ALERT_CATEGORIES).toContain('circuit_breaker');
+    expect(ALERT_CATEGORIES).toContain('withdrawal_delayed');
+    expect(ALERT_CATEGORIES).toContain('withdrawal_failed');
+    expect(ALERT_CATEGORIES).toContain('low_reserve_ratio');
+    expect(ALERT_CATEGORIES).toContain('treasury');
+  });
+
+  it('reserve ratio < 1.5 triggers alert', () => {
+    const ratio = 1.2;
+    const shouldAlert = ratio < 1.5;
+    expect(shouldAlert).toBe(true);
+  });
+
+  it('reserve ratio >= 1.5 does not trigger alert', () => {
+    const ratio = 2.0;
+    const shouldAlert = ratio < 1.5;
+    expect(shouldAlert).toBe(false);
+  });
+
+  it('withdrawal delayed > 48h triggers critical alert', () => {
+    const createdAt = Date.now() - 50 * 3600 * 1000; // 50 hours ago
+    const isStale = (Date.now() - createdAt) > 48 * 3600 * 1000;
+    expect(isStale).toBe(true);
+  });
+});

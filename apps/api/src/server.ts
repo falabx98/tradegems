@@ -221,6 +221,11 @@ export async function buildServer() {
   const { analyticsRoutes } = await import('./routes/analytics.routes.js');
   await server.register(analyticsRoutes, { prefix: '/v1/analytics' });
 
+  // Public transparency page (no auth required)
+  const { transparencyRoutes, treasuryPublicRoutes } = await import('./routes/transparency.routes.js');
+  await server.register(transparencyRoutes, { prefix: '/v1/transparency' });
+  await server.register(treasuryPublicRoutes, { prefix: '/v1/treasury' });
+
   // Run pending migrations (safe — uses IF NOT EXISTS)
   try {
     const { sql } = await import('drizzle-orm');
@@ -239,6 +244,11 @@ export async function buildServer() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT now()
       )
     `);
+    // Withdrawal queue: ensure 'queued' and 'cancelled' statuses are supported
+    // (no enum constraint in current schema — text column is flexible)
+    // Add index for queue worker performance
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_withdrawals_pending ON withdrawals (status, created_at) WHERE status IN ('pending', 'delayed')`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_withdrawals_queued ON withdrawals (status, created_at) WHERE status = 'queued'`);
   } catch (e) { server.log.error(e, 'Migration failed (non-fatal)'); }
 
   // Verify critical config on startup
@@ -268,6 +278,12 @@ export async function buildServer() {
   try { startOrphanCleanupWorker(); } catch (e) { server.log.error(e, 'Failed to start orphan cleanup worker'); }
   try { startWeeklyRaceWorker(); } catch (e) { server.log.error(e, 'Failed to start weekly race worker'); }
   try { startDataRetentionWorker(); } catch (e) { server.log.error(e, 'Failed to start data retention worker'); }
+
+  // Start withdrawal processor worker (processes delayed withdrawals every 5 min)
+  try {
+    const { startWithdrawalProcessorWorker } = await import('./workers/withdrawalProcessor.worker.js');
+    startWithdrawalProcessorWorker();
+  } catch (e) { server.log.error(e, 'Failed to start withdrawal processor worker'); }
 
   // Start worker health supervisor
   try {

@@ -150,11 +150,52 @@ export async function walletRoutes(server: FastifyInstance) {
       });
     }
 
-    return withdrawalService.requestWithdrawal(
+    // Use queued withdrawal flow (funds locked immediately, processed after delay)
+    return withdrawalService.queueWithdrawal(
       userId,
       amount,
       body.destination,
     );
+  });
+
+  // ─── Cancel pending/delayed withdrawal ─────────────────────
+  server.post('/withdraw/cancel', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request) => {
+    const userId = getAuthUser(request).userId;
+    const { withdrawalId } = z.object({
+      withdrawalId: z.string().uuid(),
+    }).parse(request.body);
+
+    await withdrawalService.cancelPendingWithdrawal(userId, withdrawalId);
+    return { success: true, message: 'Withdrawal cancelled. Funds have been returned to your balance.' };
+  });
+
+  // ─── Single withdrawal status ─────────────────────────────
+  server.get('/withdrawals/:id', async (request) => {
+    const userId = getAuthUser(request).userId;
+    const { id } = request.params as { id: string };
+    return withdrawalService.getWithdrawalById(userId, id);
+  });
+
+  // ─── Withdrawal list & notifications ──────────────────────
+  server.get('/withdrawals', async (request) => {
+    const userId = getAuthUser(request).userId;
+    const { limit } = request.query as { limit?: string };
+    const parsedLimit = Math.min(Math.max(parseInt(limit || '10', 10) || 10, 1), 50);
+    const data = await withdrawalService.getUserWithdrawals(userId, parsedLimit);
+    return { data };
+  });
+
+  server.get('/withdrawal-notifications', async (request) => {
+    const userId = getAuthUser(request).userId;
+    try {
+      const { getRedis } = await import('../config/redis.js');
+      const redis = getRedis();
+      const listKey = `withdrawal:history:${userId}`;
+      const notifications = await redis.lrange(listKey, 0, 19);
+      return { data: notifications.map((n: string) => JSON.parse(n)) };
+    } catch {
+      return { data: [] };
+    }
   });
 
   // ─── Bonus: Get bonus status ────────────────────────────

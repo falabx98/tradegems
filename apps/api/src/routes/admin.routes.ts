@@ -549,6 +549,55 @@ export async function adminRoutes(server: FastifyInstance) {
     };
   });
 
+  // GET /v1/admin/treasury/status — full treasury status (admin only)
+  server.get('/treasury/status', async () => {
+    const { TreasuryService } = await import('../modules/treasury/treasury.service.js');
+    const treasuryService = new TreasuryService();
+    return treasuryService.getTreasuryStatus();
+  });
+
+  // GET /v1/admin/treasury/health — extended health + circuit breaker + RTP
+  server.get('/treasury/health', async () => {
+    const { evaluateTreasuryHealth } = await import('../utils/treasuryMonitor.js');
+    const { getObservedRTP } = await import('../utils/payoutMonitor.js');
+    const { env: envConfig } = await import('../config/env.js');
+
+    let onChainBalance = 0;
+    try {
+      const conn = getSolanaConnection();
+      const { PublicKey } = await import('@solana/web3.js');
+      const address = getTreasuryAddress();
+      onChainBalance = await conn.getBalance(new PublicKey(address));
+    } catch { /* RPC may fail */ }
+
+    const health = await evaluateTreasuryHealth(onChainBalance);
+
+    let rtp: Awaited<ReturnType<typeof getObservedRTP>> = [];
+    try { rtp = await getObservedRTP(24); } catch { /* skip */ }
+
+    const withdrawalBreakdown = await db.execute(sql`
+      SELECT status, COUNT(*) as cnt, COALESCE(SUM(amount), 0) as total
+      FROM withdrawals
+      WHERE status IN ('pending', 'delayed', 'processing', 'completed', 'failed', 'cancelled')
+        AND created_at >= ${new Date(Date.now() - 7 * 24 * 3600 * 1000)}
+      GROUP BY status
+    `) as any[];
+
+    return {
+      health,
+      withdrawalBreakdown,
+      rtp,
+      config: {
+        withdrawalDelayHours: envConfig.WITHDRAWAL_DELAY_HOURS,
+        healthyThreshold: envConfig.TREASURY_LIQUIDITY_HEALTHY_LAMPORTS,
+        warningThreshold: envConfig.TREASURY_LIQUIDITY_WARNING_LAMPORTS,
+        criticalThreshold: envConfig.TREASURY_LIQUIDITY_CRITICAL_LAMPORTS,
+        bufferPercent: envConfig.WITHDRAWAL_BUFFER_PERCENT,
+        betReduction: envConfig.CIRCUIT_BREAKER_BET_REDUCTION,
+      },
+    };
+  });
+
   server.get('/treasury/deposits', async (request) => {
     const { limit, status } = request.query as { limit?: string; status?: string };
     const conditions = status ? eq(deposits.status, status) : undefined;

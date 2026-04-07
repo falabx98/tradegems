@@ -41,7 +41,7 @@ export async function transparencyRoutes(server: FastifyInstance) {
         COALESCE(AVG(EXTRACT(EPOCH FROM (completed_at - created_at)) / 3600), 0) as avg_hours
       FROM withdrawals
       WHERE status IN ('completed', 'confirmed')
-        AND completed_at >= ${new Date(Date.now() - 30 * 24 * 3600 * 1000)}
+        AND completed_at >= ${new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString()}
     `);
     const withdrawalStats = (wdResult as any).rows?.[0] ?? (wdResult as any)[0] ?? {};
 
@@ -61,7 +61,7 @@ export async function transparencyRoutes(server: FastifyInstance) {
       const alertResult = await db.execute(sql`
         SELECT COUNT(*) as cnt FROM ops_alerts
         WHERE category = 'circuit_breaker'
-          AND created_at >= ${new Date(Date.now() - 7 * 24 * 3600 * 1000)}
+          AND created_at >= ${new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()}
       `);
       const alertCount = (alertResult as any).rows?.[0] ?? (alertResult as any)[0] ?? {};
       const alerts = Number(alertCount?.cnt ?? 0);

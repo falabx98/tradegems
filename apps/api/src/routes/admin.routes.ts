@@ -579,7 +579,7 @@ export async function adminRoutes(server: FastifyInstance) {
       SELECT status, COUNT(*) as cnt, COALESCE(SUM(amount), 0) as total
       FROM withdrawals
       WHERE status IN ('pending', 'delayed', 'processing', 'completed', 'failed', 'cancelled')
-        AND created_at >= ${new Date(Date.now() - 7 * 24 * 3600 * 1000)}
+        AND created_at >= ${new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()}
       GROUP BY status
     `) as any[];
 

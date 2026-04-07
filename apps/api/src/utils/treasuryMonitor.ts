@@ -151,9 +151,9 @@ export async function evaluateTreasuryHealth(
     const staleResult = await db.execute(sql`
       SELECT COUNT(*) as cnt FROM withdrawals
       WHERE status = 'delayed'
-        AND created_at < ${new Date(Date.now() - 48 * 3600 * 1000)}
+        AND created_at < ${new Date(Date.now() - 48 * 3600 * 1000).toISOString()}
     `) as any;
-    const staleCnt = Number(staleResult[0]?.cnt ?? 0);
+    const staleCnt = Number((staleResult as any).rows?.[0]?.cnt ?? staleResult[0]?.cnt ?? 0);
     if (staleCnt > 0) {
       recordOpsAlert({
         severity: 'critical',

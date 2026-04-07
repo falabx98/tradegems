@@ -73,8 +73,9 @@ export function hmacToInt(hmacHex: string, min: number, max: number, offset = 0)
 /**
  * Generate a crash point (for Rug Game style games).
  * House edge is embedded in the calculation.
+ * @param maxMultiplier - hard cap on crash point (default 100x)
  */
-export function generateCrashPoint(serverSeed: string, clientSeed: string, nonce: number | string, houseEdge = 0.05): number {
+export function generateCrashPoint(serverSeed: string, clientSeed: string, nonce: number | string, houseEdge = 0.05, maxMultiplier = 100): number {
   const hmac = generateHmacResult(serverSeed, clientSeed, nonce);
   const h = parseInt(hmac.substring(0, 13), 16);
 
@@ -84,7 +85,7 @@ export function generateCrashPoint(serverSeed: string, clientSeed: string, nonce
   const e = Math.pow(2, 52);
   const raw = e / (e - (h % e));
   const result = Math.max(1.00, raw * (1 - houseEdge));
-  return Math.min(parseFloat(result.toFixed(2)), 100.00);
+  return Math.min(parseFloat(result.toFixed(2)), maxMultiplier);
 }
 
 /**

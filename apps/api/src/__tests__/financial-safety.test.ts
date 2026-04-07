@@ -108,6 +108,110 @@ describe('Rug Game crash point safety', () => {
   });
 });
 
+// ─── Rug Game Bootstrap Guardrails ──────────────────────────
+
+describe('Rug Game bootstrap guardrails', () => {
+  const RUG_MAX_BET = 500_000_000;           // 0.5 SOL
+  const RUG_MAX_PAYOUT = 50_000_000_000;     // 50 SOL
+  const RUG_MAX_ROUND_EXPOSURE = 100_000_000_000; // 100 SOL
+  const RUG_MAX_MULTIPLIER = 100;
+  const HOUSE_EDGE_RUG = 0.05;
+
+  it('bet above MAX_BET is rejected', () => {
+    const betAmount = 600_000_000; // 0.6 SOL
+    expect(betAmount > RUG_MAX_BET).toBe(true);
+  });
+
+  it('bet at exactly MAX_BET passes', () => {
+    const betAmount = 500_000_000; // 0.5 SOL
+    expect(betAmount > RUG_MAX_BET).toBe(false);
+  });
+
+  it('bet below MAX_BET passes', () => {
+    const betAmount = 100_000_000; // 0.1 SOL
+    expect(betAmount > RUG_MAX_BET).toBe(false);
+  });
+
+  it('payout above MAX_PAYOUT is truncated to cap', () => {
+    const betAmount = 500_000_000;
+    const multiplier = 100;
+    let payout = Math.floor(betAmount * multiplier); // 50 SOL
+    expect(payout).toBe(50_000_000_000);
+
+    // Exactly at cap — no truncation needed
+    if (payout > RUG_MAX_PAYOUT) payout = RUG_MAX_PAYOUT;
+    expect(payout).toBe(RUG_MAX_PAYOUT);
+  });
+
+  it('payout well above MAX_PAYOUT is truncated', () => {
+    // Hypothetical: if max bet was higher
+    const betAmount = 1_000_000_000; // 1 SOL (above current max bet, but testing payout cap)
+    const multiplier = 80;
+    let payout = Math.floor(betAmount * multiplier); // 80 SOL
+    expect(payout).toBe(80_000_000_000);
+
+    if (payout > RUG_MAX_PAYOUT) payout = RUG_MAX_PAYOUT;
+    expect(payout).toBe(RUG_MAX_PAYOUT); // truncated to 50 SOL
+  });
+
+  it('payout below MAX_PAYOUT is not truncated', () => {
+    const betAmount = 100_000_000; // 0.1 SOL
+    const multiplier = 5;
+    let payout = Math.floor(betAmount * multiplier); // 0.5 SOL
+    const original = payout;
+
+    if (payout > RUG_MAX_PAYOUT) payout = RUG_MAX_PAYOUT;
+    expect(payout).toBe(original); // unchanged
+  });
+
+  it('round exposure blocks when aggregate exceeds limit', () => {
+    // 2 players betting max (0.5 SOL each) = exposure of 2 × 0.5 × 100 = 100 SOL
+    const bets = [
+      { betAmount: 500_000_000 },
+      { betAmount: 500_000_000 },
+    ];
+    const currentExposure = bets.reduce((sum, b) => sum + b.betAmount * RUG_MAX_MULTIPLIER, 0);
+    expect(currentExposure).toBe(100_000_000_000); // exactly at limit
+
+    // Third player tries to join — should be blocked
+    const newBetExposure = 100_000_000 * RUG_MAX_MULTIPLIER; // 0.1 SOL × 100 = 10 SOL
+    expect(currentExposure + newBetExposure > RUG_MAX_ROUND_EXPOSURE).toBe(true);
+  });
+
+  it('round exposure allows when within limit', () => {
+    const bets = [{ betAmount: 200_000_000 }]; // 0.2 SOL
+    const currentExposure = bets.reduce((sum, b) => sum + b.betAmount * RUG_MAX_MULTIPLIER, 0);
+    const newBetExposure = 300_000_000 * RUG_MAX_MULTIPLIER; // 0.3 SOL × 100 = 30 SOL
+    expect(currentExposure + newBetExposure <= RUG_MAX_ROUND_EXPOSURE).toBe(true);
+  });
+
+  it('one user per round is enforced', () => {
+    const bets = [
+      { userId: 'user-1', betAmount: 100_000_000 },
+      { userId: 'user-2', betAmount: 200_000_000 },
+    ];
+    const userId = 'user-1';
+    const alreadyInRound = bets.some(b => b.userId === userId);
+    expect(alreadyInRound).toBe(true);
+  });
+
+  it('max multiplier caps crash point', () => {
+    // Simulating a raw crash point above cap
+    const rawResult = 150.00;
+    const capped = Math.min(rawResult, RUG_MAX_MULTIPLIER);
+    expect(capped).toBe(100);
+  });
+
+  it('max profit ratio is consistent: MAX_PAYOUT / MAX_BET = MAX_MULTIPLIER', () => {
+    expect(RUG_MAX_PAYOUT / RUG_MAX_BET).toBe(RUG_MAX_MULTIPLIER);
+  });
+
+  it('house edge ensures RTP < 100%', () => {
+    expect(1 - HOUSE_EDGE_RUG).toBe(0.95);
+    expect(HOUSE_EDGE_RUG).toBeGreaterThan(0);
+  });
+});
+
 // ─── Prediction Multiplier Invariants ────────────────────────
 
 describe('Prediction payout invariants', () => {

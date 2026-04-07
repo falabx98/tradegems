@@ -5,8 +5,13 @@ import { WalletService } from '../wallet/wallet.service.js';
 import { UserService } from '../user/user.service.js';
 import { MissionsService } from '../missions/missions.service.js';
 import { eq, and, desc, sql } from 'drizzle-orm';
+import { env } from '../../config/env.js';
+import { recordOpsAlert } from '../../utils/opsAlert.js';
 
-const HOUSE_EDGE = 0.05; // 5% house edge applied to crash point
+const HOUSE_EDGE = env.RUG_HOUSE_EDGE;
+const MAX_BET_LAMPORTS = env.RUG_MAX_BET_LAMPORTS;
+const MAX_PAYOUT_LAMPORTS = env.RUG_MAX_PAYOUT_LAMPORTS;
+const MAX_MULTIPLIER = env.RUG_MAX_MULTIPLIER;
 
 export class RugGameService {
   private db = getDb();
@@ -30,14 +35,22 @@ export class RugGameService {
     const raw = e / (e - (h % e));
     const result = Math.max(1.00, raw * (1 - HOUSE_EDGE));
 
-    // Cap at 100x for sanity
-    return Math.min(parseFloat(result.toFixed(2)), 100.00);
+    return Math.min(parseFloat(result.toFixed(2)), MAX_MULTIPLIER);
   }
 
   // ─── Start New Game ────────────────────────────────────────
 
   async startGame(userId: string, betAmount: number) {
     if (betAmount < 1_000_000) throw new Error('Minimum bet is 0.001 SOL');
+
+    if (betAmount > MAX_BET_LAMPORTS) {
+      recordOpsAlert({
+        severity: 'warning', category: 'bet_cap_violation',
+        message: `Rug solo bet rejected: ${betAmount} > max ${MAX_BET_LAMPORTS}`,
+        userId, game: 'rug-game', metadata: { betAmount, limit: MAX_BET_LAMPORTS },
+      }).catch(() => {});
+      throw new Error('Maximum bet is 0.5 SOL during platform bootstrap phase.');
+    }
 
     const gameId = crypto.randomUUID();
 
@@ -110,7 +123,17 @@ export class RugGameService {
     }
 
     // Successful cash out — fee=0 because house edge is in the crash point; lockFunds only locked betAmount
-    const payout = Math.floor(game.betAmount * clampedMultiplier);
+    let payout = Math.floor(game.betAmount * clampedMultiplier);
+
+    // Apply max payout cap
+    if (payout > MAX_PAYOUT_LAMPORTS) {
+      recordOpsAlert({
+        severity: 'warning', category: 'payout_outlier',
+        message: `Rug solo payout truncated: ${payout} → ${MAX_PAYOUT_LAMPORTS}`,
+        userId, game: 'rug-game', metadata: { originalPayout: payout, cap: MAX_PAYOUT_LAMPORTS, multiplier: clampedMultiplier, betAmount: game.betAmount },
+      }).catch(() => {});
+      payout = MAX_PAYOUT_LAMPORTS;
+    }
 
     await this.wallet.settlePayout(
       userId,

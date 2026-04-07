@@ -10,6 +10,7 @@ import { auditLog } from '../utils/auditLog.js';
 import { validateBetLimits } from '../utils/betLimits.js';
 import { recordOpsAlert } from '../utils/opsAlert.js';
 import { checkPayoutOutlier } from '../utils/payoutMonitor.js';
+import { env } from '../config/env.js';
 
 export async function rugGameRoutes(server: FastifyInstance) {
   const service = new RugGameService();
@@ -39,7 +40,7 @@ export async function rugGameRoutes(server: FastifyInstance) {
     }
     const userId = getAuthUser(request).userId;
     const body = z.object({
-      betAmount: z.number().int().positive().min(1_000_000),
+      betAmount: z.number().int().positive().min(1_000_000).max(env.RUG_MAX_BET_LAMPORTS),
     }).parse(request.body);
 
     try {
@@ -78,7 +79,7 @@ export async function rugGameRoutes(server: FastifyInstance) {
   // Legacy routes (kept for compatibility)
   server.post('/start', { preHandler: requireAuth }, async (request, reply) => {
     const user = getAuthUser(request);
-    const body = z.object({ betAmount: z.number().int().positive() }).parse(request.body);
+    const body = z.object({ betAmount: z.number().int().positive().min(1_000_000).max(env.RUG_MAX_BET_LAMPORTS) }).parse(request.body);
     try {
       const game = await service.startGame(user.userId, body.betAmount);
       return { success: true, game };

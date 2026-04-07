@@ -29,6 +29,13 @@ const envSchema = z.object({
   // Bet caps (in lamports). Defaults are conservative.
   MAX_BET_LAMPORTS: z.coerce.number().default(100_000_000_000),        // 100 SOL max per single bet
   MAX_USER_LOCKED_LAMPORTS: z.coerce.number().default(500_000_000_000), // 500 SOL max total locked per user
+
+  // Rug Game guardrails (bootstrap phase — adjust without redeploy)
+  RUG_HOUSE_EDGE: z.coerce.number().min(0).max(0.25).default(0.05),
+  RUG_MAX_BET_LAMPORTS: z.coerce.number().default(500_000_000),              // 0.5 SOL
+  RUG_MAX_PAYOUT_LAMPORTS: z.coerce.number().default(50_000_000_000),        // 50 SOL
+  RUG_MAX_ROUND_EXPOSURE_LAMPORTS: z.coerce.number().default(100_000_000_000), // 100 SOL
+  RUG_MAX_MULTIPLIER: z.coerce.number().min(2).default(100),                 // 100x cap
 });
 
 const parsed = envSchema.safeParse(process.env);

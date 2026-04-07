@@ -7,8 +7,13 @@ import { WalletService } from '../wallet/wallet.service.js';
 import { generateRugCandle, generateCrashCandles, estimateRoundTicks, type Candle } from '../../utils/chartGenerator.js';
 import { recordFailedSettlement } from '../../utils/settlementRecovery.js';
 import { createWorkerReporter, withWorkerRecovery } from '../../utils/workerHealth.js';
+import { env } from '../../config/env.js';
+import { recordOpsAlert } from '../../utils/opsAlert.js';
 
-const HOUSE_EDGE = 0.05;
+const HOUSE_EDGE = env.RUG_HOUSE_EDGE;
+const MAX_BET_LAMPORTS = env.RUG_MAX_BET_LAMPORTS;
+const MAX_PAYOUT_LAMPORTS = env.RUG_MAX_PAYOUT_LAMPORTS;
+const MAX_ROUND_EXPOSURE_LAMPORTS = env.RUG_MAX_ROUND_EXPOSURE_LAMPORTS;
 const WAITING_DURATION = 5000; // 5s
 const RESOLVED_DURATION = 4000; // 4s pause after rug
 const TICK_INTERVAL = 250; // 250ms per candle
@@ -65,7 +70,7 @@ const wallet = new WalletService();
 import { generateCrashPoint as pfCrashPoint } from '../../utils/provablyFair.js';
 
 function generateCrashPoint(seed: string, roundId: string): number {
-  return pfCrashPoint(seed, roundId, 0, HOUSE_EDGE);
+  return pfCrashPoint(seed, roundId, 0, HOUSE_EDGE, env.RUG_MAX_MULTIPLIER);
 }
 
 async function saveToRedis() {
@@ -275,9 +280,32 @@ export async function joinRound(userId: string, betAmount: number): Promise<{ su
     return { success: false, message: 'No round in waiting phase. Wait for next round.' };
   }
 
-  // Check if already in this round
+  // Max bet per wager
+  if (betAmount > MAX_BET_LAMPORTS) {
+    recordOpsAlert({
+      severity: 'warning', category: 'bet_cap_violation',
+      message: `Rug round bet rejected: ${betAmount} > max ${MAX_BET_LAMPORTS}`,
+      userId, game: 'rug-game', metadata: { betAmount, limit: MAX_BET_LAMPORTS },
+    }).catch(() => {});
+    return { success: false, message: 'Maximum bet is 0.5 SOL during platform bootstrap phase.' };
+  }
+
+  // Check if already in this round (1 bet per user per round)
   if (state.bets.some(b => b.userId === userId)) {
     return { success: false, message: 'Already in this round.' };
+  }
+
+  // Max round exposure: sum of potential payouts (bet × max_multiplier) for all active bets
+  const maxMult = env.RUG_MAX_MULTIPLIER;
+  const currentExposure = state.bets.reduce((sum, b) => sum + b.betAmount * maxMult, 0);
+  const newBetExposure = betAmount * maxMult;
+  if (currentExposure + newBetExposure > MAX_ROUND_EXPOSURE_LAMPORTS) {
+    recordOpsAlert({
+      severity: 'warning', category: 'exposure_limit_violation',
+      message: `Rug round exposure limit hit: ${currentExposure + newBetExposure} > ${MAX_ROUND_EXPOSURE_LAMPORTS}`,
+      userId, game: 'rug-game', metadata: { currentExposure, newBetExposure, limit: MAX_ROUND_EXPOSURE_LAMPORTS, betAmount },
+    }).catch(() => {});
+    return { success: false, message: 'Round at capacity, please wait for the next round.' };
   }
 
   // Prevent concurrent joins from the same user
@@ -351,11 +379,20 @@ export async function cashOut(userId: string): Promise<{ success: boolean; multi
       return { success: false, message: 'Too late — rugged!' };
     }
 
-    // FINANCIAL SAFETY: payout can NEVER exceed betAmount × crashPoint
-    const payout = Math.min(
+    // FINANCIAL SAFETY: payout can NEVER exceed betAmount × crashPoint, AND never exceed max payout cap
+    let payout = Math.min(
       Math.floor(bet.betAmount * multiplier),
       Math.floor(bet.betAmount * hiddenRugMultiplier),
     );
+
+    if (payout > MAX_PAYOUT_LAMPORTS) {
+      recordOpsAlert({
+        severity: 'warning', category: 'payout_outlier',
+        message: `Rug round payout truncated: ${payout} → ${MAX_PAYOUT_LAMPORTS}`,
+        userId, game: 'rug-game', metadata: { originalPayout: payout, cap: MAX_PAYOUT_LAMPORTS, multiplier, betAmount: bet.betAmount, roundId: state!.roundId },
+      }).catch(() => {});
+      payout = MAX_PAYOUT_LAMPORTS;
+    }
     bet.cashOutMultiplier = parseFloat(multiplier.toFixed(4));
     bet.status = 'cashed_out';
 

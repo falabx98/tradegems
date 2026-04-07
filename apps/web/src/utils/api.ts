@@ -482,37 +482,6 @@ export const api = {
   getPlatformStats: () =>
     apiFetch<{ totalWagered: number; totalPaidOut: number; gamesPlayed: number }>('/v1/stats/platform'),
 
-  // Lottery (Powerball-style)
-  getLotteryCurrentDraw: () =>
-    apiFetch<any>('/v1/lottery/current'),
-
-  getLotteryDraw: (id: string) =>
-    apiFetch<any>(`/v1/lottery/draw/${id}`),
-
-  getLotteryDrawByNumber: (num: number) =>
-    apiFetch<any>(`/v1/lottery/draw/number/${num}`),
-
-  getLotteryHistory: (limit?: number) =>
-    apiFetch<any[]>(`/v1/lottery/history?limit=${limit || 10}`),
-
-  getLotteryPrizes: (drawId: string) =>
-    apiFetch<any>(`/v1/lottery/prizes/${drawId}`),
-
-  buyLotteryTickets: (drawId: string, tickets: { entryType: string; numbers: number[]; gemBall: number }[]) =>
-    apiFetch<{ tickets: any[]; totalCost: string; ticketCount: number }>('/v1/lottery/buy', {
-      method: 'POST',
-      body: JSON.stringify({ drawId, tickets }),
-    }),
-
-  getMyLotteryTickets: (drawId?: string) =>
-    apiFetch<any[]>(drawId ? `/v1/lottery/my-tickets/${drawId}` : '/v1/lottery/my-tickets'),
-
-  autoFillLotteryNumbers: (count: number) =>
-    apiFetch<{ numbers: number[]; gemBall: number }[]>('/v1/lottery/auto-fill', {
-      method: 'POST',
-      body: JSON.stringify({ count }),
-    }),
-
   // Trading Sim
   getTradingSimRooms: () =>
     apiFetch<{ rooms: any[] }>('/v1/trading-sim/rooms'),

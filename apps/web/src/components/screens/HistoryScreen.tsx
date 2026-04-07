@@ -32,7 +32,6 @@ const GAME_LABELS: Record<string, string> = {
   rug_result: 'Rug Game',
   candleflip_result: 'Candleflip',
   mines_result: 'Mines',
-  lottery_result: 'Lottery',
   trading_sim_result: 'Trading Sim',
 };
 
@@ -42,7 +41,6 @@ const GAME_COLORS: Record<string, string> = {
   rug_result: '#F59E0B',
   candleflip_result: '#06B6D4',
   mines_result: '#10B981',
-  lottery_result: '#EAB308',
   trading_sim_result: '#22D3EE',
 };
 

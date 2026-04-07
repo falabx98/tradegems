@@ -21,7 +21,6 @@ export const WORKER_NAMES = [
   'deposit-monitor',
   'orphan-cleanup',
   'trading-sim-expiry',
-  'lottery-draw',
   'sweep',
   'bot-engine',
   'rug-round-manager',

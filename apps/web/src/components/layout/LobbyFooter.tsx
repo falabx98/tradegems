@@ -96,7 +96,6 @@ export function LobbyFooter() {
             <FooterLink label="Predictions" onClick={() => go('prediction')} />
             <FooterLink label="Trading Sim" onClick={() => go('trading-sim')} />
             <FooterLink label="Solo" onClick={() => go('setup')} />
-            <FooterLink label="Lottery" onClick={() => go('lottery')} />
           </FooterColumn>
 
           {/* Col 2: Features */}

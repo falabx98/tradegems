@@ -25,7 +25,6 @@ const GAME_ITEMS: NavItem[] = [
   { id: 'prediction', label: 'Predictions', icon: 'candles' },
   { id: 'trading-sim', label: 'Trading Sim', icon: 'chart' },
   { id: 'solo', label: 'Solo', icon: 'play', route: 'setup' },
-  { id: 'lottery', label: 'Lottery', icon: 'star' },
 ];
 
 const COMMUNITY_ITEMS: NavItem[] = [

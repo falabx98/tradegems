@@ -23,7 +23,6 @@ const FEED_TYPE_TO_GAME: Record<string, string> = {
   rug_result: 'Rug Game',
   candleflip_result: 'Candleflip',
   mines_result: 'Mines',
-  lottery_result: 'Lottery',
   trading_sim_result: 'Trading Arena',
 };
 
@@ -33,7 +32,6 @@ const GAME_COLORS: Record<string, string> = {
   Solo: '#8B5CF6',
   Candleflip: '#06B6D4',
   Mines: '#10B981',
-  Lottery: '#EAB308',
   'Trading Arena': '#0D9488',
 };
 

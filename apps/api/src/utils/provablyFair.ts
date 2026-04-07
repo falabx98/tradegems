@@ -123,32 +123,6 @@ export function generatePredictionOutcome(
   };
 }
 
-/**
- * Generate lottery numbers deterministically.
- * @param count - how many numbers to pick
- * @param max - maximum number (inclusive)
- */
-export function generateLotteryNumbers(
-  serverSeed: string,
-  clientSeed: string,
-  count: number,
-  max: number,
-): number[] {
-  const numbers: number[] = [];
-  let attempt = 0;
-
-  while (numbers.length < count && attempt < 1000) {
-    const hmac = generateHmacResult(serverSeed, clientSeed, `lottery:${attempt}`);
-    const num = hmacToInt(hmac, 1, max);
-    if (!numbers.includes(num)) {
-      numbers.push(num);
-    }
-    attempt++;
-  }
-
-  return numbers.sort((a, b) => a - b);
-}
-
 // ─── User Seed State (Nonce Management) ─────────────────────
 
 /**

@@ -19,7 +19,6 @@ import { SeasonScreen } from './components/screens/SeasonScreen';
 import { AdminScreen } from './components/screens/AdminScreen';
 import { PlayerProfileScreen } from './components/screens/PlayerProfileScreen';
 import { TradingSimScreen } from './components/screens/TradingSimScreen';
-import { LotteryScreen } from './components/screens/LotteryScreen';
 import { CandleflipScreen } from './components/screens/CandleflipScreen';
 import { RugGameScreen } from './components/screens/RugGameScreen';
 import { MinesScreen } from './components/screens/MinesScreen';
@@ -148,7 +147,6 @@ export default function App() {
         {screen === 'admin' && <AdminScreen />}
         {screen === 'profile' && <PlayerProfileScreen />}
         {screen === 'trading-sim' && <TradingSimScreen />}
-        {screen === 'lottery' && <LotteryScreen />}
         {screen === 'candleflip' && <CandleflipScreen />}
         {screen === 'rug-game' && <RugGameScreen />}
         {screen === 'mines' && <MinesScreen />}

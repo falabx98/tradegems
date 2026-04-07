@@ -410,44 +410,6 @@ describe('Trading Sim full flow', () => {
   });
 });
 
-describe('Lottery flow', () => {
-  it('ticket purchase deducts cost immediately', () => {
-    let available = 5_000_000_000;
-    const ticketCost = 100_000_000; // 0.1 SOL standard
-    const numTickets = 5;
-    const totalCost = ticketCost * numTickets;
-
-    available -= totalCost;
-    expect(available).toBe(4_500_000_000);
-  });
-
-  it('resolve idempotency: existing winners block re-resolve', () => {
-    const existingWinners = [{ id: 'w1' }]; // already resolved
-    const shouldResolve = existingWinners.length === 0;
-    expect(shouldResolve).toBe(false);
-  });
-
-  it('draw status completed blocks re-resolve', () => {
-    const drawStatus = 'completed';
-    const shouldResolve = drawStatus !== 'completed';
-    expect(shouldResolve).toBe(false);
-  });
-
-  it('tier allocations distribute correctly', () => {
-    const prizePool = 10_000_000_000; // 10 SOL
-    const HOUSE_FEE = 0.05;
-    const distributable = Math.floor(prizePool * (1 - HOUSE_FEE));
-    expect(distributable).toBe(9_500_000_000);
-
-    const tierPercents = [0.45, 0.12, 0.09, 0.07, 0.06, 0.05, 0.04, 0.04, 0.03];
-    const totalAllocated = tierPercents.reduce((s, p) => s + Math.floor(distributable * p), 0);
-
-    // Total allocated should be close to 95% of distributable
-    expect(totalAllocated).toBeLessThanOrEqual(distributable);
-    expect(totalAllocated / distributable).toBeGreaterThan(0.94);
-  });
-});
-
 // ═══════════════════════════════════════════════════════════
 // E. CONSERVATION INVARIANTS
 // ═══════════════════════════════════════════════════════════

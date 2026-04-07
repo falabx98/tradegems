@@ -10,7 +10,6 @@ const GAME_GRADIENTS: Record<string, string> = {
   'predictions': 'linear-gradient(160deg, #0c1024 0%, #141830 100%)',
   'trading-sim': 'linear-gradient(160deg, #10082a 0%, #1a1040 100%)',
   'solo':        'linear-gradient(160deg, #081a1a 0%, #0e2828 100%)',
-  'lottery':     'linear-gradient(160deg, #1a1408 0%, #28200a 100%)',
 };
 
 // ─── Props ──────────────────────────────────────────────────

@@ -20,14 +20,12 @@ import { tipRoutes } from './routes/tip.routes.js';
 import { startDepositWorker } from './workers/depositConfirmation.worker.js';
 import { startDepositMonitor } from './workers/depositMonitor.worker.js';
 import { startBotEngine } from './workers/botEngine.worker.js';
-import { startLotteryDrawWorker } from './workers/lotteryDraw.worker.js';
 import { startTradingSimWorker } from './workers/tradingSim.worker.js';
 import { activityRoutes } from './routes/activity.routes.js';
 import { initSentry } from './config/sentry.js';
 import { fairnessRoutes } from './routes/fairness.routes.js';
 import { seasonRoutes } from './routes/season.routes.js';
 import { predictionRoutes, predictionPublicRoutes } from './routes/prediction.routes.js';
-import { lotteryRoutes } from './routes/lottery.routes.js';
 import { tradingSimRoutes } from './routes/trading-sim.routes.js';
 import { candleflipRoutes } from './routes/candleflip.routes.js';
 import { rugGameRoutes } from './routes/rug-game.routes.js';
@@ -190,7 +188,6 @@ export async function buildServer() {
   await server.register(predictionRoutes, { prefix: '/v1/predictions' });
   await server.register(predictionPublicRoutes, { prefix: '/v1/predictions' });
   await server.register(activityRoutes, { prefix: '/v1/activity' });
-  await server.register(lotteryRoutes, { prefix: '/v1/lottery' });
   await server.register(tradingSimRoutes, { prefix: '/v1/trading-sim' });
   await server.register(candleflipRoutes, { prefix: '/v1/candleflip' });
   await server.register(rugGameRoutes, { prefix: '/v1/rug-game' });
@@ -266,7 +263,6 @@ export async function buildServer() {
   try { startDepositWorker(); } catch (e) { server.log.error(e, 'Failed to start deposit worker'); }
   try { startDepositMonitor(); } catch (e) { server.log.error(e, 'Failed to start deposit monitor'); }
   try { startBotEngine(); } catch (e) { server.log.error(e, 'Failed to start bot engine'); }
-  try { startLotteryDrawWorker(); } catch (e) { server.log.error(e, 'Failed to start lottery draw worker'); }
   try { startTradingSimWorker(); } catch (e) { server.log.error(e, 'Failed to start trading sim worker'); }
   try { startSweepWorker(); } catch (e) { server.log.error(e, 'Failed to start sweep worker'); }
   try { startOrphanCleanupWorker(); } catch (e) { server.log.error(e, 'Failed to start orphan cleanup worker'); }

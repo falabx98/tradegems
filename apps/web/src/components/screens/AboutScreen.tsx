@@ -77,7 +77,7 @@ export function AboutScreen() {
         { q: 'What is provably fair?', a: 'Every game result is determined by a cryptographic seed committed before you place your bet. After the round, you can verify the seed and independently calculate the result. This proves the casino cannot manipulate outcomes.' },
         { q: 'What are the house edges?', a: 'Each game has a transparent house edge embedded in the payout multipliers. Typical range: 5% across most games. The edge is never hidden — it is built into the published multiplier tables.' },
         { q: 'How does the VIP system work?', a: 'Every SOL you wager earns XP. As you level up, you climb VIP tiers (Bronze → Silver → Gold → Platinum → Titan) with increasing rakeback percentages returned to your balance.' },
-        { q: 'What games are available?', a: 'TradeGems has 7 original games: Mines, Rug Game, Candleflip, Predictions, Solo, Trading Sim, and Lottery. All are provably fair and exclusive to TradeGems.' },
+        { q: 'What games are available?', a: 'TradeGems has 6 original games: Mines, Rug Game, Candleflip, Predictions, Solo, and Trading Sim. All are provably fair and exclusive to TradeGems.' },
       ].map((faq, i) => (
         <div key={i} style={{ ...card, cursor: 'default' }}>
           <div style={{ fontSize: ts('md'), fontWeight: 700, color: theme.text.primary, marginBottom: gap.xs }}>{faq.q}</div>

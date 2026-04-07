@@ -18,7 +18,6 @@ const GAME_FLAG_KEYS: Record<string, string> = {
   'predictions': 'game_predictions_enabled',
   'candleflip': 'game_candleflip_enabled',
   'trading-sim': 'game_trading_sim_enabled',
-  'lottery': 'game_lottery_enabled',
 };
 
 /**

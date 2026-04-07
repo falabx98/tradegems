@@ -168,48 +168,6 @@ describe('Candleflip pool invariants', () => {
   });
 });
 
-// ─── Lottery Tier Allocation Invariants ──────────────────────
-
-describe('Lottery tier allocation invariants', () => {
-  const PRIZE_TIERS = [
-    { tier: 1, poolPercent: 0.45 },
-    { tier: 2, poolPercent: 0.12 },
-    { tier: 3, poolPercent: 0.09 },
-    { tier: 4, poolPercent: 0.07 },
-    { tier: 5, poolPercent: 0.06 },
-    { tier: 6, poolPercent: 0.05 },
-    { tier: 7, poolPercent: 0.04 },
-    { tier: 8, poolPercent: 0.04 },
-    { tier: 9, poolPercent: 0.03 },
-  ];
-  const HOUSE_FEE_RATE = 0.05;
-
-  it('tier allocations sum to 0.95', () => {
-    const total = PRIZE_TIERS.reduce((s, t) => s + t.poolPercent, 0);
-    expect(total).toBeCloseTo(0.95, 10);
-  });
-
-  it('each tier positive', () => {
-    for (const tier of PRIZE_TIERS) {
-      expect(tier.poolPercent).toBeGreaterThan(0);
-    }
-  });
-
-  it('effective RTP below 100% but above 80%', () => {
-    const totalAlloc = PRIZE_TIERS.reduce((s, t) => s + t.poolPercent, 0);
-    const effectiveRtp = (1 - HOUSE_FEE_RATE) * totalAlloc;
-    expect(effectiveRtp).toBeLessThan(1.0);
-    expect(effectiveRtp).toBeGreaterThan(0.8);
-  });
-
-  it('jackpot tier gets the largest share', () => {
-    const jackpot = PRIZE_TIERS.find(t => t.tier === 1)!;
-    for (const tier of PRIZE_TIERS) {
-      expect(jackpot.poolPercent).toBeGreaterThanOrEqual(tier.poolPercent);
-    }
-  });
-});
-
 // ─── Bet Cap Invariants ──────────────────────────────────────
 
 describe('Bet cap invariants', () => {

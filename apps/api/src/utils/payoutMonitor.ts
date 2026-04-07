@@ -28,10 +28,6 @@
  *   observed RTP = sum(payout) / sum(betAmount * 1.05)
  *   expected RTP: ~90-95% (engine-dependent)
  *
- * Lottery: pool rake + tier allocation
- *   cost basis = ticket cost
- *   observed RTP = sum(prize_payouts) / sum(ticket_costs)
- *   expected RTP: ~90.25% (5% rake, 95% tier allocation)
  */
 
 import { sql } from 'drizzle-orm';
@@ -46,7 +42,6 @@ const EXPECTED_RTP: Record<string, { rtp: number; label: string }> = {
   candleflip:   { rtp: 0.950, label: 'Candleflip (~95%)' },
   'trading-sim':{ rtp: 0.950, label: 'Trading Sim (~95%)' },
   solo:         { rtp: 0.920, label: 'Solo (~92% est.)' },
-  lottery:      { rtp: 0.903, label: 'Lottery (~90.3%)' },
 };
 
 // Outlier thresholds
@@ -171,25 +166,6 @@ export async function getObservedRTP(windowHours: number = 24): Promise<GameRTP[
       game: 'solo', expectedRtp: EXPECTED_RTP.solo.rtp,
       observedRtp: observed, delta: observed !== null ? observed - EXPECTED_RTP.solo.rtp : null,
       totalWagered: totalCost, totalPaidOut: totalPaid, sampleSize: Number(row.cnt), window: windowLabel,
-    });
-  } catch { /* skip */ }
-
-  // Lottery: cost = ticket price, payout = prize amounts
-  try {
-    const lot = await db.execute(sql`
-      SELECT
-        (SELECT COALESCE(sum(cost), 0) FROM lottery_tickets WHERE purchased_at >= ${since}) as total_cost,
-        (SELECT COALESCE(sum(prize_amount), 0) FROM lottery_winners WHERE created_at >= ${since}) as total_payout,
-        (SELECT count(*) FROM lottery_tickets WHERE purchased_at >= ${since}) as ticket_cnt
-    `) as any;
-    const row = lot[0] || { total_cost: 0, total_payout: 0, ticket_cnt: 0 };
-    const totalCost = Number(row.total_cost);
-    const totalPaid = Number(row.total_payout);
-    const observed = totalCost > 0 ? totalPaid / totalCost : null;
-    results.push({
-      game: 'lottery', expectedRtp: EXPECTED_RTP.lottery.rtp,
-      observedRtp: observed, delta: observed !== null ? observed - EXPECTED_RTP.lottery.rtp : null,
-      totalWagered: totalCost, totalPaidOut: totalPaid, sampleSize: Number(row.ticket_cnt), window: windowLabel,
     });
   } catch { /* skip */ }
 

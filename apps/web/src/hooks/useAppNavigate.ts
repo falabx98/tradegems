@@ -23,7 +23,6 @@ export const SCREEN_TO_PATH: Record<string, string> = {
   admin: '/admin',
   profile: '/player',
   'trading-sim': '/trading-sim',
-  lottery: '/lottery',
   candleflip: '/candleflip',
   'rug-game': '/rug-game',
   mines: '/mines',

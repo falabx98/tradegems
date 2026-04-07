@@ -10,7 +10,6 @@ const GAMES = [
   { id: 'trading-sim', route: 'trading-sim', label: 'Trading Sim', icon: 'chart' },
   { id: 'candleflip', route: 'candleflip', label: 'Candleflip', icon: 'swords' },
   { id: 'rug-game', route: 'rug-game', label: 'Rug Game', icon: 'terminal' },
-  { id: 'lottery', route: 'lottery', label: 'Lottery', icon: 'diamond' },
 ] as const;
 
 export interface GamesSheetProps {

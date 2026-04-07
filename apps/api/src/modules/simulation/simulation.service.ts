@@ -79,7 +79,6 @@ function createEmptyStats(): SimulationStats {
       predictions: { bets: 0, wagered: 0, payout: 0 },
       solo: { bets: 0, wagered: 0, payout: 0 },
       trading_sim: { bets: 0, wagered: 0, payout: 0 },
-      lottery: { bets: 0, wagered: 0, payout: 0 },
     },
   };
 }
@@ -276,7 +275,7 @@ async function botPlaySimpleGame(userId: string, gameType: string): Promise<void
 
 // ─── Bot Runner ─────────────────────────────────────────────
 
-const GAMES = ['mines', 'rug', 'candleflip', 'predictions', 'solo', 'trading_sim', 'lottery'];
+const GAMES = ['mines', 'rug', 'candleflip', 'predictions', 'solo', 'trading_sim'];
 
 function pickGame(preferredGames: string[]): string {
   if (Math.random() < 0.7 && preferredGames.length > 0) {

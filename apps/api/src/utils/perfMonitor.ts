@@ -18,7 +18,6 @@ const MONEY_ROUTES = new Set([
   '/v1/predictions/lock', '/v1/predictions/save',
   '/v1/candleflip/bet', '/v1/candleflip/join',
   '/v1/trading-sim/create', '/v1/trading-sim/join', '/v1/trading-sim/trade', '/v1/trading-sim/start',
-  '/v1/lottery/buy',
   '/v1/gameplay/solo/start',
   '/v1/wallet/withdraw',
 ]);

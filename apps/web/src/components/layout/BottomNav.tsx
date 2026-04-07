@@ -15,7 +15,7 @@ const TABS = [
 ] as const;
 
 // Game screen IDs that should highlight the "Games" tab
-const GAME_SCREENS = ['solo', 'setup', 'prediction', 'trading-sim', 'candleflip', 'rug-game', 'lottery', 'playing', 'result'];
+const GAME_SCREENS = ['solo', 'setup', 'prediction', 'trading-sim', 'candleflip', 'rug-game', 'playing', 'result'];
 
 export function BottomNav() {
   const screen = useGameStore((s) => s.screen);

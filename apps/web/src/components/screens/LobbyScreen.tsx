@@ -50,7 +50,6 @@ const GAMES: GameDef[] = [
   { id: 'predictions', route: 'prediction', title: 'Predictions', subtitle: 'Up or down', image: '/game-predictions.webp', tags: ['quick'] },
   { id: 'trading-sim', route: 'trading-sim', title: 'Trading Sim', subtitle: 'PvP rooms', image: '/game-trading-sim.webp', tags: ['skill', 'pvp'], defaultBadge: 'pvp' },
   { id: 'solo', route: 'setup', title: 'Solo', subtitle: 'Trade vs chart', image: '/game-solo.webp', tags: ['skill'] },
-  { id: 'lottery', route: 'lottery', title: 'Lottery', subtitle: 'Jackpot draw', image: '/game-lottery.webp', tags: ['quick'], defaultBadge: 'new' },
 ];
 
 const SKILL_GAMES = GAMES.filter(g => g.tags.includes('skill'));
@@ -65,13 +64,6 @@ const PROMO_BANNERS = [
     gradient: 'linear-gradient(135deg, #1a0533 0%, #2d1b69 25%, #4c1d95 55%, #7c3aed 100%)',
     glowColor: '#a78bfa', badgeBg: 'rgba(167,139,250,0.25)', badgeBorder: 'rgba(167,139,250,0.4)',
     badgeColor: '#c4b5fd', highlightColor: '#c4b5fd', accentGlow: 'rgba(167,139,250,0.4)', link: 'wallet',
-  },
-  {
-    id: 'jackpot', badge: 'JACKPOT LIVE', highlight: '250 SOL', title: 'LOTTERY JACKPOT',
-    subtitle: 'Next draw in 6h. Tickets still open.',
-    gradient: 'linear-gradient(135deg, #052e16 0%, #064e3b 25%, #047857 55%, #10b981 100%)',
-    glowColor: '#34d399', badgeBg: 'rgba(52,211,153,0.25)', badgeBorder: 'rgba(52,211,153,0.4)',
-    badgeColor: '#6ee7b7', highlightColor: '#6ee7b7', accentGlow: 'rgba(52,211,153,0.4)', link: 'lottery',
   },
   {
     id: 'vip', badge: 'VIP REWARDS', highlight: '10%', title: 'RAKEBACK',
@@ -551,7 +543,7 @@ export function LobbyScreen() {
         api.getActivityFeed(15).catch(() => ({ data: [] })),
       ]);
 
-      const GAME_LABELS: Record<string, string> = { prediction_result: 'Predictions', solo_result: 'Solo', rug_result: 'Rug Game', candleflip_result: 'Candleflip', mines_result: 'Mines', lottery_result: 'Lottery', trading_sim_result: 'Trading Arena' };
+      const GAME_LABELS: Record<string, string> = { prediction_result: 'Predictions', solo_result: 'Solo', rug_result: 'Rug Game', candleflip_result: 'Candleflip', mines_result: 'Mines', trading_sim_result: 'Trading Arena' };
       const feedItems = (feedRes as any).data || [];
       const wins = feedItems.filter((i: any) => i.payload?.payout > i.payload?.betAmount).slice(0, 10).map((i: any) => ({
         id: i.id, username: i.payload.username || 'Player', game: GAME_LABELS[i.feedType] || 'Game',

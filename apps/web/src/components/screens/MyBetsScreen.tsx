@@ -19,7 +19,6 @@ const GAME_MAP: Record<string, { label: string; color: string; route: string }> 
   rug_result:        { label: 'Rug Game',    color: '#F59E0B', route: 'rug-game' },
   candleflip_result: { label: 'Candleflip',  color: '#06B6D4', route: 'candleflip' },
   mines_result:      { label: 'Mines',       color: '#10B981', route: 'mines' },
-  lottery_result:    { label: 'Lottery',      color: '#EAB308', route: 'lottery' },
   trading_sim_result:{ label: 'Trading Sim',  color: '#0D9488', route: 'trading-sim' },
   tournament_result: { label: 'Tournament',   color: '#8B5CF6', route: 'trading-sim' },
 };
@@ -31,7 +30,6 @@ const FILTER_OPTIONS = [
   { key: 'rug_result', label: 'Rug Game' },
   { key: 'candleflip_result', label: 'Candleflip' },
   { key: 'mines_result', label: 'Mines' },
-  { key: 'lottery_result', label: 'Lottery' },
   { key: 'trading_sim_result', label: 'Trading Sim' },
 ];
 

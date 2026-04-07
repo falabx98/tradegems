@@ -70,9 +70,9 @@ async function processWithdrawalQueue() {
     // Evaluate treasury health (updates circuit breaker state)
     const health = await evaluateTreasuryHealth(onChainBalance);
 
-    // If maintenance state, skip processing entirely
-    if (health.circuitBreakerState === 'maintenance') {
-      console.warn('[WithdrawalProcessor] Treasury in MAINTENANCE — skipping withdrawal processing');
+    // If maintenance state AND circuit breaker/kill switch is active, skip processing
+    if (health.circuitBreakerState === 'maintenance' && (health.circuitBreakerEnabled || health.killSwitchActive)) {
+      console.warn('[WithdrawalProcessor] Treasury in MAINTENANCE (circuit breaker active) — skipping withdrawal processing');
       return;
     }
 

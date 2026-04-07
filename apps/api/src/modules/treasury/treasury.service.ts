@@ -1,14 +1,17 @@
 /**
  * Treasury Service — centralized liquidity monitoring.
  *
- * Computes real-time treasury status using on-chain balance and pending
- * withdrawal obligations. Result is cached for 30 seconds.
+ * Computes real-time treasury status using RESERVE RATIO (liquidity vs
+ * pending withdrawals), not absolute balances. Result is cached for 30s.
  *
- * Status levels (Bootstrap Nivel 2):
- *  - healthy:     currentLiquidity > 20 SOL
- *  - warning:     currentLiquidity 5–20 SOL  → max bets reduced 50%
- *  - critical:    currentLiquidity 1–5 SOL   → house games paused, Trading Sim only
- *  - maintenance: currentLiquidity < 1 SOL   → everything paused except Trading Sim
+ * Status levels (Bootstrap Nivel 2 — deposits cover withdrawals):
+ *  - healthy:     no pending withdrawals OR reserveRatio >= 2.0
+ *  - warning:     reserveRatio 1.0–2.0 (can cover, but tight)
+ *  - critical:    reserveRatio 0.5–1.0 (cannot fully cover pending)
+ *  - maintenance: reserveRatio < 0.5 (grave situation)
+ *
+ * In bootstrap mode (ENABLE_CIRCUIT_BREAKER=false), status is still
+ * computed for monitoring/alerting but does NOT trigger game pauses.
  */
 
 import { sql } from 'drizzle-orm';
@@ -17,7 +20,6 @@ import { getDb } from '../../config/database.js';
 import { getRedis } from '../../config/redis.js';
 import { getSolanaConnection, getTreasuryAddress } from '../solana/treasury.js';
 import { env } from '../../config/env.js';
-import { recordOpsAlert } from '../../utils/opsAlert.js';
 
 // ─── Types ─────────────────────────────────────────────────
 
@@ -29,8 +31,9 @@ export interface TreasuryStatusResult {
   pendingWithdrawals: number;
   pendingWithdrawalCount: number;
   currentLiquidity: number;        // on-chain balance in lamports
-  reserveRatio: number;            // currentLiquidity / pendingWithdrawals (Infinity if no pending)
+  reserveRatio: number;            // currentLiquidity / pendingWithdrawals (-1 if no pending)
   status: TreasuryStatus;
+  circuitBreakerEnabled: boolean;
   lastCheckedAt: string;
 }
 
@@ -63,7 +66,7 @@ export class TreasuryService {
       const address = getTreasuryAddress();
       currentLiquidity = await conn.getBalance(new PublicKey(address));
     } catch {
-      // RPC may fail — continue with 0 (will trigger maintenance)
+      // RPC may fail — continue with 0
     }
 
     // ── Aggregate deposit/withdrawal totals ──
@@ -86,8 +89,8 @@ export class TreasuryService {
       ? currentLiquidity / pendingWithdrawals
       : Infinity;
 
-    // ── Status determination ──
-    const status = this.computeStatus(currentLiquidity);
+    // ── Status determination (based on reserve ratio, not absolute balance) ──
+    const status = this.computeStatus(currentLiquidity, pendingWithdrawals);
 
     const result: TreasuryStatusResult = {
       totalDeposited,
@@ -97,6 +100,7 @@ export class TreasuryService {
       currentLiquidity,
       reserveRatio: reserveRatio === Infinity ? -1 : parseFloat(reserveRatio.toFixed(4)),
       status,
+      circuitBreakerEnabled: env.ENABLE_CIRCUIT_BREAKER,
       lastCheckedAt: new Date().toISOString(),
     };
 
@@ -109,18 +113,23 @@ export class TreasuryService {
   }
 
   /**
-   * Determine treasury status from on-chain liquidity.
+   * Determine treasury status from reserve ratio.
    *
-   * Thresholds (env-configurable):
-   *  > HEALTHY  (20 SOL) → 'healthy'
-   *  > WARNING  ( 5 SOL) → 'warning'
-   *  > CRITICAL ( 1 SOL) → 'critical'
-   *  ≤ CRITICAL ( 1 SOL) → 'maintenance'
+   * Bootstrap logic:
+   *  - No pending withdrawals → always 'healthy' (nothing to pay)
+   *  - reserveRatio >= 2.0 → 'healthy' (2x what we owe)
+   *  - reserveRatio 1.0–2.0 → 'warning' (just enough)
+   *  - reserveRatio 0.5–1.0 → 'critical' (less than we owe)
+   *  - reserveRatio < 0.5 → 'maintenance' (grave)
    */
-  computeStatus(currentLiquidityLamports: number): TreasuryStatus {
-    if (currentLiquidityLamports > env.TREASURY_LIQUIDITY_HEALTHY_LAMPORTS) return 'healthy';
-    if (currentLiquidityLamports > env.TREASURY_LIQUIDITY_WARNING_LAMPORTS) return 'warning';
-    if (currentLiquidityLamports > env.TREASURY_LIQUIDITY_CRITICAL_LAMPORTS) return 'critical';
+  computeStatus(currentLiquidityLamports: number, pendingWithdrawalsLamports: number): TreasuryStatus {
+    // No pending withdrawals = nothing at risk
+    if (pendingWithdrawalsLamports <= 0) return 'healthy';
+
+    const ratio = currentLiquidityLamports / pendingWithdrawalsLamports;
+    if (ratio >= 2.0) return 'healthy';
+    if (ratio >= 1.0) return 'warning';
+    if (ratio >= 0.5) return 'critical';
     return 'maintenance';
   }
 

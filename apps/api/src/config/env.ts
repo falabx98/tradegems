@@ -57,10 +57,10 @@ const envSchema = z.object({
   WITHDRAWAL_DELAY_HOURS: z.coerce.number().min(0).default(24),                        // 24h delay before processing
   WITHDRAWAL_WORKER_INTERVAL_MS: z.coerce.number().default(300_000),                   // Process queue every 5 min
   WITHDRAWAL_BUFFER_PERCENT: z.coerce.number().min(0).max(100).default(10),            // Reserve 10% buffer beyond pending withdrawals
-  TREASURY_LIQUIDITY_HEALTHY_LAMPORTS: z.coerce.number().default(20_000_000_000),      // 20 SOL — healthy
-  TREASURY_LIQUIDITY_WARNING_LAMPORTS: z.coerce.number().default(5_000_000_000),       // 5 SOL — warning: reduce max bets 50%
-  TREASURY_LIQUIDITY_CRITICAL_LAMPORTS: z.coerce.number().default(1_000_000_000),      // 1 SOL — critical: pause house games, Trading Sim only
+  TREASURY_LIQUIDITY_WARNING_LAMPORTS: z.coerce.number().default(5_000_000_000),       // 5 SOL — informational alert threshold
+  TREASURY_LIQUIDITY_CRITICAL_LAMPORTS: z.coerce.number().default(1_000_000_000),      // 1 SOL — informational alert threshold
   CIRCUIT_BREAKER_BET_REDUCTION: z.coerce.number().min(0).max(1).default(0.5),         // Reduce max bets to 50% at warning level
+  ENABLE_CIRCUIT_BREAKER: z.preprocess(v => v === 'true' || v === '1', z.boolean().default(false)), // false = no automatic game pausing (bootstrap mode)
 });
 
 const parsed = envSchema.safeParse(process.env);

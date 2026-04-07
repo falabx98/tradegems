@@ -1,20 +1,18 @@
 /**
  * Treasury health monitoring and circuit breaker.
  *
- * Uses TreasuryService for status determination (4 levels).
- * Updates circuit breaker state in Redis, auto-pauses/resumes games,
- * and publishes status changes to WS gateway for real-time frontend banners.
+ * Status is based on RESERVE RATIO (liquidity vs pending withdrawals):
+ *  - "healthy"     : no pending withdrawals OR ratio >= 2.0
+ *  - "warning"     : ratio 1.0–2.0
+ *  - "critical"    : ratio 0.5–1.0
+ *  - "maintenance" : ratio < 0.5
  *
- * Circuit breaker states (stored in Redis):
- *  - "healthy"     : full limits
- *  - "warning"     : max bets reduced by CIRCUIT_BREAKER_BET_REDUCTION (50%)
- *  - "critical"    : house games paused, only Trading Sim allowed
- *  - "maintenance" : ALL paused except Trading Sim, banner shown
+ * Automatic game pausing is controlled by ENABLE_CIRCUIT_BREAKER (default false).
+ * When disabled (bootstrap mode), status is computed for monitoring/alerts only.
  *
- * Thresholds (env-configurable):
- *  - TREASURY_LIQUIDITY_HEALTHY_LAMPORTS  (default 20 SOL)
- *  - TREASURY_LIQUIDITY_WARNING_LAMPORTS  (default  5 SOL)
- *  - TREASURY_LIQUIDITY_CRITICAL_LAMPORTS (default  1 SOL)
+ * Manual kill switch:
+ *  - Redis key 'treasury:kill_switch' = 'true' overrides everything
+ *  - Toggled via POST /v1/admin/circuit-breaker/toggle
  */
 
 import { sql } from 'drizzle-orm';
@@ -35,22 +33,79 @@ export interface TreasuryHealth {
   reserveRatio: number;
   availableLiquidity: number;
   circuitBreakerState: CircuitBreakerState;
+  circuitBreakerEnabled: boolean;
+  killSwitchActive: boolean;
   lastCheckedAt: string;
 }
 
 // Redis keys
 const CB_STATE_KEY = 'treasury:circuit_breaker:state';
 const CB_HEALTH_KEY = 'treasury:health:latest';
+const KILL_SWITCH_KEY = 'treasury:kill_switch';
 const CB_STATE_TTL = 120; // seconds — re-evaluate every 2 min max
+
+// ─── Kill switch ──────────────────────────────────────────
+
+/**
+ * Check if the manual kill switch is active.
+ */
+export async function isKillSwitchActive(): Promise<boolean> {
+  try {
+    const redis = getRedis();
+    const val = await redis.get(KILL_SWITCH_KEY);
+    return val === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Toggle the manual kill switch. When active, all house games are paused
+ * regardless of ENABLE_CIRCUIT_BREAKER or reserve ratio.
+ */
+export async function setKillSwitch(active: boolean): Promise<void> {
+  const redis = getRedis();
+  if (active) {
+    await redis.set(KILL_SWITCH_KEY, 'true');
+  } else {
+    await redis.del(KILL_SWITCH_KEY);
+  }
+  // Immediately update game flags
+  await setAllHouseGamesEnabled(!active);
+  // Publish to WS gateway
+  try {
+    await redis.publish('treasury:status_change', JSON.stringify({
+      type: 'treasury.kill_switch',
+      active,
+      timestamp: Date.now(),
+    }));
+  } catch { /* non-critical */ }
+  await recordOpsAlert({
+    severity: active ? 'critical' : 'warning',
+    category: 'circuit_breaker',
+    message: active
+      ? 'Manual kill switch ACTIVATED — all house games paused by admin'
+      : 'Manual kill switch DEACTIVATED — house games resumed by admin',
+    metadata: { killSwitch: active },
+  });
+}
 
 // ─── Circuit breaker state ─────────────────────────────────
 
 /**
- * Get current circuit breaker state from Redis cache.
- * Returns 'healthy' if Redis is unavailable (fail-open).
+ * Get the effective circuit breaker state.
+ * Kill switch overrides everything.
+ * If ENABLE_CIRCUIT_BREAKER is false, always returns 'healthy'
+ * (games are never auto-paused).
  */
 export async function getCircuitBreakerState(): Promise<CircuitBreakerState> {
   try {
+    // Kill switch takes priority
+    if (await isKillSwitchActive()) return 'maintenance';
+
+    // If auto circuit breaker is disabled, always healthy (no pausing)
+    if (!env.ENABLE_CIRCUIT_BREAKER) return 'healthy';
+
     const redis = getRedis();
     const state = await redis.get(CB_STATE_KEY);
     if (state === 'warning' || state === 'critical' || state === 'maintenance') return state as CircuitBreakerState;
@@ -61,13 +116,15 @@ export async function getCircuitBreakerState(): Promise<CircuitBreakerState> {
 }
 
 /**
- * Compute treasury status from on-chain balance.
- * Mirrors TreasuryService.computeStatus — pure function for use without service.
+ * Compute treasury status from reserve ratio.
+ * No pending withdrawals = healthy (nothing at risk).
  */
-export function computeTreasuryStatus(liquidityLamports: number): CircuitBreakerState {
-  if (liquidityLamports > env.TREASURY_LIQUIDITY_HEALTHY_LAMPORTS) return 'healthy';
-  if (liquidityLamports > env.TREASURY_LIQUIDITY_WARNING_LAMPORTS) return 'warning';
-  if (liquidityLamports > env.TREASURY_LIQUIDITY_CRITICAL_LAMPORTS) return 'critical';
+export function computeTreasuryStatus(liquidityLamports: number, pendingWithdrawalsLamports: number): CircuitBreakerState {
+  if (pendingWithdrawalsLamports <= 0) return 'healthy';
+  const ratio = liquidityLamports / pendingWithdrawalsLamports;
+  if (ratio >= 2.0) return 'healthy';
+  if (ratio >= 1.0) return 'warning';
+  if (ratio >= 0.5) return 'critical';
   return 'maintenance';
 }
 
@@ -94,8 +151,8 @@ export async function evaluateTreasuryHealth(
            COALESCE(SUM(amount), 0) as total
     FROM withdrawals
     WHERE status IN ('pending', 'processing', 'pending_review')
-  `) as any;
-  const row = pendingResult[0] || { cnt: 0, total: 0 };
+  `);
+  const row = (pendingResult as any).rows?.[0] ?? (pendingResult as any)[0] ?? { cnt: 0, total: 0 };
   const totalPendingWithdrawals = Number(row.total);
   const pendingWithdrawalCount = Number(row.cnt);
 
@@ -109,14 +166,23 @@ export async function evaluateTreasuryHealth(
   const requiredReserve = totalPendingWithdrawals * bufferMultiplier;
   const availableLiquidity = onChainBalanceLamports - requiredReserve;
 
-  // Determine state from 4-level system
-  const newState = computeTreasuryStatus(onChainBalanceLamports);
+  // Determine state from reserve ratio
+  const computedState = computeTreasuryStatus(onChainBalanceLamports, totalPendingWithdrawals);
+  const killSwitchActive = await isKillSwitchActive();
+
+  // Effective state: kill switch overrides, then auto circuit breaker
+  let effectiveState = computedState;
+  if (killSwitchActive) {
+    effectiveState = 'maintenance';
+  } else if (!env.ENABLE_CIRCUIT_BREAKER) {
+    effectiveState = 'healthy'; // bootstrap mode: never auto-pause
+  }
 
   // Get previous state for transition detection
   const prevState = await getCircuitBreakerState();
 
-  // Update Redis
-  await redis.set(CB_STATE_KEY, newState, 'EX', CB_STATE_TTL);
+  // Update Redis with effective state
+  await redis.set(CB_STATE_KEY, effectiveState, 'EX', CB_STATE_TTL);
 
   const health: TreasuryHealth = {
     onChainBalanceLamports,
@@ -124,19 +190,23 @@ export async function evaluateTreasuryHealth(
     pendingWithdrawalCount,
     reserveRatio: reserveRatio === Infinity ? -1 : parseFloat(reserveRatio.toFixed(4)),
     availableLiquidity,
-    circuitBreakerState: newState,
+    circuitBreakerState: effectiveState,
+    circuitBreakerEnabled: env.ENABLE_CIRCUIT_BREAKER,
+    killSwitchActive,
     lastCheckedAt: new Date().toISOString(),
   };
 
   // Cache health snapshot
   await redis.set(CB_HEALTH_KEY, JSON.stringify(health), 'EX', CB_STATE_TTL);
 
-  // Handle state transitions
-  if (newState !== prevState) {
-    await handleStateTransition(prevState, newState, health);
+  // Handle state transitions (only when circuit breaker is enabled or kill switch)
+  if (effectiveState !== prevState && (env.ENABLE_CIRCUIT_BREAKER || killSwitchActive)) {
+    await handleStateTransition(prevState, effectiveState, health);
   }
 
-  // Alert on low reserve ratio (even within same state)
+  // ── Informational alerts (always logged, regardless of circuit breaker) ──
+
+  // Alert on low reserve ratio
   if (reserveRatio !== Infinity && reserveRatio < 1.5 && totalPendingWithdrawals > 0) {
     recordOpsAlert({
       severity: reserveRatio < 1.0 ? 'critical' : 'warning',
@@ -146,14 +216,24 @@ export async function evaluateTreasuryHealth(
     }).catch(() => {});
   }
 
+  // Informational low-balance alerts (never triggers game pauses)
+  if (onChainBalanceLamports < env.TREASURY_LIQUIDITY_CRITICAL_LAMPORTS && onChainBalanceLamports > 0) {
+    recordOpsAlert({
+      severity: 'warning',
+      category: 'treasury',
+      message: `Treasury balance low: ${(onChainBalanceLamports / 1e9).toFixed(4)} SOL (below ${(env.TREASURY_LIQUIDITY_CRITICAL_LAMPORTS / 1e9).toFixed(0)} SOL threshold). Informational only.`,
+      metadata: { onChainBalanceLamports, threshold: env.TREASURY_LIQUIDITY_CRITICAL_LAMPORTS },
+    }).catch(() => {});
+  }
+
   // Alert on withdrawals delayed > 48 hours
   try {
     const staleResult = await db.execute(sql`
       SELECT COUNT(*) as cnt FROM withdrawals
       WHERE status = 'delayed'
         AND created_at < ${new Date(Date.now() - 48 * 3600 * 1000).toISOString()}
-    `) as any;
-    const staleCnt = Number((staleResult as any).rows?.[0]?.cnt ?? staleResult[0]?.cnt ?? 0);
+    `);
+    const staleCnt = Number((staleResult as any).rows?.[0]?.cnt ?? (staleResult as any)[0]?.cnt ?? 0);
     if (staleCnt > 0) {
       recordOpsAlert({
         severity: 'critical',
@@ -201,48 +281,36 @@ async function handleStateTransition(
     }));
   } catch { /* non-critical */ }
 
-  if (to === 'maintenance') {
-    console.error(`[CircuitBreaker] MAINTENANCE — Treasury ${balSol} SOL below critical. ALL games paused except Trading Sim.`);
+  if (to === 'maintenance' || to === 'critical') {
+    console.error(`[CircuitBreaker] ${to.toUpperCase()} — Treasury ${balSol} SOL. House games paused.`);
     await recordOpsAlert({
       severity: 'critical',
       category: 'circuit_breaker',
-      message: `Circuit breaker MAINTENANCE: treasury ${balSol} SOL. All games paused except Trading Sim. Pending: ${health.pendingWithdrawalCount}`,
-      metadata: { ...health, transition: `${from} → ${to}` },
-    });
-    await setAllHouseGamesEnabled(false);
-
-  } else if (to === 'critical') {
-    console.error(`[CircuitBreaker] CRITICAL — Treasury ${balSol} SOL. House games paused, Trading Sim only.`);
-    await recordOpsAlert({
-      severity: 'critical',
-      category: 'circuit_breaker',
-      message: `Circuit breaker CRITICAL: treasury ${balSol} SOL. House games paused, only Trading Sim available.`,
+      message: `Circuit breaker ${to.toUpperCase()}: treasury ${balSol} SOL. Reserve ratio: ${health.reserveRatio}. Pending: ${health.pendingWithdrawalCount}`,
       metadata: { ...health, transition: `${from} → ${to}` },
     });
     await setAllHouseGamesEnabled(false);
 
   } else if (to === 'warning') {
-    console.warn(`[CircuitBreaker] WARNING — Treasury ${balSol} SOL. Max bets reduced to ${env.CIRCUIT_BREAKER_BET_REDUCTION * 100}%.`);
+    console.warn(`[CircuitBreaker] WARNING — Reserve ratio ${health.reserveRatio}. Max bets reduced to ${env.CIRCUIT_BREAKER_BET_REDUCTION * 100}%.`);
     await recordOpsAlert({
       severity: 'warning',
       category: 'circuit_breaker',
-      message: `Circuit breaker WARNING: treasury ${balSol} SOL. Max bets reduced to ${env.CIRCUIT_BREAKER_BET_REDUCTION * 100}%.`,
+      message: `Circuit breaker WARNING: reserve ratio ${health.reserveRatio}. Max bets reduced to ${env.CIRCUIT_BREAKER_BET_REDUCTION * 100}%.`,
       metadata: { ...health, transition: `${from} → ${to}` },
     });
-    // Re-enable house games if recovering from critical/maintenance
     if (from === 'critical' || from === 'maintenance') {
       await setAllHouseGamesEnabled(true);
     }
 
   } else if (to === 'healthy' && from !== 'healthy') {
-    console.log(`[CircuitBreaker] HEALTHY — Treasury ${balSol} SOL. Full limits restored.`);
+    console.log(`[CircuitBreaker] HEALTHY — Reserve ratio restored. Full limits active.`);
     await recordOpsAlert({
       severity: 'warning',
       category: 'circuit_breaker',
-      message: `Circuit breaker HEALTHY: treasury ${balSol} SOL restored. Full limits active.`,
+      message: `Circuit breaker HEALTHY: reserve ratio restored. Full limits active.`,
       metadata: { ...health, transition: `${from} → ${to}` },
     });
-    // Re-enable house games if recovering from any degraded state
     if (from === 'critical' || from === 'maintenance') {
       await setAllHouseGamesEnabled(true);
     }
@@ -253,10 +321,9 @@ async function handleStateTransition(
  * Enable or disable all house games via feature flags + Redis cache.
  * NOTE: Trading Sim (game_trading_sim_enabled) is NEVER disabled by circuit breaker.
  */
-async function setAllHouseGamesEnabled(enabled: boolean): Promise<void> {
+export async function setAllHouseGamesEnabled(enabled: boolean): Promise<void> {
   const db = getDb();
   const redis = getRedis();
-  // Trading Sim is intentionally excluded — it must always remain available
   const flagKeys = [
     'game_rug_enabled',
     'game_solo_enabled',
@@ -281,7 +348,6 @@ async function setAllHouseGamesEnabled(enabled: boolean): Promise<void> {
 
 /**
  * Check if treasury has sufficient liquidity for a withdrawal.
- * Returns { allowed, reason }.
  */
 export async function checkWithdrawalLiquidity(
   amountLamports: number,
@@ -294,14 +360,6 @@ export async function checkWithdrawalLiquidity(
     return {
       allowed: false,
       reason: `Insufficient treasury liquidity: on-chain ${(onChainBalanceLamports / 1e9).toFixed(4)} SOL, needed ${(requiredAfter / 1e9).toFixed(4)} SOL (including ${env.WITHDRAWAL_BUFFER_PERCENT}% buffer)`,
-    };
-  }
-
-  // Don't process if it would drop below critical threshold
-  if (onChainBalanceLamports - amountLamports < env.TREASURY_LIQUIDITY_CRITICAL_LAMPORTS) {
-    return {
-      allowed: false,
-      reason: `Processing would drop treasury below critical threshold (${(env.TREASURY_LIQUIDITY_CRITICAL_LAMPORTS / 1e9).toFixed(2)} SOL)`,
     };
   }
 

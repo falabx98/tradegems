@@ -13,6 +13,7 @@ import { getTreasuryAddress, getSolanaConnection } from '../modules/solana/treas
 import { DepositWalletService } from '../modules/solana/depositWallet.service.js';
 import { retrySettlement } from '../utils/settlementRecovery.js';
 import { getObservedRTP } from '../utils/payoutMonitor.js';
+import { AppError } from '../middleware/errorHandler.js';
 import { getPerformanceStats, getMoneyRoutePerformance } from '../utils/perfMonitor.js';
 import { getRedis } from '../config/redis.js';
 import { z, ZodError } from 'zod';
@@ -589,12 +590,43 @@ export async function adminRoutes(server: FastifyInstance) {
       rtp,
       config: {
         withdrawalDelayHours: envConfig.WITHDRAWAL_DELAY_HOURS,
-        healthyThreshold: envConfig.TREASURY_LIQUIDITY_HEALTHY_LAMPORTS,
         warningThreshold: envConfig.TREASURY_LIQUIDITY_WARNING_LAMPORTS,
         criticalThreshold: envConfig.TREASURY_LIQUIDITY_CRITICAL_LAMPORTS,
         bufferPercent: envConfig.WITHDRAWAL_BUFFER_PERCENT,
         betReduction: envConfig.CIRCUIT_BREAKER_BET_REDUCTION,
+        circuitBreakerEnabled: envConfig.ENABLE_CIRCUIT_BREAKER,
       },
+    };
+  });
+
+  // ─── Circuit breaker manual controls ─────────────────────
+
+  // GET /v1/admin/circuit-breaker/status
+  server.get('/circuit-breaker/status', async () => {
+    const { getCircuitBreakerState, isKillSwitchActive } = await import('../utils/treasuryMonitor.js');
+    const { env: envConfig } = await import('../config/env.js');
+    return {
+      circuitBreakerEnabled: envConfig.ENABLE_CIRCUIT_BREAKER,
+      killSwitchActive: await isKillSwitchActive(),
+      effectiveState: await getCircuitBreakerState(),
+    };
+  });
+
+  // POST /v1/admin/circuit-breaker/toggle — manual kill switch
+  server.post('/circuit-breaker/toggle', {
+    config: { rateLimit: RATE_LIMIT_WRITE },
+    preHandler: [requireRole('operator', 'admin', 'superadmin')],
+  }, async (request) => {
+    const { enabled } = request.body as { enabled: boolean };
+    if (typeof enabled !== 'boolean') {
+      throw new AppError(400, 'INVALID_PARAMS', 'Body must include { enabled: boolean }');
+    }
+    const { setKillSwitch, isKillSwitchActive, getCircuitBreakerState } = await import('../utils/treasuryMonitor.js');
+    await setKillSwitch(enabled);
+    return {
+      killSwitchActive: await isKillSwitchActive(),
+      effectiveState: await getCircuitBreakerState(),
+      message: enabled ? 'Kill switch activated — all house games paused' : 'Kill switch deactivated — house games resumed',
     };
   });
 

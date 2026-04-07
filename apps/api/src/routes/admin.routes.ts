@@ -1338,28 +1338,28 @@ export async function adminRoutes(server: FastifyInstance) {
   // Ops health overview — single endpoint for operator dashboard
   server.get('/ops/health', async () => {
     const now = new Date();
-    const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const oneDayAgoStr = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const oneHourAgoStr = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
 
     // Failed settlements
-    const failedSettlementsData = await db.execute(sql`
+    const failedSettlementsResult = await db.execute(sql`
       SELECT
         count(*) FILTER (WHERE status = 'pending') as pending_count,
         count(*) FILTER (WHERE status = 'resolved') as resolved_count,
         count(*) FILTER (WHERE status = 'abandoned') as abandoned_count,
-        count(*) FILTER (WHERE created_at >= ${oneDayAgo}) as last_24h_count
+        count(*) FILTER (WHERE created_at >= ${oneDayAgoStr}) as last_24h_count
       FROM failed_settlements
     `);
 
     // Ops alerts (last 24h)
-    const alertsData = await db.execute(sql`
+    const alertsResult = await db.execute(sql`
       SELECT
         count(*) FILTER (WHERE severity = 'critical') as critical_count,
         count(*) FILTER (WHERE severity = 'warning') as warning_count,
         count(*) FILTER (WHERE acknowledged = false) as unacked_count,
-        count(*) FILTER (WHERE created_at >= ${oneHourAgo}) as last_hour_count
+        count(*) FILTER (WHERE created_at >= ${oneHourAgoStr}) as last_hour_count
       FROM ops_alerts
-      WHERE created_at >= ${oneDayAgo}
+      WHERE created_at >= ${oneDayAgoStr}
     `);
 
     // Game flags
@@ -1370,20 +1370,24 @@ export async function adminRoutes(server: FastifyInstance) {
     }));
 
     // Recent critical alerts (last 10)
-    const recentAlerts = await db.execute(sql`
+    const recentAlertsResult = await db.execute(sql`
       SELECT id, severity, category, message, user_id, game, request_id, created_at, acknowledged
       FROM ops_alerts
-      WHERE created_at >= ${oneDayAgo}
+      WHERE created_at >= ${oneDayAgoStr}
       ORDER BY created_at DESC
       LIMIT 10
     `);
 
+    const failedSettlementsData = (failedSettlementsResult as any).rows?.[0] ?? (failedSettlementsResult as any)[0] ?? {};
+    const alertsData = (alertsResult as any).rows?.[0] ?? (alertsResult as any)[0] ?? {};
+    const recentAlerts = (recentAlertsResult as any).rows ?? recentAlertsResult ?? [];
+
     return {
       timestamp: now.toISOString(),
-      settlements: (failedSettlementsData as any)[0] || { pending_count: 0, resolved_count: 0, abandoned_count: 0, last_24h_count: 0 },
-      alerts: (alertsData as any)[0] || { critical_count: 0, warning_count: 0, unacked_count: 0, last_hour_count: 0 },
+      settlements: failedSettlementsData.pending_count !== undefined ? failedSettlementsData : { pending_count: 0, resolved_count: 0, abandoned_count: 0, last_24h_count: 0 },
+      alerts: alertsData.critical_count !== undefined ? alertsData : { critical_count: 0, warning_count: 0, unacked_count: 0, last_hour_count: 0 },
       gameFlags,
-      recentAlerts: recentAlerts || [],
+      recentAlerts,
     };
   });
 

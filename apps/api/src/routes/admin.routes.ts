@@ -1445,8 +1445,8 @@ export async function adminRoutes(server: FastifyInstance) {
     const actor = getAuthUser(request);
 
     await db.execute(sql`
-      UPDATE ops_alerts SET acknowledged = true, acknowledged_by = ${actor.userId}, acknowledged_at = now()
-      WHERE id = ${id}::uuid
+      UPDATE ops_alerts SET acknowledged = true, acknowledged_by = ${actor.userId}, acknowledged_at = ${new Date().toISOString()}
+      WHERE id = ${id}
     `);
 
     return { success: true };

@@ -6,7 +6,8 @@ import { requireNotExcluded } from '../middleware/selfExclusion.js';
 import { CandleflipService } from '../modules/candleflip/candleflip.service.js';
 import { getCandleflipCurrentRound, betOnRound, getRecentCandleflipRounds } from '../modules/round-manager/candleflipRoundManager.js';
 import { requireGameEnabled } from '../utils/gameGates.js';
-import { validateBetLimits } from '../utils/betLimits.js';
+import { validateBetLimits, validateGameBetLimits } from '../utils/betLimits.js';
+import { env } from '../config/env.js';
 
 export async function candleflipRoutes(server: FastifyInstance) {
   const service = new CandleflipService();
@@ -30,8 +31,11 @@ export async function candleflipRoutes(server: FastifyInstance) {
     const userId = getAuthUser(request).userId;
     const body = z.object({
       pick: z.enum(['bullish', 'bearish']),
-      betAmount: z.number().int().positive().min(1_000_000),
+      betAmount: z.number().int().positive().min(1_000_000).max(env.CANDLEFLIP_MAX_BET_LAMPORTS),
     }).parse(request.body);
+
+    // Game-specific bet validation
+    validateGameBetLimits('candleflip', userId, body.betAmount);
 
     await validateBetLimits(userId, body.betAmount);
     const result = await betOnRound(userId, body.pick, body.betAmount);
@@ -67,7 +71,7 @@ export async function candleflipRoutes(server: FastifyInstance) {
   server.post('/create', { preHandler: requireAuth }, async (request, reply) => {
     const user = getAuthUser(request);
     const body = z.object({
-      betAmount: z.number().int().positive(),
+      betAmount: z.number().int().positive().min(1_000_000).max(env.CANDLEFLIP_MAX_BET_LAMPORTS),
       pick: z.enum(['bullish', 'bearish']),
     }).parse(request.body);
     try {

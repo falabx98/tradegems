@@ -14,7 +14,7 @@ import { env } from '../config/env.js';
 import { getRedis } from '../config/redis.js';
 import { requireGameEnabled } from '../utils/gameGates.js';
 import { auditLog } from '../utils/auditLog.js';
-import { validateBetLimits } from '../utils/betLimits.js';
+import { validateBetLimits, validateGameBetLimits } from '../utils/betLimits.js';
 import { checkPayoutOutlier } from '../utils/payoutMonitor.js';
 
 // In-memory store for prediction locks (maps lockRef → { userId, betAmount, fee, totalCost, ref, serverOutcome })
@@ -59,9 +59,12 @@ export async function predictionRoutes(server: FastifyInstance) {
     const userId = getAuthUser(request).userId;
 
     const body = z.object({
-      betAmount: z.number().int().positive(),
+      betAmount: z.number().int().positive().min(1_000_000).max(env.PREDICTIONS_MAX_BET_LAMPORTS),
       direction: z.enum(['up', 'down', 'sideways']),
     }).parse(request.body);
+
+    // Game-specific bet validation
+    validateGameBetLimits('predictions', userId, body.betAmount);
 
     const feeRate = env.PLATFORM_FEE_RATE;
     const fee = Math.floor(body.betAmount * feeRate);

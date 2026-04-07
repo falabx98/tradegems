@@ -7,7 +7,7 @@ import { RugGameService } from '../modules/rug-game/rugGame.service.js';
 import { getCurrentRound, joinRound, cashOut as roundCashOut, getRecentRounds } from '../modules/round-manager/rugRoundManager.js';
 import { requireGameEnabled } from '../utils/gameGates.js';
 import { auditLog } from '../utils/auditLog.js';
-import { validateBetLimits } from '../utils/betLimits.js';
+import { validateBetLimits, validateGameBetLimits } from '../utils/betLimits.js';
 import { recordOpsAlert } from '../utils/opsAlert.js';
 import { checkPayoutOutlier } from '../utils/payoutMonitor.js';
 import { env } from '../config/env.js';
@@ -42,6 +42,9 @@ export async function rugGameRoutes(server: FastifyInstance) {
     const body = z.object({
       betAmount: z.number().int().positive().min(1_000_000).max(env.RUG_MAX_BET_LAMPORTS),
     }).parse(request.body);
+
+    // Game-specific bet validation
+    validateGameBetLimits('rug-game', userId, body.betAmount);
 
     try {
       await validateBetLimits(userId, body.betAmount);

@@ -9,11 +9,13 @@ import { requireAuth, requireAdmin, getAuthUser } from '../middleware/auth.js';
 import { requireNotExcluded } from '../middleware/selfExclusion.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { requireGameEnabled } from '../utils/gameGates.js';
-import { validateBetLimits } from '../utils/betLimits.js';
+import { validateBetLimits, validateGameBetLimits } from '../utils/betLimits.js';
 import { env } from '../config/env.js';
 
-const placeBetSchema = z.object({
-  amount: z.number().int().positive().min(1_000_000).max(100_000_000_000),
+// Note: env is already imported below — placeBetSchema is created inside the route handler
+// to access env.SOLO_MAX_BET_LAMPORTS at runtime
+const placeBetSchemaBase = z.object({
+  amount: z.number().int().positive().min(1_000_000),
   riskTier: z.enum(['conservative', 'balanced', 'aggressive']),
   idempotencyKey: z.string().min(1).max(128),
 });
@@ -87,9 +89,16 @@ export async function gameplayRoutes(server: FastifyInstance) {
 
   server.post('/:id/bet', { preHandler: [requireAuth, requireNotExcluded] }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const body = placeBetSchema.parse(request.body);
+    const body = placeBetSchemaBase.refine(b => b.amount <= env.SOLO_MAX_BET_LAMPORTS, {
+      message: `Maximum bet is ${(env.SOLO_MAX_BET_LAMPORTS / 1e9).toFixed(2)} SOL during platform bootstrap phase.`,
+      path: ['amount'],
+    }).parse(request.body);
 
     const userId = getAuthUser(request).userId;
+
+    // Game-specific bet validation
+    validateGameBetLimits('solo', userId, body.amount);
+
     await validateBetLimits(userId, body.amount, Math.floor(body.amount * env.PLATFORM_FEE_RATE));
     const result = await betService.placeBet({
       userId,

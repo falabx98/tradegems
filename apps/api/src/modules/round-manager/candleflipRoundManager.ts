@@ -8,6 +8,8 @@ import { generateCandleflipChart, type Candle } from '../../utils/chartGenerator
 import { auditLog } from '../../utils/auditLog.js';
 import { recordFailedSettlement } from '../../utils/settlementRecovery.js';
 import { createWorkerReporter, withWorkerRecovery } from '../../utils/workerHealth.js';
+import { env } from '../../config/env.js';
+import { recordOpsAlert } from '../../utils/opsAlert.js';
 
 const WAITING_DURATION = 4000; // 4s
 const FLIPPING_DURATION = 5000; // 5s
@@ -231,6 +233,17 @@ export async function betOnRound(userId: string, pick: 'bullish' | 'bearish', be
   if (!state || state.status !== 'waiting') {
     return { success: false, message: 'No round in waiting phase.' };
   }
+
+  // Max bet guardrail
+  if (betAmount > env.CANDLEFLIP_MAX_BET_LAMPORTS) {
+    recordOpsAlert({
+      severity: 'warning', category: 'bet_cap_violation',
+      message: `Candleflip round bet rejected: ${betAmount} > max ${env.CANDLEFLIP_MAX_BET_LAMPORTS}`,
+      userId, game: 'candleflip', metadata: { betAmount, limit: env.CANDLEFLIP_MAX_BET_LAMPORTS },
+    }).catch(() => {});
+    return { success: false, message: `Maximum bet is ${(env.CANDLEFLIP_MAX_BET_LAMPORTS / 1e9).toFixed(2)} SOL during platform bootstrap phase.` };
+  }
+
   if (state.bets.some(b => b.userId === userId)) {
     return { success: false, message: 'Already bet in this round.' };
   }

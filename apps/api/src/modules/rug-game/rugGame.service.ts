@@ -7,10 +7,10 @@ import { MissionsService } from '../missions/missions.service.js';
 import { eq, and, desc, sql } from 'drizzle-orm';
 import { env } from '../../config/env.js';
 import { recordOpsAlert } from '../../utils/opsAlert.js';
+import { clampPayout as clampGamePayout, validateGameBetLimits } from '../../utils/betLimits.js';
 
 const HOUSE_EDGE = env.RUG_HOUSE_EDGE;
 const MAX_BET_LAMPORTS = env.RUG_MAX_BET_LAMPORTS;
-const MAX_PAYOUT_LAMPORTS = env.RUG_MAX_PAYOUT_LAMPORTS;
 const MAX_MULTIPLIER = env.RUG_MAX_MULTIPLIER;
 
 export class RugGameService {
@@ -43,14 +43,8 @@ export class RugGameService {
   async startGame(userId: string, betAmount: number) {
     if (betAmount < 1_000_000) throw new Error('Minimum bet is 0.001 SOL');
 
-    if (betAmount > MAX_BET_LAMPORTS) {
-      recordOpsAlert({
-        severity: 'warning', category: 'bet_cap_violation',
-        message: `Rug solo bet rejected: ${betAmount} > max ${MAX_BET_LAMPORTS}`,
-        userId, game: 'rug-game', metadata: { betAmount, limit: MAX_BET_LAMPORTS },
-      }).catch(() => {});
-      throw new Error('Maximum bet is 0.5 SOL during platform bootstrap phase.');
-    }
+    // Game-specific bet validation (shared helper)
+    validateGameBetLimits('rug-game', userId, betAmount);
 
     const gameId = crypto.randomUUID();
 
@@ -125,15 +119,9 @@ export class RugGameService {
     // Successful cash out — fee=0 because house edge is in the crash point; lockFunds only locked betAmount
     let payout = Math.floor(game.betAmount * clampedMultiplier);
 
-    // Apply max payout cap
-    if (payout > MAX_PAYOUT_LAMPORTS) {
-      recordOpsAlert({
-        severity: 'warning', category: 'payout_outlier',
-        message: `Rug solo payout truncated: ${payout} → ${MAX_PAYOUT_LAMPORTS}`,
-        userId, game: 'rug-game', metadata: { originalPayout: payout, cap: MAX_PAYOUT_LAMPORTS, multiplier: clampedMultiplier, betAmount: game.betAmount },
-      }).catch(() => {});
-      payout = MAX_PAYOUT_LAMPORTS;
-    }
+    // Apply max payout cap (shared helper)
+    const clamped = clampGamePayout('rug-game', userId, payout, { multiplier: clampedMultiplier, betAmount: game.betAmount });
+    payout = clamped.payout;
 
     await this.wallet.settlePayout(
       userId,

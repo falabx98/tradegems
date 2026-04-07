@@ -9,10 +9,10 @@ import { recordFailedSettlement } from '../../utils/settlementRecovery.js';
 import { createWorkerReporter, withWorkerRecovery } from '../../utils/workerHealth.js';
 import { env } from '../../config/env.js';
 import { recordOpsAlert } from '../../utils/opsAlert.js';
+import { clampPayout as clampGamePayout } from '../../utils/betLimits.js';
 
 const HOUSE_EDGE = env.RUG_HOUSE_EDGE;
 const MAX_BET_LAMPORTS = env.RUG_MAX_BET_LAMPORTS;
-const MAX_PAYOUT_LAMPORTS = env.RUG_MAX_PAYOUT_LAMPORTS;
 const MAX_ROUND_EXPOSURE_LAMPORTS = env.RUG_MAX_ROUND_EXPOSURE_LAMPORTS;
 const WAITING_DURATION = 5000; // 5s
 const RESOLVED_DURATION = 4000; // 4s pause after rug
@@ -385,14 +385,9 @@ export async function cashOut(userId: string): Promise<{ success: boolean; multi
       Math.floor(bet.betAmount * hiddenRugMultiplier),
     );
 
-    if (payout > MAX_PAYOUT_LAMPORTS) {
-      recordOpsAlert({
-        severity: 'warning', category: 'payout_outlier',
-        message: `Rug round payout truncated: ${payout} → ${MAX_PAYOUT_LAMPORTS}`,
-        userId, game: 'rug-game', metadata: { originalPayout: payout, cap: MAX_PAYOUT_LAMPORTS, multiplier, betAmount: bet.betAmount, roundId: state!.roundId },
-      }).catch(() => {});
-      payout = MAX_PAYOUT_LAMPORTS;
-    }
+    // Apply max payout cap (shared helper)
+    const clamped = clampGamePayout('rug-game', userId, payout, { multiplier, betAmount: bet.betAmount, roundId: state!.roundId });
+    payout = clamped.payout;
     bet.cashOutMultiplier = parseFloat(multiplier.toFixed(4));
     bet.status = 'cashed_out';
 

@@ -12,6 +12,9 @@ import { getDb } from '../../config/database.js';
 import { getRedis } from '../../config/redis.js';
 import { WalletService } from '../wallet/wallet.service.js';
 import { UserService } from '../user/user.service.js';
+import { env } from '../../config/env.js';
+import { recordOpsAlert } from '../../utils/opsAlert.js';
+import { clampPayout as clampGamePayout } from '../../utils/betLimits.js';
 
 export class RoundService {
   private db = getDb();
@@ -175,7 +178,12 @@ export class RoundService {
         bet.riskTier as RiskTier,
       );
 
-      const payoutLamports = Math.floor(result.payout);
+      let payoutLamports = Math.floor(result.payout);
+
+      // Max payout cap (shared helper)
+      const clamped = clampGamePayout('solo', bet.userId, payoutLamports, { multiplier: result.finalMultiplier, betAmount: bet.amount });
+      payoutLamports = clamped.payout;
+
       const resultType = payoutLamports > bet.amount ? 'win' : payoutLamports < bet.amount ? 'loss' : 'breakeven';
 
       // L9 fix: Settle balance FIRST — if this throws, bet stays 'active' and can be retried

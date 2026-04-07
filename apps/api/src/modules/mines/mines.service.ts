@@ -16,6 +16,9 @@ import { recordFailedSettlement } from '../../utils/settlementRecovery.js';
 import { UserService } from '../user/user.service.js';
 import { MissionsService } from '../missions/missions.service.js';
 import { checkPayoutOutlier } from '../../utils/payoutMonitor.js';
+import { env } from '../../config/env.js';
+import { recordOpsAlert } from '../../utils/opsAlert.js';
+import { clampPayout as clampGamePayout } from '../../utils/betLimits.js';
 import {
   generateBoard,
   generateServerSeed,
@@ -54,6 +57,16 @@ export class MinesService {
     // Validate mine count
     if (!(VALID_MINE_COUNTS as readonly number[]).includes(mineCount)) {
       throw new AppError(400, 'INVALID_MINE_COUNT', `Mine count must be one of: ${VALID_MINE_COUNTS.join(', ')}`);
+    }
+
+    // Max bet guardrail
+    if (betAmount > env.MINES_MAX_BET_LAMPORTS) {
+      recordOpsAlert({
+        severity: 'warning', category: 'bet_cap_violation',
+        message: `Mines bet rejected: ${betAmount} > max ${env.MINES_MAX_BET_LAMPORTS}`,
+        userId, game: 'mines', metadata: { betAmount, limit: env.MINES_MAX_BET_LAMPORTS },
+      }).catch(() => {});
+      throw new AppError(400, 'BET_EXCEEDS_CAP', `Maximum bet is ${(env.MINES_MAX_BET_LAMPORTS / 1e9).toFixed(2)} SOL during platform bootstrap phase.`);
     }
 
     // Check for existing active game (auto-expire timed out ones)
@@ -409,7 +422,11 @@ export class MinesService {
     board: number[],
     reason: 'manual' | 'cap_hit' | 'full_clear' = 'manual',
   ): Promise<RevealResult> {
-    const payout = calculatePayout(game.betAmount, multiplier);
+    let payout = calculatePayout(game.betAmount, multiplier);
+
+    // Max payout cap (shared helper)
+    const clamped = clampGamePayout('mines', game.userId, payout, { multiplier, betAmount: game.betAmount });
+    payout = clamped.payout;
 
     try {
       await this.wallet.settlePayout(game.userId, game.betAmount, 0, payout, 'SOL', {

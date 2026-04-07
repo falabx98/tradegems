@@ -7,6 +7,8 @@ import { auditLog } from '../../utils/auditLog.js';
 import { recordFailedSettlement } from '../../utils/settlementRecovery.js';
 import { UserService } from '../user/user.service.js';
 import { MissionsService } from '../missions/missions.service.js';
+import { env } from '../../config/env.js';
+import { recordOpsAlert } from '../../utils/opsAlert.js';
 
 const HOUSE_FEE_RATE = 0.05; // 5% rake
 
@@ -20,6 +22,15 @@ export class CandleflipService {
 
   async createGame(userId: string, betAmount: number, pick: 'bullish' | 'bearish') {
     if (betAmount < 1_000_000) throw new Error('Minimum bet is 0.001 SOL');
+
+    if (betAmount > env.CANDLEFLIP_MAX_BET_LAMPORTS) {
+      recordOpsAlert({
+        severity: 'warning', category: 'bet_cap_violation',
+        message: `Candleflip lobby bet rejected: ${betAmount} > max ${env.CANDLEFLIP_MAX_BET_LAMPORTS}`,
+        userId, game: 'candleflip', metadata: { betAmount, limit: env.CANDLEFLIP_MAX_BET_LAMPORTS },
+      }).catch(() => {});
+      throw new Error(`Maximum bet is ${(env.CANDLEFLIP_MAX_BET_LAMPORTS / 1e9).toFixed(2)} SOL during platform bootstrap phase.`);
+    }
 
     const gameId = crypto.randomUUID();
 

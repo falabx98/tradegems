@@ -36,6 +36,22 @@ const envSchema = z.object({
   RUG_MAX_PAYOUT_LAMPORTS: z.coerce.number().default(50_000_000_000),        // 50 SOL
   RUG_MAX_ROUND_EXPOSURE_LAMPORTS: z.coerce.number().default(100_000_000_000), // 100 SOL
   RUG_MAX_MULTIPLIER: z.coerce.number().min(2).default(100),                 // 100x cap
+
+  // Mines guardrails
+  MINES_MAX_BET_LAMPORTS: z.coerce.number().default(500_000_000),            // 0.5 SOL
+  MINES_MAX_PAYOUT_LAMPORTS: z.coerce.number().default(50_000_000_000),      // 50 SOL
+
+  // Predictions guardrails
+  PREDICTIONS_MAX_BET_LAMPORTS: z.coerce.number().default(500_000_000),      // 0.5 SOL
+  PREDICTIONS_MAX_PAYOUT_LAMPORTS: z.coerce.number().default(50_000_000_000), // 50 SOL
+
+  // Solo guardrails
+  SOLO_MAX_BET_LAMPORTS: z.coerce.number().default(500_000_000),             // 0.5 SOL
+  SOLO_MAX_PAYOUT_LAMPORTS: z.coerce.number().default(50_000_000_000),       // 50 SOL
+
+  // Candleflip guardrails
+  CANDLEFLIP_MAX_BET_LAMPORTS: z.coerce.number().default(500_000_000),       // 0.5 SOL
+  CANDLEFLIP_MAX_PAYOUT_LAMPORTS: z.coerce.number().default(50_000_000_000), // 50 SOL
 });
 
 const parsed = envSchema.safeParse(process.env);

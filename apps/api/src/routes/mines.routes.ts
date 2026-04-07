@@ -5,11 +5,12 @@ import { AppError } from '../middleware/errorHandler.js';
 import { MinesService } from '../modules/mines/mines.service.js';
 import { requireGameEnabled } from '../utils/gameGates.js';
 import { auditLog } from '../utils/auditLog.js';
-import { validateBetLimits } from '../utils/betLimits.js';
+import { validateBetLimits, validateGameBetLimits } from '../utils/betLimits.js';
 import { recordOpsAlert } from '../utils/opsAlert.js';
 import { VALID_MINE_COUNTS } from '../modules/mines/mines.types.js';
 import { getMultiplier, getNextMultiplier } from '../modules/mines/mines.math.js';
 import { requireNotExcluded } from '../middleware/selfExclusion.js';
+import { env } from '../config/env.js';
 
 export async function minesRoutes(server: FastifyInstance) {
   const service = new MinesService();
@@ -34,12 +35,15 @@ export async function minesRoutes(server: FastifyInstance) {
 
     const userId = getAuthUser(request).userId;
     const body = z.object({
-      betAmount: z.number().int().positive().min(1_000_000),
+      betAmount: z.number().int().positive().min(1_000_000).max(env.MINES_MAX_BET_LAMPORTS),
       mineCount: z.number().int().refine(
         (v) => (VALID_MINE_COUNTS as readonly number[]).includes(v),
         { message: `Mine count must be one of: ${VALID_MINE_COUNTS.join(', ')}` },
       ),
     }).parse(request.body);
+
+    // Game-specific bet + payout validation
+    validateGameBetLimits('mines', userId, body.betAmount);
 
     try {
       await validateBetLimits(userId, body.betAmount);

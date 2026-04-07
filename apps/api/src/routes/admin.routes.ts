@@ -1440,23 +1440,25 @@ export async function adminRoutes(server: FastifyInstance) {
   });
 
   // Acknowledge an ops alert
-  server.post('/ops/alerts/:id/acknowledge', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('support', 'operator', 'admin', 'superadmin')] }, async (request) => {
-    const { id } = parseParams(uuidParams, request.params);
-    const actor = getAuthUser(request);
-
+  server.post('/ops/alerts/:id/acknowledge', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('support', 'operator', 'admin', 'superadmin')] }, async (request, reply) => {
     try {
-      await db.execute(sql`
-        UPDATE ops_alerts SET acknowledged = true, acknowledged_by = ${actor.userId}, acknowledged_at = ${new Date().toISOString()}
-        WHERE id = ${id}
-      `);
-    } catch {
-      // Fallback if acknowledged_by/acknowledged_at columns don't exist yet
-      await db.execute(sql`
-        UPDATE ops_alerts SET acknowledged = true WHERE id = ${id}
-      `);
-    }
+      const { id } = parseParams(uuidParams, request.params);
+      const actor = getAuthUser(request);
+      const now = new Date().toISOString();
 
-    return { success: true };
+      await db.execute(sql`
+        UPDATE ops_alerts
+        SET acknowledged = true,
+            acknowledged_by = ${actor.userId}::uuid,
+            acknowledged_at = ${now}::timestamptz
+        WHERE id = ${id}::uuid
+      `);
+
+      return { success: true };
+    } catch (err: any) {
+      console.error('[Admin] Acknowledge alert error:', err.message, err.stack?.slice(0, 500));
+      return reply.status(500).send({ error: { code: 'ACKNOWLEDGE_FAILED', message: err.message } });
+    }
   });
 
   // Bulk acknowledge alerts by category

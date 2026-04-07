@@ -1439,31 +1439,27 @@ export async function adminRoutes(server: FastifyInstance) {
     return { data, count: (data as any[]).length };
   });
 
-  // Acknowledge an ops alert
-  server.post('/ops/alerts/:id/acknowledge', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('support', 'operator', 'admin', 'superadmin')] }, async (request, reply) => {
-    try {
-      const { id } = parseParams(uuidParams, request.params);
+  // Acknowledge ops alerts (single by id, or bulk by category/before)
+  // POST /ops/alerts/acknowledge { id?: string, category?: string, before?: string }
+  server.post('/ops/alerts/acknowledge', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('support', 'operator', 'admin', 'superadmin')] }, async (request) => {
+    const body = request.body as { id?: string; category?: string; before?: string };
+
+    if (body.id) {
+      // Single alert acknowledge
       const actor = getAuthUser(request);
       const now = new Date().toISOString();
-
       await db.execute(sql`
         UPDATE ops_alerts
         SET acknowledged = true,
-            acknowledged_by = ${actor.userId}::uuid,
-            acknowledged_at = ${now}::timestamptz
-        WHERE id = ${id}::uuid
+            acknowledged_by = ${actor.userId},
+            acknowledged_at = ${now}
+        WHERE id = ${body.id}
+          AND acknowledged = false
       `);
-
-      return { success: true };
-    } catch (err: any) {
-      console.error('[Admin] Acknowledge alert error:', err.message, err.stack?.slice(0, 500));
-      return reply.status(500).send({ error: { code: 'ACKNOWLEDGE_FAILED', message: err.message } });
+      return { success: true, acknowledged: 1 };
     }
-  });
 
-  // Bulk acknowledge alerts by category
-  server.post('/ops/alerts/acknowledge-bulk', { config: { rateLimit: RATE_LIMIT_WRITE }, preHandler: [requireRole('operator', 'admin', 'superadmin')] }, async (request) => {
-    const body = request.body as { category?: string; before?: string };
+    // Bulk acknowledge
     let query = sql`UPDATE ops_alerts SET acknowledged = true WHERE acknowledged = false`;
     if (body.category) query = sql`${query} AND category = ${body.category}`;
     if (body.before) query = sql`${query} AND created_at < ${body.before}`;

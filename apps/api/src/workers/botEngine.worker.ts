@@ -703,7 +703,7 @@ async function recoverOrphanedBotGames(): Promise<void> {
   if (botUsers.length === 0) return;
   const db = getDb();
   const botIds = botUsers.map(b => b.id);
-  const thirtySecsAgo = new Date(Date.now() - 30_000);
+  const thirtySecsAgo = new Date(Date.now() - 30_000).toISOString();
 
   try {
     // Resolve orphaned active rug games
@@ -713,7 +713,7 @@ async function recoverOrphanedBotGames(): Promise<void> {
       .where(and(
         eq(rugGames.status, 'active'),
         inArray(rugGames.userId, botIds),
-        sql`${rugGames.createdAt} < ${thirtySecsAgo}`,
+        sql`${rugGames.createdAt} < ${thirtySecsAgo}::timestamptz`,
       ))
       .returning({ id: rugGames.id });
 
@@ -728,7 +728,7 @@ async function recoverOrphanedBotGames(): Promise<void> {
       .where(and(
         eq(candleflipGames.status, 'open'),
         inArray(candleflipGames.creatorId, botIds),
-        sql`${candleflipGames.createdAt} < ${thirtySecsAgo}`,
+        sql`${candleflipGames.createdAt} < ${thirtySecsAgo}::timestamptz`,
       ))
       .returning({ id: candleflipGames.id });
 

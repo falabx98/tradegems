@@ -1061,3 +1061,23 @@ export const analyticsEvents = pgTable('analytics_events', {
   index('idx_analytics_event').on(table.event),
   index('idx_analytics_created').on(table.createdAt),
 ]);
+
+// ============================================================
+// EMAILS
+// ============================================================
+
+export const emails = pgTable('emails', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+  toAddress: text('to_address').notNull(),
+  subject: text('subject').notNull(),
+  template: text('template').notNull(),
+  status: text('status').notNull(),
+  resendId: text('resend_id'),
+  errorMessage: text('error_message'),
+  metadata: jsonb('metadata').$type<Record<string, any>>(),
+  sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_emails_user_id').on(table.userId),
+  index('idx_emails_sent_at').on(table.sentAt),
+]);

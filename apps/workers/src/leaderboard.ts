@@ -42,7 +42,7 @@ export class LeaderboardWorker {
       SELECT
         u.id as user_id,
         u.username,
-        up.level,
+        u.level,
         u.vip_tier,
         COALESCE(SUM(br.payout_amount - b.amount), 0) as net_profit,
         COUNT(*) as rounds
@@ -51,7 +51,7 @@ export class LeaderboardWorker {
       JOIN users u ON u.id = br.user_id
       JOIN user_profiles up ON up.user_id = u.id
       WHERE br.created_at > now() - interval '24 hours'
-      GROUP BY u.id, u.username, up.level, u.vip_tier
+      GROUP BY u.id, u.username, u.level, u.vip_tier
       ORDER BY net_profit DESC
       LIMIT 100
     `) as unknown as Array<Record<string, unknown>>;
@@ -81,7 +81,7 @@ export class LeaderboardWorker {
       SELECT
         u.id as user_id,
         u.username,
-        up.level,
+        u.level,
         u.vip_tier,
         COALESCE(SUM(br.payout_amount - b.amount), 0) as net_profit,
         COUNT(*) as rounds
@@ -90,7 +90,7 @@ export class LeaderboardWorker {
       JOIN users u ON u.id = br.user_id
       JOIN user_profiles up ON up.user_id = u.id
       WHERE br.created_at > now() - interval '7 days'
-      GROUP BY u.id, u.username, up.level, u.vip_tier
+      GROUP BY u.id, u.username, u.level, u.vip_tier
       ORDER BY net_profit DESC
       LIMIT 100
     `) as unknown as Array<Record<string, unknown>>;
@@ -120,7 +120,7 @@ export class LeaderboardWorker {
       SELECT
         u.id as user_id,
         u.username,
-        up.level,
+        u.level,
         u.vip_tier,
         COALESCE(up.total_won - up.total_wagered, 0) as net_profit,
         up.rounds_played as rounds

@@ -43,10 +43,21 @@ export function BattleScreen() {
   const [betAmount, setBetAmount] = useState(0);
   const [countdown, setCountdown] = useState(0);
   const [feeRate, setFeeRate] = useState<number>((globalThis as any).__serverFeeRate ?? 0.05);
+  const [battleTiers, setBattleTiers] = useState<{ label: string; lamports: number }[]>([
+    { label: '0.1', lamports: 100_000_000 },
+  ]);
 
-  // Fetch server fee rate for dynamic display
+  // Fetch server config (fee rate + battle tiers)
   useEffect(() => {
-    getServerConfig().then(cfg => setFeeRate(cfg.feeRate));
+    getServerConfig().then(cfg => {
+      setFeeRate(cfg.feeRate);
+      if (cfg.buyInTiers && cfg.buyInTiers.length > 0) {
+        setBattleTiers(cfg.buyInTiers.map(t => ({
+          label: String(t / 1_000_000_000),
+          lamports: t,
+        })));
+      }
+    });
   }, []);
 
   // Chart/active phase state
@@ -267,13 +278,7 @@ export function BattleScreen() {
 
         <div style={{ padding: '0 20px 8px' }}>
           <BetPanel
-            presets={[
-              { label: '0.1', lamports: 100_000_000 },
-              { label: '0.25', lamports: 250_000_000 },
-              { label: '0.5', lamports: 500_000_000 },
-              { label: '1', lamports: 1_000_000_000 },
-              { label: '2', lamports: 2_000_000_000 },
-            ]}
+            presets={battleTiers}
             selectedAmount={betAmount}
             onAmountChange={setBetAmount}
             balance={profile.balance}

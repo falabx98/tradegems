@@ -158,14 +158,14 @@ export async function apiFetch<T = unknown>(
 
 // ─── Server Config Cache (M1 fix: fee rate from server) ─────────────────────
 
-let _serverConfig: { feeRate: number; minBetLamports: number; maxBetLamports: number } | null = null;
+let _serverConfig: { feeRate: number; minBetLamports: number; maxBetLamports: number; buyInTiers?: number[] } | null = null;
 let _configFetchedAt = 0;
 
 export async function getServerConfig() {
   const now = Date.now();
   if (_serverConfig && now - _configFetchedAt < 300_000) return _serverConfig; // Cache 5 min
   try {
-    const data = await apiFetch<{ feeRate: number; minBetLamports: number; maxBetLamports: number }>('/v1/config');
+    const data = await apiFetch<{ feeRate: number; minBetLamports: number; maxBetLamports: number; buyInTiers?: number[] }>('/v1/config');
     _serverConfig = data;
     _configFetchedAt = now;
     return data;

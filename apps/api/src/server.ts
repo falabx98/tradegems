@@ -141,7 +141,7 @@ export async function buildServer() {
     feeRate: env.PLATFORM_FEE_RATE,
     minBetLamports: 1_000_000,
     maxBetLamports: env.MAX_BET_LAMPORTS,
-    buyInTiers: [100_000_000, 250_000_000, 500_000_000, 1_000_000_000, 2_000_000_000],
+    buyInTiers: (await import('./routes/battle.routes.js')).getValidBuyInTiers(),
     tournamentRounds: 3,
     roundDurationMs: 15000,
   }));

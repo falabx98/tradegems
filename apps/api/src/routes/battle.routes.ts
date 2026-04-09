@@ -11,14 +11,20 @@ import {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-/** Valid buy-in tiers in lamports */
-const BUYIN_TIERS = [
+/** All possible buy-in tiers in lamports (filtered at runtime by caps) */
+const ALL_BUYIN_TIERS = [
   100_000_000,    // 0.1 SOL
   250_000_000,    // 0.25 SOL
   500_000_000,    // 0.5 SOL
   1_000_000_000,  // 1 SOL
   2_000_000_000,  // 2 SOL
 ];
+
+/** Returns tiers filtered against the active MAX_BET and BATTLE_MAX_BET caps */
+export function getValidBuyInTiers(): number[] {
+  const cap = Math.min(env.MAX_BET_LAMPORTS, env.BATTLE_MAX_BET_LAMPORTS);
+  return ALL_BUYIN_TIERS.filter(t => t <= cap);
+}
 
 const FEE_RATE = env.PLATFORM_FEE_RATE; // Unified fee rate from env (default 5%)
 const MIN_PLAYERS = 2;            // Lowered: real players only (no bots)
@@ -574,14 +580,14 @@ export async function battleRoutes(server: FastifyInstance) {
     }
 
     // Group by buy-in tier
-    const tiers = BUYIN_TIERS.map(tier => ({
+    const tiers = getValidBuyInTiers().map(tier => ({
       buyIn: tier,
       label: `${tier / 1_000_000_000} SOL`,
       rooms: openRooms.filter(r => r.buyIn === tier),
       openCount: openRooms.filter(r => r.buyIn === tier).length,
     }));
 
-    return { tiers, buyInOptions: BUYIN_TIERS };
+    return { tiers, buyInOptions: getValidBuyInTiers() };
   });
 
   // ─── Join / Create Room ──────────────────────────────────
@@ -589,7 +595,7 @@ export async function battleRoutes(server: FastifyInstance) {
     const user = getAuthUser(request);
 
     const body = z.object({
-      buyIn: z.number().int().refine(v => BUYIN_TIERS.includes(v), {
+      buyIn: z.number().int().refine(v => getValidBuyInTiers().includes(v), {
         message: 'Invalid buy-in tier',
       }),
     }).parse(request.body);
@@ -848,13 +854,13 @@ export async function battleRoutes(server: FastifyInstance) {
 
     return {
       phase: 'lobby',
-      tiers: BUYIN_TIERS.map(tier => ({
+      tiers: getValidBuyInTiers().map(tier => ({
         buyIn: tier,
         label: `${tier / 1_000_000_000} SOL`,
         rooms: openRooms.filter(r => r.buyIn === tier),
         openCount: openRooms.filter(r => r.buyIn === tier).length,
       })),
-      buyInOptions: BUYIN_TIERS,
+      buyInOptions: getValidBuyInTiers(),
     };
   });
 

@@ -6,7 +6,9 @@ import {
   deposits, withdrawals, roundPools, roundNodes, riskFlags,
   userDepositWallets, referralCodes, referrals, referralEarnings,
   chatMessages, bonusCodes, bonusCodeRedemptions, failedSettlements,
+  emails,
 } from '@tradingarena/db';
+import { createEmailService } from '@tradingarena/email-service';
 import { getDb } from '../config/database.js';
 import { requireAdmin, requireRole, getAuthUser } from '../middleware/auth.js';
 import { getTreasuryAddress, getSolanaConnection } from '../modules/solana/treasury.js';
@@ -1817,6 +1819,43 @@ export async function adminRoutes(server: FastifyInstance) {
       message: 'Casino reset complete. All non-admin users and game data deleted.',
       adminUsersPreserved: adminIds.length,
       deletedRows: counts,
+    };
+  });
+
+  // ── Email test endpoint ──────────────────────────────────────
+  server.post('/email/test', {
+    config: { rateLimit: RATE_LIMIT_WRITE },
+  }, async (request, reply) => {
+    const schema = z.object({ to: z.string().email() });
+    const { to } = schema.parse(request.body);
+
+    const emailService = createEmailService();
+    const result = await emailService.sendEmail({
+      to,
+      subject: 'TradeGems test email',
+      html: '<p>Si recibes esto, el sistema de email funciona correctamente.</p>',
+    });
+
+    try {
+      await db.insert(emails).values({
+        userId: null,
+        toAddress: to,
+        subject: 'TradeGems test email',
+        template: 'admin-test',
+        status: result.status,
+        resendId: result.resendId || null,
+        errorMessage: result.error || null,
+        metadata: { source: 'admin-test' },
+      });
+    } catch (err) {
+      request.log.error({ err }, 'Failed to log test email to DB');
+    }
+
+    return {
+      success: result.status !== 'failed',
+      status: result.status,
+      resendId: result.resendId,
+      error: result.error,
     };
   });
 }

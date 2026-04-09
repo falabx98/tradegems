@@ -6,6 +6,9 @@ import { ReferralService } from '../modules/referral/referral.service.js';
 import { requireAuth, getAuthUser } from '../middleware/auth.js';
 import { AppError } from '../middleware/errorHandler.js';
 import { env } from '../config/env.js';
+import { emails } from '@tradingarena/db';
+import { createEmailService, welcomeEmail } from '@tradingarena/email-service';
+import { getDb } from '../config/database.js';
 
 const registerSchema = z.object({
   email: z.string().email(),
@@ -42,6 +45,34 @@ export async function authRoutes(server: FastifyInstance) {
         // Don't fail registration if referral code is invalid
       }
     }
+
+    // Fire-and-forget welcome email (never blocks signup response)
+    const welcome = welcomeEmail({ username: body.username });
+    const emailService = createEmailService();
+    emailService.sendEmail({
+      to: body.email,
+      subject: welcome.subject,
+      html: welcome.html,
+      metadata: { template: 'welcome', userId },
+    }).then(async (result) => {
+      try {
+        const db = getDb();
+        await db.insert(emails).values({
+          userId,
+          toAddress: body.email,
+          subject: welcome.subject,
+          template: 'welcome',
+          status: result.status,
+          resendId: result.resendId || null,
+          errorMessage: result.error || null,
+          metadata: { source: 'signup' },
+        });
+      } catch (err) {
+        request.log.error({ err, userId }, 'Failed to log welcome email to DB');
+      }
+    }).catch((err) => {
+      request.log.error({ err, userId }, 'Welcome email send failed');
+    });
 
     const { sessionId, refreshToken } = await authService.createSession(userId, {
       ip: request.ip,

@@ -7,6 +7,7 @@ import { trackOnline } from '../routes/chat.routes.js';
 import { generateSimulatedChart } from '../utils/chartGenerator.js';
 import { joinRound as rugJoinRound, getCurrentRound as getRugCurrentRound } from '../modules/round-manager/rugRoundManager.js';
 import { betOnRound as candleflipBetOnRound, getCandleflipCurrentRound } from '../modules/round-manager/candleflipRoundManager.js';
+import { env } from '../config/env.js';
 
 // ─── Types ──────────────────────────────────────────────────
 interface BotUser {
@@ -248,8 +249,10 @@ async function simulateSoloPlay(bot: BotUser): Promise<void> {
   try {
     const db = getDb();
 
-    // Generate bet amount: 10M to 1B lamports (0.01 - 1 SOL)
-    const betAmount = randomBetween(10_000_000, 1_000_000_000);
+    // Generate bet amount within game-specific cap
+    const soloMax = env.SOLO_MAX_BET_LAMPORTS;
+    const soloMin = Math.min(10_000_000, Math.floor(soloMax * 0.1));
+    const betAmount = randomBetween(soloMin, soloMax);
     const multiplier = generateMultiplier();
     const payout = multiplier > 0 ? Math.floor(betAmount * multiplier) : 0;
     const isWin = multiplier >= 1.0;
@@ -371,7 +374,9 @@ async function simulatePrediction(bot: BotUser): Promise<void> {
   try {
     const db = getDb();
     const direction = Math.random() > 0.5 ? 'up' : 'down';
-    const betAmount = randomBetween(10_000_000, 500_000_000);
+    const predMax = env.PREDICTIONS_MAX_BET_LAMPORTS;
+    const predMin = Math.min(10_000_000, Math.floor(predMax * 0.1));
+    const betAmount = randomBetween(predMin, predMax);
 
     // 48% win rate for predictions
     const isWin = Math.random() < 0.48;
@@ -416,7 +421,9 @@ async function botJoinRugRound(bot: BotUser): Promise<void> {
     const round = await getRugCurrentRound();
     if (!round || round.status !== 'waiting') return;
 
-    const betAmounts = [10_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000];
+    const rugMax = env.RUG_MAX_BET_LAMPORTS;
+    const betAmounts = [10_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000].filter(a => a <= rugMax);
+    if (betAmounts.length === 0) return;
     const betAmount = pickRandom(betAmounts);
 
     const result = await rugJoinRound(bot.id, betAmount);
@@ -435,7 +442,9 @@ async function botJoinCandleflipRound(bot: BotUser): Promise<void> {
     const round = await getCandleflipCurrentRound();
     if (!round || round.status !== 'waiting') return;
 
-    const betAmounts = [10_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000];
+    const cfMax = env.CANDLEFLIP_MAX_BET_LAMPORTS;
+    const betAmounts = [10_000_000, 50_000_000, 100_000_000, 250_000_000, 500_000_000].filter(a => a <= cfMax);
+    if (betAmounts.length === 0) return;
     const betAmount = pickRandom(betAmounts);
     const pick = Math.random() > 0.5 ? 'bullish' : 'bearish' as const;
 

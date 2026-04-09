@@ -1,0 +1,23 @@
+{
+  "name": "@tradingarena/email-service",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "resend": "^4.1.2"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.3"
+  }
+}

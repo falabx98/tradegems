@@ -28,6 +28,7 @@ export const WORKER_NAMES = [
   'weekly-race',
   'data-retention',
   'withdrawal-queue',
+  'alert-dispatcher',
 ] as const;
 
 export type WorkerName = typeof WORKER_NAMES[number];

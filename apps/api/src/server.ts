@@ -291,6 +291,12 @@ export async function buildServer() {
     startWithdrawalProcessorWorker();
   } catch (e) { server.log.error(e, 'Failed to start withdrawal processor worker'); }
 
+  // Start alert dispatcher (Telegram/Discord notifications for ops_alerts)
+  try {
+    const { startAlertDispatcher } = await import('./workers/alertDispatcher.worker.js');
+    startAlertDispatcher();
+  } catch (e) { server.log.error(e, 'Failed to start alert dispatcher'); }
+
   // Start worker health supervisor
   try {
     const { startWorkerSupervisor } = await import('./utils/workerHealth.js');

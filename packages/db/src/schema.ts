@@ -39,6 +39,9 @@ export const users = pgTable('users', {
   lastDemoRefill: timestamp('last_demo_refill', { withTimezone: true }),
   avatarUrl: text('avatar_url'),
   isBot: boolean('is_bot').notNull().default(false),
+  contactTelegram: text('contact_telegram'),
+  contactDiscord: text('contact_discord'),
+  notifyOnWithdrawalDelay: boolean('notify_on_withdrawal_delay').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
@@ -176,6 +179,9 @@ export const withdrawals = pgTable('withdrawals', {
   reviewedBy: uuid('reviewed_by').references(() => users.id),
   reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
   completedAt: timestamp('completed_at', { withTimezone: true }),
+  contactedAt: timestamp('contacted_at', { withTimezone: true }),
+  contactNotes: text('contact_notes'),
+  delayReason: text('delay_reason'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
   index('idx_withdrawals_user').on(table.userId, table.createdAt),

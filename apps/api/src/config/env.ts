@@ -53,6 +53,10 @@ const envSchema = z.object({
   CANDLEFLIP_MAX_BET_LAMPORTS: z.coerce.number().default(500_000_000),       // 0.5 SOL
   CANDLEFLIP_MAX_PAYOUT_LAMPORTS: z.coerce.number().default(50_000_000_000), // 50 SOL
 
+  // Battle/Tournament guardrails
+  BATTLE_MAX_BET_LAMPORTS: z.coerce.number().default(100_000_000),           // 0.1 SOL
+  BATTLE_MAX_PAYOUT_LAMPORTS: z.coerce.number().default(1_000_000_000),      // 1 SOL
+
   // Treasury monitoring & withdrawal queue
   WITHDRAWAL_DELAY_HOURS: z.coerce.number().min(0).default(24),                        // 24h delay before processing
   WITHDRAWAL_WORKER_INTERVAL_MS: z.coerce.number().default(300_000),                   // Process queue every 5 min

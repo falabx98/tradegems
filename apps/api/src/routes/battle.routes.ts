@@ -3,6 +3,7 @@ import { z } from 'zod';
 import crypto from 'node:crypto';
 import { requireAuth, getAuthUser, optionalAuth } from '../middleware/auth.js';
 import { env } from '../config/env.js';
+import { validateBetLimits, validateGameBetLimits } from '../utils/betLimits.js';
 import {
   DEFAULT_ENGINE_CONFIG,
   generateRound,
@@ -592,6 +593,11 @@ export async function battleRoutes(server: FastifyInstance) {
         message: 'Invalid buy-in tier',
       }),
     }).parse(request.body);
+
+    // Validate bet limits (global + game-specific) before room search/creation
+    const fee = Math.floor(body.buyIn * FEE_RATE);
+    await validateBetLimits(user.userId, body.buyIn, fee);
+    validateGameBetLimits('battle', user.userId, body.buyIn);
 
     // Check if player is already in an active room
     for (const room of rooms.values()) {

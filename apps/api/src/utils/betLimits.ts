@@ -13,7 +13,7 @@ import { getCircuitBreakerState } from './treasuryMonitor.js';
 
 // ─── Game-specific limits lookup ────────────────────────────
 
-export type HouseGame = 'rug-game' | 'mines' | 'predictions' | 'solo' | 'candleflip';
+export type HouseGame = 'rug-game' | 'mines' | 'predictions' | 'solo' | 'candleflip' | 'battle';
 
 interface GameLimits {
   maxBet: number;
@@ -32,6 +32,8 @@ function getGameLimits(game: HouseGame): GameLimits {
       return { maxBet: env.SOLO_MAX_BET_LAMPORTS, maxPayout: env.SOLO_MAX_PAYOUT_LAMPORTS };
     case 'candleflip':
       return { maxBet: env.CANDLEFLIP_MAX_BET_LAMPORTS, maxPayout: env.CANDLEFLIP_MAX_PAYOUT_LAMPORTS };
+    case 'battle':
+      return { maxBet: env.BATTLE_MAX_BET_LAMPORTS, maxPayout: env.BATTLE_MAX_PAYOUT_LAMPORTS };
   }
 }
 
